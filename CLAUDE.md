@@ -18,6 +18,10 @@ Interface en **français**.
 
 Projet développé pendant le Build Challenge (Unaite, MWM, Apple, ⌘+F), les 15 et 16 octobre 2026. Équipe de deux développeurs. Objectif : une app fonctionnelle et un build soumis sur App Store Connect à la fin du deuxième jour. Le temps est très limité : privilégier ce qui marche et se démontre.
 
+**Esprit du hackathon :** le Build Challenge vise à tirer parti de l'écosystème Apple. Quand une technologie Apple répond au besoin (Foundation Models, Vision, HealthKit, Liquid Glass, Apple Watch…), la préférer à une solution générique et la mettre en valeur dans la démo. Proposer les technologies Apple qui enrichiraient l'app, mais ne pas les ajouter sans validation. Le parcours principal de la démo reste prioritaire : une technologie de plus ne doit pas le mettre en danger.
+
+**Apple Watch :** prévue dans un second temps, dans une cible watchOS séparée ; usage à définir. Ne rien construire pour la montre tant que cette cible n'existe pas.
+
 ## Environnement
 
 - Xcode 27.1, Swift 6.4, SDK iOS 27.1
