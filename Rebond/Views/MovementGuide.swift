@@ -1,7 +1,7 @@
 import SwiftUI
 import Vision
 
-/// Stick figure doing the exercise in a loop. The patient steps inside it to be well framed:
+/// Simple outline of a person doing the exercise in a loop. The patient steps inside it to be well framed:
 /// it turns yellow when they are close, then green and still once their body lines up with it.
 struct MovementGuide: View {
     typealias Joint = VNHumanBodyPoseObservation.JointName
@@ -14,7 +14,7 @@ struct MovementGuide: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private static let limbs: [(Joint, Joint)] = [
-        (.leftShoulder, .rightShoulder), (.leftHip, .rightHip),
+        (.neck, .nose),
         (.leftShoulder, .leftElbow), (.leftElbow, .leftWrist),
         (.rightShoulder, .rightElbow), (.rightElbow, .rightWrist),
         (.leftHip, .leftKnee), (.leftKnee, .leftAnkle),
@@ -32,15 +32,15 @@ struct MovementGuide: View {
             TimelineView(.animation(paused: reduceMotion || placement == .aligned)) { timeline in
                 Canvas { context, _ in
                     let progress = placement == .aligned || reduceMotion ? 0 : Self.progress(at: timeline.date)
-                    let figure = Self.stickFigure(exercise.guideRest, exercise.guideTarget, progress: progress, in: box)
+                    let figure = Self.outline(exercise.guideRest, exercise.guideTarget, progress: progress, in: box)
                     let color: Color = switch placement {
                     case .aligned: .green
                     case .almost: .yellow
                     default: .white
                     }
                     // A dark edge under the line keeps it visible on a bright room.
-                    context.stroke(figure, with: .color(.black.opacity(0.35)), style: StrokeStyle(lineWidth: 8, lineCap: .round, lineJoin: .round))
-                    context.stroke(figure, with: .color(color), style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
+                    context.stroke(figure, with: .color(.black.opacity(0.35)), style: StrokeStyle(lineWidth: 7, lineJoin: .round))
+                    context.stroke(figure, with: .color(color), style: StrokeStyle(lineWidth: 3.5, lineJoin: .round))
                 }
             }
             .onChange(of: placement, initial: true) { onPlacement(placement) }
@@ -80,7 +80,8 @@ struct MovementGuide: View {
         return held * held * (3 - 2 * held)
     }
 
-    private static func stickFigure(_ rest: GuidePose, _ target: GuidePose, progress: Double, in box: CGRect) -> Path {
+    /// The body's outline: limbs of even thickness, a rounded torso and a round head, merged into one contour.
+    private static func outline(_ rest: GuidePose, _ target: GuidePose, progress: Double, in box: CGRect) -> Path {
         func point(_ joint: Joint) -> CGPoint? {
             guard let a = rest[joint], let b = target[joint] else { return nil }
             return CGPoint(
@@ -88,23 +89,28 @@ struct MovementGuide: View {
                 y: box.minY + (a.y + (b.y - a.y) * progress) * box.height
             )
         }
+        let thickness = box.height * 0.065
 
-        var figure = Path()
+        var bones = Path()
         for (a, b) in limbs {
             guard let pointA = point(a), let pointB = point(b) else { continue }
-            figure.move(to: pointA)
-            figure.addLine(to: pointB)
+            bones.move(to: pointA)
+            bones.addLine(to: pointB)
         }
-        // Spine, from the neck to the middle of the hips.
-        if let neck = point(.neck), let leftHip = point(.leftHip), let rightHip = point(.rightHip) {
-            figure.move(to: neck)
-            figure.addLine(to: CGPoint(x: (leftHip.x + rightHip.x) / 2, y: (leftHip.y + rightHip.y) / 2))
+        var outline = bones.strokedPath(StrokeStyle(lineWidth: thickness, lineCap: .round, lineJoin: .round))
+
+        if let leftShoulder = point(.leftShoulder), let rightShoulder = point(.rightShoulder),
+           let leftHip = point(.leftHip), let rightHip = point(.rightHip) {
+            var torso = Path()
+            torso.addLines([leftShoulder, rightShoulder, rightHip, leftHip])
+            torso.closeSubpath()
+            outline = outline.union(torso.strokedPath(StrokeStyle(lineWidth: thickness, lineJoin: .round)).union(torso))
         }
         if let head = point(.nose) {
-            let radius = box.height * 0.055
-            figure.addEllipse(in: CGRect(x: head.x - radius, y: head.y - radius, width: radius * 2, height: radius * 2))
+            let radius = box.height * 0.06
+            outline = outline.union(Path(ellipseIn: CGRect(x: head.x - radius, y: head.y - radius, width: radius * 2, height: radius * 2)))
         }
-        return figure
+        return outline
     }
 
     private func placement(in size: CGSize, box: CGRect) -> GuidePlacement {
