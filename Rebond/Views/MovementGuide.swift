@@ -54,7 +54,7 @@ struct MovementGuide: View {
     /// on them: their height on screen depends on how the phone is set, not on where the patient stands.
     private func box(in size: CGSize) -> CGRect {
         let height = size.height * 0.6
-        let width = height * 0.5
+        let width = height * 0.65
         var top = size.height * 0.28
         if let feet = bodyPoint(.leftAnkle, .rightAnkle, in: size),
            let guideFeet = exercise.guideRest[.leftAnkle]?.y {
@@ -100,7 +100,7 @@ struct MovementGuide: View {
             if rightArm.contains(joint) { p.x += rightShift }
             return CGPoint(x: box.minX + p.x * box.width, y: box.minY + p.y * box.height)
         }
-        let thickness = box.height * 0.065
+        let thickness = box.height * 0.08
 
         var bones = Path()
         for (a, b) in limbs {
