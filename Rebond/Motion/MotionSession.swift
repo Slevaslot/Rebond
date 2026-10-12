@@ -40,6 +40,8 @@ final class MotionSession {
     private(set) var repCount = 0
     private(set) var incompleteCount = 0
     private(set) var feedback: Feedback?
+    /// Fault to show in red on the body: the live posture problem, or the last rejected movement for a moment.
+    private(set) var faultToHighlight: Correction?
     var isMuted = false {
         didSet { coach.isMuted = isMuted }
     }
@@ -53,6 +55,11 @@ final class MotionSession {
     /// Consecutive frames without a body, so a single missed detection doesn't flash the placement hint.
     @ObservationIgnored private var missedFrames = 0
     @ObservationIgnored private var feedbackDismissal: Task<Void, Never>?
+    @ObservationIgnored private var heldFault: Correction?
+    @ObservationIgnored private var heldFaultRelease: Task<Void, Never>?
+    /// "Plus lentement" is said at most once every few repetitions, so it doesn't become noise.
+    @ObservationIgnored private var lastTempoReminder = -10
+    private let tempoReminderInterval = 3
 
     init(exercise: CatalogExercise, targetReps: Int) {
         self.exercise = exercise
@@ -119,6 +126,9 @@ final class MotionSession {
         incompleteCount = 0
         feedbackDismissal?.cancel()
         feedback = nil
+        heldFault = nil
+        faultToHighlight = nil
+        lastTempoReminder = -10
         coach.say("Restez debout, immobile")
     }
 
@@ -137,6 +147,7 @@ final class MotionSession {
 
         guard phase != .finished else { return }
         depthProgress = update.progress
+        faultToHighlight = update.posture ?? heldFault
 
         switch update.event {
         case .calibrated:
@@ -148,20 +159,40 @@ final class MotionSession {
                 phase = .finished
                 depthProgress = 0
                 coach.say("\(repCount). Série terminée, bravo !")
-            } else if let correction = result.correction {
-                show(Feedback(message: correction.message, isPositive: false))
-                coach.say("\(repCount). \(String(localized: correction.message))")
+            } else if result.tooFast {
+                if repCount - lastTempoReminder >= tempoReminderInterval {
+                    lastTempoReminder = repCount
+                    show(Feedback(message: Correction.slowDown.message, isPositive: false))
+                    coach.say("\(repCount). \(String(localized: Correction.slowDown.message))")
+                } else {
+                    coach.say("\(repCount)")
+                }
             } else {
                 show(Feedback(message: "Bien !", isPositive: true))
                 coach.say("\(repCount)")
             }
         case .repIncomplete:
             incompleteCount += 1
+        case .bottomReached:
+            coach.say("Remontez")
         case .correction(let correction):
             show(Feedback(message: correction.message, isPositive: false))
             coach.say(correction.message)
+            hold(correction)
         case nil:
             break
+        }
+    }
+
+    /// Keeps a rejected movement's fault highlighted for a moment, so the patient sees what went wrong.
+    private func hold(_ fault: Correction) {
+        heldFault = fault
+        faultToHighlight = fault
+        heldFaultRelease?.cancel()
+        heldFaultRelease = Task {
+            try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled else { return }
+            self.heldFault = nil
         }
     }
 

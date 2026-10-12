@@ -8,6 +8,8 @@ struct SkeletonOverlay: View {
     let skeleton: PoseSkeleton
     let highlightedJoints: Set<Joint>
     let highlightColor: Color
+    /// Body part at fault, drawn in red above everything else.
+    var faultyJoints: Set<Joint> = []
 
     private static let bones: [(Joint, Joint)] = [
         (.leftShoulder, .rightShoulder),
@@ -34,23 +36,38 @@ struct SkeletonOverlay: View {
                 var path = Path()
                 path.move(to: place(pointA))
                 path.addLine(to: place(pointB))
+                let isFaulty = faultyJoints.contains(a) && faultyJoints.contains(b)
                 let isHighlighted = highlightedJoints.contains(a) && highlightedJoints.contains(b)
                 context.stroke(
                     path,
-                    with: .color(isHighlighted ? highlightColor : .white.opacity(0.6)),
-                    style: StrokeStyle(lineWidth: isHighlighted ? 7 : 3, lineCap: .round)
+                    with: .color(isFaulty ? .red : isHighlighted ? highlightColor : .white.opacity(0.6)),
+                    style: StrokeStyle(lineWidth: isFaulty || isHighlighted ? 7 : 3, lineCap: .round)
                 )
             }
 
             for (joint, point) in skeleton.points where Self.bones.contains(where: { $0.0 == joint || $0.1 == joint }) {
+                let isFaulty = faultyJoints.contains(joint)
                 let isHighlighted = highlightedJoints.contains(joint)
-                let radius: CGFloat = isHighlighted ? 8 : 5
+                let radius: CGFloat = isFaulty || isHighlighted ? 8 : 5
                 let center = place(point)
                 let dot = Path(ellipseIn: CGRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2))
-                context.fill(dot, with: .color(isHighlighted ? highlightColor : .white))
+                context.fill(dot, with: .color(isFaulty ? .red : isHighlighted ? highlightColor : .white))
             }
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+    }
+}
+
+extension Correction {
+    /// The body part each correction is about, to show it on the skeleton.
+    var bodyJoints: Set<VNHumanBodyPoseObservation.JointName> {
+        switch self {
+        case .keepBackStraight: [.neck, .root, .leftShoulder, .rightShoulder, .leftHip, .rightHip]
+        case .goLower: [.root, .leftHip, .rightHip, .leftKnee, .rightKnee]
+        case .bendBothKnees: [.leftHip, .rightHip, .leftKnee, .rightKnee, .leftAnkle, .rightAnkle]
+        case .keepFeetInPlace: [.leftKnee, .rightKnee, .leftAnkle, .rightAnkle]
+        case .slowDown: []
+        }
     }
 }

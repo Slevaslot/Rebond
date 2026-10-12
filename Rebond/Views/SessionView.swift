@@ -28,7 +28,8 @@ struct SessionView: View {
                     SkeletonOverlay(
                         skeleton: skeleton,
                         highlightedJoints: exercise.highlightedJoints,
-                        highlightColor: motion.depthProgress >= 1 ? .green : .yellow
+                        highlightColor: motion.depthProgress >= 1 ? .green : .yellow,
+                        faultyJoints: motion.faultToHighlight?.bodyJoints ?? []
                     )
                 }
             }

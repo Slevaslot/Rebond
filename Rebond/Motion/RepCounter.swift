@@ -23,19 +23,15 @@ nonisolated struct RepResult: Sendable {
     /// How far the hips went down, in torso lengths (range of motion).
     let depth: Double
     let tooFast: Bool
+    /// Already said during the movement, kept for the report.
     let leanedForward: Bool
-
-    /// The most important correction for this repetition, if any.
-    var correction: Correction? {
-        if leanedForward { return .keepBackStraight }
-        if tooFast { return .slowDown }
-        return nil
-    }
 }
 
 nonisolated enum RepEvent: Sendable {
     /// The resting position has been measured for the first time: counting starts.
     case calibrated
+    /// The target depth is reached: time to come back up.
+    case bottomReached
     case repCompleted(RepResult)
     case repIncomplete(depth: Double)
     case correction(Correction)
@@ -45,6 +41,8 @@ nonisolated struct CounterUpdate: Sendable {
     /// 0 at rest, 1 when the target depth is reached.
     let progress: Double
     let event: RepEvent?
+    /// Posture problem visible right now, to highlight on the body.
+    var posture: Correction? = nil
 }
 
 /// Counts repetitions from a stream of 2D measures.
@@ -126,10 +124,11 @@ nonisolated struct RepCounter {
     private var phase = Phase.calibrating
     private var rest = Rest(hipsX: 0, hipsHeight: 0, torsoLength: 1, lean: 0, leftAnkle: nil, rightAnkle: nil, stance: nil)
     private var maxDepth = 0.0
-    private var maxLean = 0.0
     private var repStart = 0.0
     /// Whether the patient faced the camera when the repetition started: some limits depend on the view.
     private var repFacingCamera = true
+    /// The lean correction is said once per repetition, as soon as it happens.
+    private var leanWarned = false
     private var lastMeasureTime = 0.0
     private var progress = 0.0
 
@@ -164,7 +163,12 @@ nonisolated struct RepCounter {
         let depth = (rest.hipsHeight - Self.median(recentHips)) / rest.torsoLength
         progress = max(0, depth / exercise.targetDepth)
         let event = advance(depth: depth, measure: measure, time: time)
-        return CounterUpdate(progress: progress, event: event)
+        let leaning = isInRepetition && isLeaning(measure)
+        if leaning, event == nil, !leanWarned {
+            leanWarned = true
+            return CounterUpdate(progress: progress, event: .correction(.keepBackStraight), posture: .keepBackStraight)
+        }
+        return CounterUpdate(progress: progress, event: event, posture: leaning ? .keepBackStraight : nil)
     }
 
     /// Learns the resting position when the patient stands still,
@@ -217,7 +221,6 @@ nonisolated struct RepCounter {
     private mutating func advance(depth: Double, measure: PoseMeasure, time: Double) -> RepEvent? {
         if isInRepetition {
             maxDepth = max(maxDepth, depth)
-            maxLean = max(maxLean, measure.torsoLean)
             if let fault = fault(in: measure, depth: depth) {
                 phase = .cancelled
                 return .correction(fault)
@@ -236,13 +239,14 @@ nonisolated struct RepCounter {
             if depth >= startDepth {
                 phase = .descending
                 maxDepth = depth
-                maxLean = measure.torsoLean
                 repStart = time
                 repFacingCamera = isFacingCamera()
+                leanWarned = false
             }
         case .descending:
             if depth >= exercise.targetDepth {
                 phase = .bottomReached
+                return .bottomReached
             } else if depth < maxDepth - reversalMargin {
                 guard maxDepth >= noiseDepth else {
                     phase = .rest
@@ -257,7 +261,7 @@ nonisolated struct RepCounter {
                 return .repCompleted(RepResult(
                     depth: maxDepth,
                     tooFast: time - repStart < minRepDuration,
-                    leanedForward: maxLean - rest.lean > (repFacingCamera ? maxLeanIncreaseFacing : maxLeanIncreaseSideways)
+                    leanedForward: leanWarned
                 ))
             }
         case .risingTooEarly:
@@ -293,6 +297,10 @@ nonisolated struct RepCounter {
             }
         }
         return nil
+    }
+
+    private func isLeaning(_ measure: PoseMeasure) -> Bool {
+        measure.torsoLean - rest.lean > (repFacingCamera ? maxLeanIncreaseFacing : maxLeanIncreaseSideways)
     }
 
     /// Seen from the front, both hips are apart on screen; seen from the side, they overlap.
