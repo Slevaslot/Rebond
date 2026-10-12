@@ -5,8 +5,7 @@ final class Coach {
     var isMuted = false
 
     private let synthesizer = AVSpeechSynthesizer()
-    /// Same language as the interface.
-    private let voice = AVSpeechSynthesisVoice(language: Bundle.main.preferredLocalizations.first)
+    private let voice = Coach.bestVoice()
 
     init() {
         // Audible even with the silent switch on, and lowers music while speaking.
@@ -24,5 +23,22 @@ final class Coach {
         let utterance = AVSpeechUtterance(string: text)
         utterance.voice = voice
         synthesizer.speak(utterance)
+    }
+
+    /// The most natural installed voice in the interface language.
+    /// Premium and enhanced voices sound much better than the default one; the user downloads them in
+    /// Réglages > Accessibilité > Contenu énoncé > Voix.
+    private static func bestVoice() -> AVSpeechSynthesisVoice? {
+        let language = Bundle.main.preferredLocalizations.first ?? "fr"
+        let preferredCode = AVSpeechSynthesisVoice.currentLanguageCode()
+        let voices = AVSpeechSynthesisVoice.speechVoices().filter {
+            $0.language.hasPrefix(language) && !$0.voiceTraits.contains(.isNoveltyVoice)
+        }
+        let best = voices.max { a, b in
+            if a.quality != b.quality { return a.quality.rawValue < b.quality.rawValue }
+            // Same quality: prefer the user's own region (fr-FR over fr-CA for a French user).
+            return a.language != preferredCode && b.language == preferredCode
+        }
+        return best ?? AVSpeechSynthesisVoice(language: language)
     }
 }

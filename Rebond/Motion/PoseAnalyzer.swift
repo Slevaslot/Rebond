@@ -1,7 +1,6 @@
 import CoreGraphics
 import CoreVideo
 import Vision
-import simd
 
 /// 2D joints to draw over the camera feed.
 nonisolated struct PoseSkeleton: Sendable {
@@ -12,90 +11,70 @@ nonisolated struct PoseSkeleton: Sendable {
 }
 
 /// What the rep counter needs from one frame.
+/// Positions use the image height as unit, origin bottom-left, so distances are comparable in x and y.
 nonisolated struct PoseMeasure: Sendable {
-    /// Tracked joint angle for each side of the body, in degrees (see `CatalogExercise.joints`).
-    let angles: [Double]
-    /// Torso angle from vertical, in degrees.
-    let torsoLean: Double
-    /// Height of the neck in the image (0 bottom, 1 top), seen directly by the camera.
-    /// Independent from the 3D legs, which Vision has to guess when they are hidden.
-    let neckHeight: Double?
-    /// Neck to hips distance in the image, as a fraction of the image height. Used as the body's scale.
-    let torsoLength: Double?
+    let hips: CGPoint
+    let neck: CGPoint
+    let leftAnkle: CGPoint?
+    let rightAnkle: CGPoint?
+
+    /// Neck to hips distance: the body's scale in the image.
+    var torsoLength: Double {
+        hypot(neck.x - hips.x, neck.y - hips.y)
+    }
+
+    /// Torso angle from vertical, in degrees. Visible when standing sideways, close to 0 when facing the camera.
+    var torsoLean: Double {
+        atan2(abs(neck.x - hips.x), neck.y - hips.y) * 180 / .pi
+    }
 }
 
-/// Detects the body in a camera frame.
+nonisolated struct PoseFrame: Sendable {
+    let skeleton: PoseSkeleton?
+    /// Nil when the hips or the neck aren't reliably visible.
+    let measure: PoseMeasure?
+}
+
+/// Detects the body in a camera frame with Vision's 2D body pose.
 nonisolated struct PoseAnalyzer {
-    let exercise: CatalogExercise
     /// Orientation of the frames. Camera frames are already upright.
     var orientation = CGImagePropertyOrientation.up
 
-    /// 2D joints below this confidence are not drawn.
+    /// Joints below this confidence are ignored.
     private let minimumConfidence: Float = 0.3
 
-    /// Fast 2D detection, used to draw the skeleton and know if someone is in frame.
-    func skeleton(in pixelBuffer: CVPixelBuffer) -> PoseSkeleton? {
+    func analyze(_ pixelBuffer: CVPixelBuffer) -> PoseFrame {
         let request = VNDetectHumanBodyPoseRequest()
         let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: orientation)
         guard (try? handler.perform([request])) != nil,
               let points = try? request.results?.first?.recognizedPoints(.all)
-        else { return nil }
+        else { return PoseFrame(skeleton: nil, measure: nil) }
 
-        let visible = points
-            .filter { $0.value.confidence >= minimumConfidence }
-            .mapValues { CGPoint(x: $0.location.x, y: 1 - $0.location.y) }
-        guard visible.count >= 4 else { return nil }
+        let visible = points.filter { $0.value.confidence >= minimumConfidence }
+        guard visible.count >= 4 else { return PoseFrame(skeleton: nil, measure: nil) }
 
-        return PoseSkeleton(points: visible, imageSize: uprightSize(of: pixelBuffer))
-    }
-
-    /// Slower 3D detection, used to measure the movement.
-    /// Works facing the camera or sideways, even when the feet are hidden.
-    func measure(in pixelBuffer: CVPixelBuffer) -> PoseMeasure? {
-        let request = VNDetectHumanBodyPose3DRequest()
-        let request2D = VNDetectHumanBodyPoseRequest()
-        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: orientation)
-        guard (try? handler.perform([request, request2D])) != nil,
-              let observation = request.results?.first
-        else { return nil }
-
-        func position(_ joint: VNHumanBodyPose3DObservation.JointName) -> simd_float3? {
-            guard let point = try? observation.recognizedPoint(joint) else { return nil }
-            let translation = point.position.columns.3
-            return simd_float3(translation.x, translation.y, translation.z)
-        }
-
-        var angles: [Double] = []
-        for joints in exercise.joints {
-            guard let first = position(joints.first),
-                  let vertex = position(joints.vertex),
-                  let last = position(joints.last)
-            else { return nil }
-            angles.append(Self.angle(at: vertex, from: first, to: last))
-        }
-
-        // The 3D torso stays upright in Vision's model: measure the lean in the image instead.
-        // Visible when standing sideways, close to 0 when facing the camera.
-        var torsoLean = 0.0
-        var neckHeight: Double?
-        var torsoLength: Double?
-        let points = try? request2D.results?.first?.recognizedPoints(.torso)
-        if let neck = points?[.neck], neck.confidence >= minimumConfidence {
-            neckHeight = neck.location.y
-            if let root = points?[.root], root.confidence >= minimumConfidence {
-                let size = uprightSize(of: pixelBuffer)
-                let dx = abs(neck.location.x - root.location.x) * size.width
-                let dy = (neck.location.y - root.location.y) * size.height
-                torsoLean = atan2(dx, dy) * 180 / .pi
-                torsoLength = hypot(dx, dy) / size.height
-            }
-        }
-        return PoseMeasure(
-            angles: angles,
-            torsoLean: torsoLean,
-            neckHeight: neckHeight,
-            torsoLength: torsoLength
+        let size = uprightSize(of: pixelBuffer)
+        let skeleton = PoseSkeleton(
+            points: visible.mapValues { CGPoint(x: $0.location.x, y: 1 - $0.location.y) },
+            imageSize: size
         )
+
+        // Vision's normalized x is relative to the width: rescale it to the height unit.
+        let aspect = size.width / size.height
+        func position(_ joint: VNHumanBodyPoseObservation.JointName) -> CGPoint? {
+            visible[joint].map { CGPoint(x: $0.location.x * aspect, y: $0.location.y) }
+        }
+
+        var measure: PoseMeasure?
+        if let hips = position(.root), let neck = position(.neck) {
+            measure = PoseMeasure(
+                hips: hips,
+                neck: neck,
+                leftAnkle: position(.leftAnkle),
+                rightAnkle: position(.rightAnkle)
+            )
+        }
+        return PoseFrame(skeleton: skeleton, measure: measure)
     }
 
     /// Image size once `orientation` is applied, matching Vision's normalized coordinates.
@@ -108,15 +87,5 @@ nonisolated struct PoseAnalyzer {
         default:
             return CGSize(width: width, height: height)
         }
-    }
-
-    /// Angle in degrees at `vertex` between the segments to `a` and `b`.
-    static func angle(at vertex: simd_float3, from a: simd_float3, to b: simd_float3) -> Double {
-        let v1 = a - vertex
-        let v2 = b - vertex
-        let lengths = simd_length(v1) * simd_length(v2)
-        guard lengths > 0 else { return 0 }
-        let cosine = Double(simd_dot(v1, v2) / lengths)
-        return acos(max(-1, min(1, cosine))) * 180 / .pi
     }
 }

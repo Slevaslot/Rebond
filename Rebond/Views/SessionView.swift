@@ -23,7 +23,7 @@ struct SessionView: View {
                     description: Text("Autorisez l'accès à la caméra dans Réglages pour que Rebond suive vos mouvements.")
                 )
             } else {
-                CameraPreview(session: motion.captureSession, camera: motion.camera)
+                CameraFrameView(frame: motion.liveFrame)
                 if let skeleton = motion.skeleton {
                     SkeletonOverlay(
                         skeleton: skeleton,

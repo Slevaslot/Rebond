@@ -2,6 +2,13 @@ import AVFoundation
 import Observation
 import Synchronization
 
+/// Latest camera image to display, kept apart from `MotionSession`
+/// so only the camera view redraws at the camera's frame rate.
+@Observable
+final class LiveFrame {
+    var image: CGImage?
+}
+
 /// Runs the camera and exposes the live state of a guided session.
 @Observable
 final class MotionSession {
@@ -22,9 +29,8 @@ final class MotionSession {
 
     let exercise: CatalogExercise
     let targetReps: Int
-    let captureSession = AVCaptureSession()
+    let liveFrame = LiveFrame()
 
-    private(set) var camera: AVCaptureDevice?
     private(set) var cameraUnavailable = false
     private(set) var phase = Phase.calibrating
     private(set) var bodyVisible = false
@@ -38,6 +44,7 @@ final class MotionSession {
         didSet { coach.isMuted = isMuted }
     }
 
+    @ObservationIgnored private let captureSession = AVCaptureSession()
     @ObservationIgnored private let coach = Coach()
     @ObservationIgnored private let processor: FrameProcessor
     @ObservationIgnored private let videoQueue = DispatchQueue(label: "rebond.video")
@@ -51,11 +58,11 @@ final class MotionSession {
         self.exercise = exercise
         self.targetReps = targetReps
         processor = FrameProcessor(exercise: exercise)
-        processor.onSkeleton = { [weak self] skeleton in
-            Task { @MainActor [self] in self?.apply(skeleton) }
+        processor.onImage = { [weak self] image in
+            Task { @MainActor [self] in self?.liveFrame.image = image }
         }
-        processor.onUpdate = { [weak self] update in
-            Task { @MainActor [self] in self?.apply(update) }
+        processor.onAnalysis = { [weak self] skeleton, update in
+            Task { @MainActor [self] in self?.apply(skeleton, update) }
         }
     }
 
@@ -74,11 +81,13 @@ final class MotionSession {
         output.setSampleBufferDelegate(processor, queue: videoQueue)
 
         captureSession.beginConfiguration()
+        // 720p is plenty for the analysis and keeps the background blur fast.
+        if captureSession.canSetSessionPreset(.hd1280x720) { captureSession.sessionPreset = .hd1280x720 }
         if captureSession.canAddInput(input) { captureSession.addInput(input) }
         if captureSession.canAddOutput(output) { captureSession.addOutput(output) }
         captureSession.commitConfiguration()
 
-        // Mirror the analyzed frames like the preview, so the skeleton lines up with the patient.
+        // Mirror the frames like a mirror: the patient sees themselves as they move.
         nonisolated(unsafe) let connection = output.connection(with: .video)
         if let connection, connection.isVideoMirroringSupported {
             connection.automaticallyAdjustsVideoMirroring = false
@@ -91,7 +100,6 @@ final class MotionSession {
             connection?.videoRotationAngle = coordinator.videoRotationAngleForHorizonLevelCapture
         }
         rotationCoordinator = coordinator
-        self.camera = camera
 
         nonisolated(unsafe) let session = captureSession
         videoQueue.async { session.startRunning() }
@@ -114,7 +122,7 @@ final class MotionSession {
         coach.say("Restez debout, immobile")
     }
 
-    private func apply(_ skeleton: PoseSkeleton?) {
+    private func apply(_ skeleton: PoseSkeleton?, _ update: CounterUpdate) {
         self.skeleton = skeleton
         if skeleton == nil {
             missedFrames += 1
@@ -126,9 +134,7 @@ final class MotionSession {
                 if phase == .calibrating { coach.say("Restez debout, immobile") }
             }
         }
-    }
 
-    private func apply(_ update: CounterUpdate) {
         guard phase != .finished else { return }
         depthProgress = update.progress
 
@@ -170,54 +176,45 @@ final class MotionSession {
     }
 }
 
-/// Receives camera frames on the video queue and runs the analysis off the main thread.
-/// The fast 2D skeleton runs on every frame; the slower 3D measure runs whenever the previous one is done.
+/// Receives camera frames on the video queue: blurs the background of every frame for display,
+/// and analyzes the pose 15 times per second. Its state is only touched on that queue.
 nonisolated final class FrameProcessor: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, @unchecked Sendable {
-    var onSkeleton: (@Sendable (PoseSkeleton?) -> Void)?
-    var onUpdate: (@Sendable (CounterUpdate) -> Void)?
+    var onImage: (@Sendable (CGImage?) -> Void)?
+    var onAnalysis: (@Sendable (PoseSkeleton?, CounterUpdate) -> Void)?
 
-    private let analyzer: PoseAnalyzer
-    /// Only touched on `analysisQueue`.
+    private let exercise: CatalogExercise
+    private let analyzer = PoseAnalyzer()
+    private let blur = BackgroundBlur()
     private var counter: RepCounter
-    private let analysisQueue = DispatchQueue(label: "rebond.analysis")
-    private let isMeasuring = Mutex(false)
-    /// Only touched on the video queue.
-    private var lastFrameTime = CMTime.zero
-    /// 15 frames per second are enough to follow the movement.
-    private let minFrameInterval = CMTime(value: 1, timescale: 15)
+    private var lastAnalysisTime = CMTime.zero
+    /// 15 analyses per second are enough to follow the movement.
+    private let minAnalysisInterval = CMTime(value: 1, timescale: 15)
 
     init(exercise: CatalogExercise) {
-        analyzer = PoseAnalyzer(exercise: exercise)
+        self.exercise = exercise
         counter = RepCounter(exercise: exercise)
     }
 
+    /// Called from the main thread: the counter itself is replaced on the video queue, at the next analysis.
     func resetCounter() {
-        analysisQueue.async { [self] in
-            counter = RepCounter(exercise: analyzer.exercise)
-        }
+        resetRequested.withLock { $0 = true }
     }
 
+    private let resetRequested = Mutex(false)
+
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+        guard let pixelBuffer = sampleBuffer.imageBuffer else { return }
+        onImage?(blur.apply(to: pixelBuffer))
+
         let time = sampleBuffer.presentationTimeStamp
-        guard time - lastFrameTime >= minFrameInterval,
-              let pixelBuffer = sampleBuffer.imageBuffer
-        else { return }
-        lastFrameTime = time
+        guard time - lastAnalysisTime >= minAnalysisInterval else { return }
+        lastAnalysisTime = time
 
-        onSkeleton?(analyzer.skeleton(in: pixelBuffer))
-
-        let wasMeasuring = isMeasuring.withLock { measuring in
-            defer { measuring = true }
-            return measuring
+        if resetRequested.withLock({ requested in defer { requested = false }; return requested }) {
+            counter = RepCounter(exercise: exercise)
         }
-        guard !wasMeasuring else { return }
-
-        nonisolated(unsafe) let frame = pixelBuffer
-        analysisQueue.async { [self] in
-            if let measure = analyzer.measure(in: frame) {
-                onUpdate?(counter.process(measure, at: time.seconds))
-            }
-            isMeasuring.withLock { $0 = false }
-        }
+        let frame = analyzer.analyze(pixelBuffer)
+        let update = counter.process(frame.measure, at: time.seconds)
+        onAnalysis?(frame.skeleton, update)
     }
 }

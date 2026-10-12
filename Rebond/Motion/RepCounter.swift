@@ -1,22 +1,25 @@
+import CoreGraphics
 import Foundation
 
 nonisolated enum Correction: Sendable {
     case goLower
     case keepBackStraight
     case slowDown
+    case keepFeetInPlace
 
     var message: LocalizedStringResource {
         switch self {
         case .goLower: "Descendez encore un peu"
         case .keepBackStraight: "Gardez le dos plus droit"
         case .slowDown: "Plus lentement"
+        case .keepFeetInPlace: "Gardez les pieds en place"
         }
     }
 }
 
 nonisolated struct RepResult: Sendable {
-    /// Lowest angle reached (range of motion), in degrees.
-    let bestAngle: Double
+    /// How far the hips went down, in torso lengths (range of motion).
+    let depth: Double
     let tooFast: Bool
     let leanedForward: Bool
 
@@ -29,10 +32,10 @@ nonisolated struct RepResult: Sendable {
 }
 
 nonisolated enum RepEvent: Sendable {
-    /// The resting position has been measured: counting starts.
+    /// The resting position has been measured for the first time: counting starts.
     case calibrated
     case repCompleted(RepResult)
-    case repIncomplete(bestAngle: Double)
+    case repIncomplete(depth: Double)
     case correction(Correction)
 }
 
@@ -42,12 +45,12 @@ nonisolated struct CounterUpdate: Sendable {
     let event: RepEvent?
 }
 
-/// Counts repetitions from a stream of measures.
+/// Counts repetitions from a stream of 2D measures.
 /// Pure logic: can be tested by feeding recorded measures.
 ///
-/// A repetition needs two independent signs at the same time:
-/// both knees bending together (3D pose) and the upper body going down in the image (2D pose).
-/// The 3D legs alone can't be trusted: Vision guesses them when they are hidden or blurred.
+/// A repetition is the hips going down by `targetDepth` torso lengths and coming back up,
+/// feet staying in place. Everything is relative to the patient's resting position,
+/// measured again whenever they stand still.
 nonisolated struct RepCounter {
     private enum Phase {
         case calibrating
@@ -56,37 +59,36 @@ nonisolated struct RepCounter {
         case bottomReached
         /// Came back up before reaching the target depth.
         case risingTooEarly
+        /// The feet moved during the repetition: waiting for the patient to settle again.
+        case cancelled
     }
 
-    private struct Sample {
-        let angle: Double
-        let lean: Double
-        let neckHeight: Double
+    private struct Rest {
+        let hipsHeight: Double
         let torsoLength: Double
+        let lean: Double
+        let leftAnkle: CGPoint?
+        let rightAnkle: CGPoint?
     }
 
     let exercise: CatalogExercise
 
     /// Median over a few measures removes isolated detection errors.
     private let smoothingWindow = 3
-    /// Measures needed while standing still to learn the resting position.
-    private let calibrationSamples = 5
-    private let calibrationTolerance = 15.0
-    /// Maximum difference between both knees. Beyond, one leg moves alone
-    /// (walking, lunge, knee lift) or Vision guessed wrong: the measure is ignored.
-    private let symmetryTolerance = 35.0
-    /// How far below the resting angle the movement counts as started.
-    private let startMargin = 20.0
-    /// How close to the resting angle the patient must come back to finish the repetition.
-    private let returnMargin = 15.0
-    /// How far the angle must rise from its lowest point to count as coming back up.
-    private let reversalMargin = 15.0
-    /// How far the neck must go down at the bottom, in torso lengths.
-    private let minNeckDrop = 0.4
-    /// Below this neck drop, the attempt didn't move the body at all: it is ignored without correction.
-    private let noiseNeckDrop = 0.15
-    /// Neck drop under which the patient is back up, in torso lengths.
-    private let maxNeckDropAtRest = 0.2
+    /// Measures (about 0.5 s) needed while standing still to learn the resting position.
+    private let stillSamples = 8
+    /// Maximum hips movement while "still", in torso lengths.
+    private let stillTolerance = 0.1
+    /// Hips drop at which a repetition starts, in torso lengths.
+    private let startDepth = 0.25
+    /// Hips drop under which the patient is back up, in torso lengths.
+    private let returnDepth = 0.2
+    /// How far the hips must rise from their lowest point to count as coming back up.
+    private let reversalMargin = 0.2
+    /// Below this depth, an attempt is too small to be worth a correction.
+    private let noiseDepth = 0.4
+    /// Maximum ankle movement during a repetition, in torso lengths. Beyond: a step, a lunge, walking.
+    private let feetTolerance = 0.5
     /// A repetition is cancelled when the body isn't measured for this long, in seconds.
     private let lostTimeout = 1.5
     /// Torso lean beyond the resting lean that triggers a correction, in degrees.
@@ -94,114 +96,116 @@ nonisolated struct RepCounter {
     /// Seconds from the start of the descent to the return to rest.
     private let minRepDuration = 1.2
 
-    private var recentAngles: [Double] = []
-    private var recentNecks: [Double] = []
-    private var calibration: [Sample] = []
+    private var recentHips: [Double] = []
+    private var recentMeasures: [PoseMeasure] = []
     private var phase = Phase.calibrating
-    private var rest = Sample(angle: 0, lean: 0, neckHeight: 0, torsoLength: 1)
-    private var bestAngle = Double.infinity
-    private var maxNeckDrop = 0.0
+    private var rest = Rest(hipsHeight: 0, torsoLength: 1, lean: 0, leftAnkle: nil, rightAnkle: nil)
+    private var maxDepth = 0.0
     private var maxLean = 0.0
     private var repStart = 0.0
-    private var lastValidTime = 0.0
+    private var lastMeasureTime = 0.0
     private var progress = 0.0
 
     init(exercise: CatalogExercise) {
         self.exercise = exercise
     }
 
-    /// Target adapted to the patient: never asks for less than 45° of flexion from their resting angle.
-    private var targetAngle: Double {
-        min(exercise.targetAngle, rest.angle - 45)
-    }
-
     private var isInRepetition: Bool {
         phase == .descending || phase == .bottomReached || phase == .risingTooEarly
     }
 
-    mutating func process(_ measure: PoseMeasure, at time: Double) -> CounterUpdate {
-        guard let maxAngle = measure.angles.max(), let minAngle = measure.angles.min(),
-              maxAngle - minAngle <= symmetryTolerance,
-              let neckHeight = measure.neckHeight
-        else {
-            cancelIfLost(at: time)
+    /// Call for every frame, with nil when the body isn't measured.
+    mutating func process(_ measure: PoseMeasure?, at time: Double) -> CounterUpdate {
+        guard let measure else {
+            if isInRepetition, time - lastMeasureTime > lostTimeout {
+                phase = .rest
+            }
             return CounterUpdate(progress: progress, event: nil)
         }
-        cancelIfLost(at: time)
-        lastValidTime = time
+        lastMeasureTime = time
 
-        recentAngles.append((maxAngle + minAngle) / 2)
-        recentNecks.append(neckHeight)
-        if recentAngles.count > smoothingWindow {
-            recentAngles.removeFirst()
-            recentNecks.removeFirst()
+        recentHips.append(measure.hips.y)
+        if recentHips.count > smoothingWindow { recentHips.removeFirst() }
+        recentMeasures.append(measure)
+        if recentMeasures.count > stillSamples { recentMeasures.removeFirst() }
+
+        if let event = updateRestIfStill() {
+            return CounterUpdate(progress: 0, event: event)
         }
-        let angle = Self.median(recentAngles)
-        let neck = Self.median(recentNecks)
+        guard phase != .calibrating else { return CounterUpdate(progress: 0, event: nil) }
 
-        if phase == .calibrating {
-            guard let torsoLength = measure.torsoLength else {
-                return CounterUpdate(progress: 0, event: nil)
-            }
-            let sample = Sample(angle: angle, lean: measure.torsoLean, neckHeight: neck, torsoLength: torsoLength)
-            return CounterUpdate(progress: 0, event: calibrate(with: sample))
-        }
-
-        let neckDrop = (rest.neckHeight - neck) / rest.torsoLength
-        // Both signs must agree for the gauge to reach the target.
-        let angleProgress = (rest.angle - angle) / (rest.angle - targetAngle)
-        progress = max(0, min(angleProgress, neckDrop / minNeckDrop))
-        let event = advance(angle: angle, neckDrop: neckDrop, lean: measure.torsoLean, time: time)
+        let depth = (rest.hipsHeight - Self.median(recentHips)) / rest.torsoLength
+        progress = max(0, depth / exercise.targetDepth)
+        let event = advance(depth: depth, measure: measure, time: time)
         return CounterUpdate(progress: progress, event: event)
     }
 
-    private mutating func calibrate(with sample: Sample) -> RepEvent? {
-        calibration.append(sample)
-        if calibration.count > calibrationSamples {
-            calibration.removeFirst()
-        }
-        guard calibration.count == calibrationSamples else { return nil }
+    /// Learns the resting position when the patient stands still,
+    /// at the start and again whenever they settle somewhere else.
+    private mutating func updateRestIfStill() -> RepEvent? {
+        guard phase == .calibrating || phase == .rest || phase == .cancelled,
+              recentMeasures.count == stillSamples
+        else { return nil }
 
-        let angles = calibration.map(\.angle)
-        let necks = calibration.map(\.neckHeight)
-        let torsoLength = Self.median(calibration.map(\.torsoLength))
-        let isStill = angles.max()! - angles.min()! < calibrationTolerance
-            && necks.max()! - necks.min()! < torsoLength * 0.1
-        let isStanding = Self.median(angles) > exercise.targetAngle + 40
-        guard isStill, isStanding else { return nil }
+        let torsoLength = Self.median(recentMeasures.map(\.torsoLength))
+        let hips = recentMeasures.map { Double($0.hips.y) }
+        guard torsoLength > 0, hips.max()! - hips.min()! < stillTolerance * torsoLength else { return nil }
 
-        rest = Sample(
-            angle: Self.median(angles),
-            lean: Self.median(calibration.map(\.lean)),
-            neckHeight: Self.median(necks),
-            torsoLength: torsoLength
+        let last = recentMeasures.last!
+        let candidate = Rest(
+            hipsHeight: Self.median(hips),
+            torsoLength: torsoLength,
+            lean: Self.median(recentMeasures.map(\.torsoLean)),
+            leftAnkle: last.leftAnkle,
+            rightAnkle: last.rightAnkle
         )
-        phase = .rest
-        return .calibrated
+
+        switch phase {
+        case .calibrating:
+            rest = candidate
+            phase = .rest
+            return .calibrated
+        case .rest:
+            // Don't take a held half squat for the new resting position, unless the patient moved elsewhere.
+            let notLower = candidate.hipsHeight >= rest.hipsHeight - stillTolerance * rest.torsoLength
+            if notLower || feetMoved(last) { rest = candidate }
+        default:
+            rest = candidate
+            phase = .rest
+        }
+        return nil
     }
 
-    private mutating func advance(angle: Double, neckDrop: Double, lean: Double, time: Double) -> RepEvent? {
-        let reachedBottom = angle <= targetAngle && neckDrop >= minNeckDrop
-        let backUp = angle >= rest.angle - returnMargin && neckDrop <= maxNeckDropAtRest
+    private mutating func advance(depth: Double, measure: PoseMeasure, time: Double) -> RepEvent? {
+        if isInRepetition {
+            maxDepth = max(maxDepth, depth)
+            maxLean = max(maxLean, measure.torsoLean)
+            if feetMoved(measure) {
+                phase = .cancelled
+                return maxDepth >= noiseDepth ? .correction(.keepFeetInPlace) : nil
+            }
+        }
 
         switch phase {
         case .calibrating:
             break
+        case .cancelled:
+            // Back up with the feet where they were: resume without waiting to stand still.
+            if depth <= returnDepth, !feetMoved(measure) {
+                phase = .rest
+            }
         case .rest:
-            if angle < rest.angle - startMargin {
+            if depth >= startDepth {
                 phase = .descending
-                bestAngle = angle
-                maxNeckDrop = neckDrop
-                maxLean = lean
+                maxDepth = depth
+                maxLean = measure.torsoLean
                 repStart = time
             }
         case .descending:
-            track(angle: angle, neckDrop: neckDrop, lean: lean)
-            if reachedBottom {
+            if depth >= exercise.targetDepth {
                 phase = .bottomReached
-            } else if angle > bestAngle + reversalMargin {
-                guard maxNeckDrop >= noiseNeckDrop else {
-                    // The knees "moved" but the body didn't go down: a detection error, not an attempt.
+            } else if depth < maxDepth - reversalMargin {
+                guard maxDepth >= noiseDepth else {
                     phase = .rest
                     return nil
                 }
@@ -209,39 +213,34 @@ nonisolated struct RepCounter {
                 return .correction(.goLower)
             }
         case .bottomReached:
-            track(angle: angle, neckDrop: neckDrop, lean: lean)
-            if backUp {
+            if depth <= returnDepth {
                 phase = .rest
                 return .repCompleted(RepResult(
-                    bestAngle: bestAngle,
+                    depth: maxDepth,
                     tooFast: time - repStart < minRepDuration,
                     leanedForward: maxLean - rest.lean > maxLeanIncrease
                 ))
             }
         case .risingTooEarly:
-            track(angle: angle, neckDrop: neckDrop, lean: lean)
-            if reachedBottom {
+            if depth >= exercise.targetDepth {
                 phase = .bottomReached
-            } else if backUp {
+            } else if depth <= returnDepth {
                 phase = .rest
-                return .repIncomplete(bestAngle: bestAngle)
+                return .repIncomplete(depth: maxDepth)
             }
         }
         return nil
     }
 
-    private mutating func track(angle: Double, neckDrop: Double, lean: Double) {
-        bestAngle = min(bestAngle, angle)
-        maxNeckDrop = max(maxNeckDrop, neckDrop)
-        maxLean = max(maxLean, lean)
-    }
-
-    /// Drops the repetition in progress when the body has been lost for too long.
-    private mutating func cancelIfLost(at time: Double) {
-        guard isInRepetition, time - lastValidTime > lostTimeout else { return }
-        phase = .rest
-        recentAngles.removeAll()
-        recentNecks.removeAll()
+    /// True when a visible ankle moved away from its resting position.
+    private func feetMoved(_ measure: PoseMeasure) -> Bool {
+        let limit = feetTolerance * rest.torsoLength
+        for (now, before) in [(measure.leftAnkle, rest.leftAnkle), (measure.rightAnkle, rest.rightAnkle)] {
+            if let now, let before, hypot(now.x - before.x, now.y - before.y) > limit {
+                return true
+            }
+        }
+        return false
     }
 
     static func median(_ values: [Double]) -> Double {
