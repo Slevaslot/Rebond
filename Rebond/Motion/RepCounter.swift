@@ -7,6 +7,7 @@ nonisolated enum Correction: Sendable {
     case slowDown
     case keepFeetInPlace
     case bendBothKnees
+    case showBothLegs
 
     var message: LocalizedStringResource {
         switch self {
@@ -15,6 +16,7 @@ nonisolated enum Correction: Sendable {
         case .slowDown: "Plus lentement"
         case .keepFeetInPlace: "Gardez les pieds en place"
         case .bendBothKnees: "Pliez les deux genoux ensemble"
+        case .showBothLegs: "Je ne vois pas vos deux jambes"
         }
     }
 }
@@ -129,6 +131,9 @@ nonisolated struct RepCounter {
     private var repFacingCamera = true
     /// The lean correction is said once per repetition, as soon as it happens.
     private var leanWarned = false
+    /// Facing the camera, the checks comparing both legs need both knees seen at the bottom,
+    /// otherwise a lunge or a collapsed squat would slip through unchecked.
+    private var sawBothKneesAtBottom = false
     private var lastMeasureTime = 0.0
     private var progress = 0.0
 
@@ -220,6 +225,9 @@ nonisolated struct RepCounter {
 
     private mutating func advance(depth: Double, measure: PoseMeasure, time: Double) -> RepEvent? {
         if isInRepetition {
+            if depth >= exercise.targetDepth * 0.8, measure.leftKnee != nil, measure.rightKnee != nil {
+                sawBothKneesAtBottom = true
+            }
             maxDepth = max(maxDepth, depth)
             if let fault = fault(in: measure, depth: depth) {
                 phase = .cancelled
@@ -242,6 +250,7 @@ nonisolated struct RepCounter {
                 repStart = time
                 repFacingCamera = isFacingCamera()
                 leanWarned = false
+                sawBothKneesAtBottom = false
             }
         case .descending:
             if depth >= exercise.targetDepth {
@@ -258,6 +267,9 @@ nonisolated struct RepCounter {
         case .bottomReached:
             if depth <= returnDepth {
                 phase = .rest
+                if repFacingCamera, !sawBothKneesAtBottom {
+                    return .correction(.showBothLegs)
+                }
                 return .repCompleted(RepResult(
                     depth: maxDepth,
                     tooFast: time - repStart < minRepDuration,
