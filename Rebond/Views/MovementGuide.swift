@@ -1,7 +1,7 @@
 import SwiftUI
 import Vision
 
-/// Hollow outline of a person doing the exercise in a loop. The patient steps inside it to be well framed:
+/// Stick figure doing the exercise in a loop. The patient steps inside it to be well framed:
 /// it turns yellow when they are close, then green and still once their body lines up with it.
 struct MovementGuide: View {
     typealias Joint = VNHumanBodyPoseObservation.JointName
@@ -13,13 +13,12 @@ struct MovementGuide: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    /// Limbs and their thickness, in guide heights: thighs thicker than shins, upper arms than forearms.
-    private static let limbs: [(Joint, Joint, width: Double)] = [
-        (.neck, .nose, 0.04),
-        (.leftShoulder, .leftElbow, 0.05), (.leftElbow, .leftWrist, 0.04),
-        (.rightShoulder, .rightElbow, 0.05), (.rightElbow, .rightWrist, 0.04),
-        (.leftHip, .leftKnee, 0.075), (.leftKnee, .leftAnkle, 0.055),
-        (.rightHip, .rightKnee, 0.075), (.rightKnee, .rightAnkle, 0.055),
+    private static let limbs: [(Joint, Joint)] = [
+        (.leftShoulder, .rightShoulder), (.leftHip, .rightHip),
+        (.leftShoulder, .leftElbow), (.leftElbow, .leftWrist),
+        (.rightShoulder, .rightElbow), (.rightElbow, .rightWrist),
+        (.leftHip, .leftKnee), (.leftKnee, .leftAnkle),
+        (.rightHip, .rightKnee), (.rightKnee, .rightAnkle),
     ]
     /// Seconds for one full movement, down and back up.
     private static let cycle = 4.0
@@ -33,16 +32,15 @@ struct MovementGuide: View {
             TimelineView(.animation(paused: reduceMotion || placement == .aligned)) { timeline in
                 Canvas { context, _ in
                     let progress = placement == .aligned || reduceMotion ? 0 : Self.progress(at: timeline.date)
-                    let outline = Self.silhouette(exercise.guideRest, exercise.guideTarget, progress: progress, in: box)
+                    let figure = Self.stickFigure(exercise.guideRest, exercise.guideTarget, progress: progress, in: box)
                     let color: Color = switch placement {
                     case .aligned: .green
                     case .almost: .yellow
                     default: .white
                     }
-                    context.fill(outline, with: .color(color.opacity(0.08)))
                     // A dark edge under the line keeps it visible on a bright room.
-                    context.stroke(outline, with: .color(.black.opacity(0.35)), style: StrokeStyle(lineWidth: 6, lineJoin: .round))
-                    context.stroke(outline, with: .color(color), style: StrokeStyle(lineWidth: 3, lineJoin: .round))
+                    context.stroke(figure, with: .color(.black.opacity(0.35)), style: StrokeStyle(lineWidth: 8, lineCap: .round, lineJoin: .round))
+                    context.stroke(figure, with: .color(color), style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
                 }
             }
             .onChange(of: placement, initial: true) { onPlacement(placement) }
@@ -51,13 +49,13 @@ struct MovementGuide: View {
         .accessibilityHidden(true)
     }
 
-    /// Where the outline sits: the size of a person standing 2 to 3 m away, measured on real videos
-    /// (shoulders to ankles: about 56% of the screen height). Once the feet are seen, the outline stands
+    /// Where the figure sits: the size of a person standing about 3 m away (at 2 to 3 m, shoulders to
+    /// ankles fill about 56% of the screen height on real videos). Once the feet are seen, the figure stands
     /// on them: their height on screen depends on how the phone is set, not on where the patient stands.
     private func box(in size: CGSize) -> CGRect {
-        let height = size.height * 0.74
+        let height = size.height * 0.6
         let width = height * 0.5
-        var top = size.height * 0.17
+        var top = size.height * 0.25
         if let feet = bodyPoint(.leftAnkle, .rightAnkle, in: size),
            let guideFeet = exercise.guideRest[.leftAnkle]?.y {
             top = min(max(feet.y - guideFeet * height, size.height * 0.05), size.height * 0.3)
@@ -82,7 +80,7 @@ struct MovementGuide: View {
         return held * held * (3 - 2 * held)
     }
 
-    private static func silhouette(_ rest: GuidePose, _ target: GuidePose, progress: Double, in box: CGRect) -> Path {
+    private static func stickFigure(_ rest: GuidePose, _ target: GuidePose, progress: Double, in box: CGRect) -> Path {
         func point(_ joint: Joint) -> CGPoint? {
             guard let a = rest[joint], let b = target[joint] else { return nil }
             return CGPoint(
@@ -91,26 +89,22 @@ struct MovementGuide: View {
             )
         }
 
-        var outline = Path()
-        for (a, b, width) in limbs {
+        var figure = Path()
+        for (a, b) in limbs {
             guard let pointA = point(a), let pointB = point(b) else { continue }
-            var limb = Path()
-            limb.move(to: pointA)
-            limb.addLine(to: pointB)
-            outline = outline.union(limb.strokedPath(StrokeStyle(lineWidth: box.height * width, lineCap: .round)))
+            figure.move(to: pointA)
+            figure.addLine(to: pointB)
         }
-        if let leftShoulder = point(.leftShoulder), let rightShoulder = point(.rightShoulder),
-           let leftHip = point(.leftHip), let rightHip = point(.rightHip) {
-            var torso = Path()
-            torso.addLines([leftShoulder, rightShoulder, rightHip, leftHip])
-            torso.closeSubpath()
-            outline = outline.union(torso.strokedPath(StrokeStyle(lineWidth: box.height * 0.04, lineJoin: .round)).union(torso))
+        // Spine, from the neck to the middle of the hips.
+        if let neck = point(.neck), let leftHip = point(.leftHip), let rightHip = point(.rightHip) {
+            figure.move(to: neck)
+            figure.addLine(to: CGPoint(x: (leftHip.x + rightHip.x) / 2, y: (leftHip.y + rightHip.y) / 2))
         }
         if let head = point(.nose) {
-            let width = box.height * 0.1, height = box.height * 0.125
-            outline = outline.union(Path(ellipseIn: CGRect(x: head.x - width / 2, y: head.y - height / 2, width: width, height: height)))
+            let radius = box.height * 0.055
+            figure.addEllipse(in: CGRect(x: head.x - radius, y: head.y - radius, width: radius * 2, height: radius * 2))
         }
-        return outline
+        return figure
     }
 
     private func placement(in size: CGSize, box: CGRect) -> GuidePlacement {

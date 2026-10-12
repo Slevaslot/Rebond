@@ -34,13 +34,13 @@ nonisolated extension CatalogExercise {
             .leftKnee: CGPoint(x: 0.41, y: 0.73), .rightKnee: CGPoint(x: 0.59, y: 0.73),
             .leftAnkle: CGPoint(x: 0.41, y: 0.95), .rightAnkle: CGPoint(x: 0.59, y: 0.95),
         ],
-        // Bottom of the squat seen from the front: hips down, knees over the feet, arms forward.
+        // Bottom of the squat seen from the front: hips down, knees over the feet.
         guideTarget: [
             .nose: CGPoint(x: 0.5, y: 0.3),
             .neck: CGPoint(x: 0.5, y: 0.4),
             .leftShoulder: CGPoint(x: 0.36, y: 0.42), .rightShoulder: CGPoint(x: 0.64, y: 0.42),
-            .leftElbow: CGPoint(x: 0.38, y: 0.44), .rightElbow: CGPoint(x: 0.62, y: 0.44),
-            .leftWrist: CGPoint(x: 0.42, y: 0.43), .rightWrist: CGPoint(x: 0.58, y: 0.43),
+            .leftElbow: CGPoint(x: 0.26, y: 0.55), .rightElbow: CGPoint(x: 0.74, y: 0.55),
+            .leftWrist: CGPoint(x: 0.22, y: 0.67), .rightWrist: CGPoint(x: 0.78, y: 0.67),
             .leftHip: CGPoint(x: 0.41, y: 0.69), .rightHip: CGPoint(x: 0.59, y: 0.69),
             .leftKnee: CGPoint(x: 0.34, y: 0.75), .rightKnee: CGPoint(x: 0.66, y: 0.75),
             .leftAnkle: CGPoint(x: 0.39, y: 0.95), .rightAnkle: CGPoint(x: 0.61, y: 0.95),
