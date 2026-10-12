@@ -12,11 +12,18 @@ nonisolated struct CatalogExercise: Identifiable, Sendable {
     let targetDepth: Double
 }
 
-extension CatalogExercise {
+nonisolated extension CatalogExercise {
     static let squat = CatalogExercise(
         id: "squat",
         name: "Squat",
         highlightedJoints: [.leftHip, .leftKnee, .leftAnkle, .rightHip, .rightKnee, .rightAnkle],
         targetDepth: 0.85
     )
+
+    /// Exercises the camera knows how to follow.
+    static let all: [CatalogExercise] = [.squat]
+
+    static func find(_ id: String) -> CatalogExercise? {
+        all.first { $0.id == id }
+    }
 }

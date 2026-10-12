@@ -2,6 +2,14 @@ import AVFoundation
 import Observation
 import Synchronization
 
+/// What one set produced, saved in the session.
+nonisolated struct SetResult: Sendable {
+    var completedReps = 0
+    var incompleteReps = 0
+    /// Deepest repetition, in percent of the target depth. Nil when nothing was completed.
+    var amplitude: Double?
+}
+
 /// Latest camera image to display, kept apart from `MotionSession`
 /// so only the camera view redraws at the camera's frame rate.
 @Observable
@@ -32,6 +40,8 @@ final class MotionSession {
     let liveFrame = LiveFrame()
 
     private(set) var cameraUnavailable = false
+    /// Access was refused, as opposed to a device without a front camera.
+    private(set) var cameraAccessDenied = false
     private(set) var phase = Phase.calibrating
     private(set) var bodyVisible = false
     private(set) var skeleton: PoseSkeleton?
@@ -39,6 +49,8 @@ final class MotionSession {
     private(set) var depthProgress = 0.0
     private(set) var repCount = 0
     private(set) var incompleteCount = 0
+    /// Deepest completed repetition, in torso lengths.
+    private(set) var bestDepth = 0.0
     private(set) var feedback: Feedback?
     /// Fault to show in red on the body: the live posture problem, or the last rejected movement for a moment.
     private(set) var faultToHighlight: Correction?
@@ -75,8 +87,12 @@ final class MotionSession {
 
     func start() async {
         guard captureSession.inputs.isEmpty else { return }
-        guard await AVCaptureDevice.requestAccess(for: .video),
-              let camera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front),
+        guard await AVCaptureDevice.requestAccess(for: .video) else {
+            cameraAccessDenied = true
+            cameraUnavailable = true
+            return
+        }
+        guard let camera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front),
               let input = try? AVCaptureDeviceInput(device: camera)
         else {
             cameraUnavailable = true
@@ -117,6 +133,14 @@ final class MotionSession {
         videoQueue.async { session.stopRunning() }
     }
 
+    var result: SetResult {
+        SetResult(
+            completedReps: repCount,
+            incompleteReps: incompleteCount,
+            amplitude: repCount > 0 ? bestDepth / exercise.targetDepth * 100 : nil
+        )
+    }
+
     /// Starts the set over, measuring the resting position again.
     func restart() {
         processor.resetCounter()
@@ -124,6 +148,7 @@ final class MotionSession {
         depthProgress = 0
         repCount = 0
         incompleteCount = 0
+        bestDepth = 0
         feedbackDismissal?.cancel()
         feedback = nil
         heldFault = nil
@@ -155,6 +180,7 @@ final class MotionSession {
             coach.say("C'est parti !")
         case .repCompleted(let result):
             repCount += 1
+            bestDepth = max(bestDepth, result.depth)
             if repCount >= targetReps {
                 phase = .finished
                 depthProgress = 0

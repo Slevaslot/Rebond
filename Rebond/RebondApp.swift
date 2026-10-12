@@ -1,3 +1,4 @@
+import SwiftData
 import SwiftUI
 
 @main struct RebondApp: App {
@@ -5,5 +6,6 @@ import SwiftUI
         WindowGroup {
             ContentView()
         }
+        .modelContainer(for: [Program.self, Session.self])
     }
 }

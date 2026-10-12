@@ -3,13 +3,17 @@ import SwiftUI
 /// Guided session: camera feed with the skeleton, repetition counter, depth gauge and corrections on top.
 struct SessionView: View {
     let exercise: CatalogExercise
+    /// Shown under the exercise name, e.g. "Série 1 sur 3".
+    let setTitle: LocalizedStringKey
+    let onFinish: (SetResult) -> Void
 
     @State private var motion: MotionSession
-    @Environment(\.dismiss) private var dismiss
     @ScaledMetric private var ringSize = 64
 
-    init(exercise: CatalogExercise, targetReps: Int) {
+    init(exercise: CatalogExercise, targetReps: Int, setTitle: LocalizedStringKey, onFinish: @escaping (SetResult) -> Void) {
         self.exercise = exercise
+        self.setTitle = setTitle
+        self.onFinish = onFinish
         _motion = State(initialValue: MotionSession(exercise: exercise, targetReps: targetReps))
     }
 
@@ -20,7 +24,9 @@ struct SessionView: View {
                 ContentUnavailableView(
                     "Caméra indisponible",
                     systemImage: "video.slash",
-                    description: Text("Autorisez l'accès à la caméra dans Réglages pour que Rebond suive vos mouvements.")
+                    description: motion.cameraAccessDenied
+                        ? Text("Autorisez l'accès à la caméra dans Réglages pour que Rebond suive vos mouvements.")
+                        : Text("Aucune caméra avant n'est disponible. Vous pouvez terminer la série.")
                 )
             } else {
                 CameraFrameView(frame: motion.liveFrame)
@@ -58,9 +64,11 @@ struct SessionView: View {
                 if let feedback = motion.feedback {
                     feedbackBanner(feedback)
                 }
-                Button("Terminer") { dismiss() }
-                    .buttonStyle(.glass)
-                    .controlSize(.extraLarge)
+                if motion.phase != .finished {
+                    Button("Terminer la série") { onFinish(motion.result) }
+                        .buttonStyle(.glass)
+                        .controlSize(.extraLarge)
+                }
             }
             .padding()
             .animation(.spring(duration: 0.35), value: motion.feedback)
@@ -115,6 +123,8 @@ struct SessionView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(exercise.name)
                     .font(.headline)
+                Text(setTitle)
+                    .font(.subheadline)
                 Text("sur \(motion.targetReps) répétitions")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -138,10 +148,16 @@ struct SessionView: View {
                 card(systemImage: "checkmark.circle.fill", color: .green,
                      title: "Série terminée !",
                      detail: "\(motion.repCount) répétitions")
-                Button("Recommencer", systemImage: "arrow.counterclockwise") {
-                    motion.restart()
+                HStack {
+                    Button("Recommencer", systemImage: "arrow.counterclockwise") {
+                        motion.restart()
+                    }
+                    .buttonStyle(.glass)
+                    Button("Continuer", systemImage: "arrow.right") {
+                        onFinish(motion.result)
+                    }
+                    .buttonStyle(.glassProminent)
                 }
-                .buttonStyle(.glassProminent)
                 .controlSize(.extraLarge)
             }
         } else if !motion.bodyVisible {
