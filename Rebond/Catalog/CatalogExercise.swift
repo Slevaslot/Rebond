@@ -5,21 +5,21 @@ import Vision
 nonisolated struct CatalogExercise: Identifiable, Sendable {
     /// Three joints forming the tracked angle, measured at `vertex`.
     struct Joints: Sendable {
-        let first: VNHumanBodyPoseObservation.JointName
-        let vertex: VNHumanBodyPoseObservation.JointName
-        let last: VNHumanBodyPoseObservation.JointName
+        let first: VNHumanBodyPose3DObservation.JointName
+        let vertex: VNHumanBodyPose3DObservation.JointName
+        let last: VNHumanBodyPose3DObservation.JointName
     }
 
     let id: String
     let name: LocalizedStringResource
-    /// One entry per side of the body; the most reliable side is used.
+    /// Measured in 3D, so the angle is right whether the patient faces the camera or stands sideways.
+    /// One entry per side of the body.
     let joints: [Joints]
-    /// Angle when standing still (upper threshold), in degrees.
-    let restAngle: Double
-    /// Angle to reach for a complete repetition (lower threshold), in degrees.
+    /// Joints highlighted on the on-screen skeleton.
+    let highlightedJoints: Set<VNHumanBodyPoseObservation.JointName>
+    /// Angle to reach for a complete repetition, in degrees.
+    /// The resting angle is measured on the patient before the first repetition.
     let targetAngle: Double
-    /// Shown when the patient comes back up before reaching `targetAngle`.
-    let correction: LocalizedStringResource
 }
 
 extension CatalogExercise {
@@ -30,8 +30,7 @@ extension CatalogExercise {
             Joints(first: .leftHip, vertex: .leftKnee, last: .leftAnkle),
             Joints(first: .rightHip, vertex: .rightKnee, last: .rightAnkle),
         ],
-        restAngle: 160,
-        targetAngle: 100,
-        correction: "Descendez encore un peu"
+        highlightedJoints: [.leftHip, .leftKnee, .leftAnkle, .rightHip, .rightKnee, .rightAnkle],
+        targetAngle: 110
     )
 }
