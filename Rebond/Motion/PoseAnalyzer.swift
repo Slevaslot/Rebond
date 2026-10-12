@@ -13,10 +13,15 @@ nonisolated struct PoseSkeleton: Sendable {
 
 /// What the rep counter needs from one frame.
 nonisolated struct PoseMeasure: Sendable {
-    /// Tracked joint angle, in degrees.
-    let angle: Double
+    /// Tracked joint angle for each side of the body, in degrees (see `CatalogExercise.joints`).
+    let angles: [Double]
     /// Torso angle from vertical, in degrees.
     let torsoLean: Double
+    /// Height of the neck in the image (0 bottom, 1 top), seen directly by the camera.
+    /// Independent from the 3D legs, which Vision has to guess when they are hidden.
+    let neckHeight: Double?
+    /// Neck to hips distance in the image, as a fraction of the image height. Used as the body's scale.
+    let torsoLength: Double?
 }
 
 /// Detects the body in a camera frame.
@@ -60,28 +65,37 @@ nonisolated struct PoseAnalyzer {
             return simd_float3(translation.x, translation.y, translation.z)
         }
 
-        let angles = exercise.joints.compactMap { joints -> Double? in
+        var angles: [Double] = []
+        for joints in exercise.joints {
             guard let first = position(joints.first),
                   let vertex = position(joints.vertex),
                   let last = position(joints.last)
             else { return nil }
-            return Self.angle(at: vertex, from: first, to: last)
+            angles.append(Self.angle(at: vertex, from: first, to: last))
         }
-        // Vision sometimes folds one leg too much: keep the most open angle.
-        guard let angle = angles.max() else { return nil }
 
         // The 3D torso stays upright in Vision's model: measure the lean in the image instead.
         // Visible when standing sideways, close to 0 when facing the camera.
         var torsoLean = 0.0
-        if let points = try? request2D.results?.first?.recognizedPoints(.torso),
-           let neck = points[.neck], let root = points[.root],
-           neck.confidence >= minimumConfidence, root.confidence >= minimumConfidence {
-            let size = uprightSize(of: pixelBuffer)
-            let dx = abs(neck.location.x - root.location.x) * size.width
-            let dy = (neck.location.y - root.location.y) * size.height
-            torsoLean = atan2(dx, dy) * 180 / .pi
+        var neckHeight: Double?
+        var torsoLength: Double?
+        let points = try? request2D.results?.first?.recognizedPoints(.torso)
+        if let neck = points?[.neck], neck.confidence >= minimumConfidence {
+            neckHeight = neck.location.y
+            if let root = points?[.root], root.confidence >= minimumConfidence {
+                let size = uprightSize(of: pixelBuffer)
+                let dx = abs(neck.location.x - root.location.x) * size.width
+                let dy = (neck.location.y - root.location.y) * size.height
+                torsoLean = atan2(dx, dy) * 180 / .pi
+                torsoLength = hypot(dx, dy) / size.height
+            }
         }
-        return PoseMeasure(angle: angle, torsoLean: torsoLean)
+        return PoseMeasure(
+            angles: angles,
+            torsoLean: torsoLean,
+            neckHeight: neckHeight,
+            torsoLength: torsoLength
+        )
     }
 
     /// Image size once `orientation` is applied, matching Vision's normalized coordinates.
