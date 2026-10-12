@@ -55,7 +55,7 @@ struct MovementGuide: View {
     private func box(in size: CGSize) -> CGRect {
         let height = size.height * 0.6
         let width = height * 0.5
-        var top = size.height * 0.25
+        var top = size.height * 0.28
         if let feet = bodyPoint(.leftAnkle, .rightAnkle, in: size),
            let guideFeet = exercise.guideRest[.leftAnkle]?.y {
             top = min(max(feet.y - guideFeet * height, size.height * 0.05), size.height * 0.3)
@@ -80,14 +80,25 @@ struct MovementGuide: View {
         return held * held * (3 - 2 * held)
     }
 
-    /// The body's outline: limbs of even thickness, a rounded torso and a round head, merged into one contour.
+    /// A simple pictogram: round head, a torso as wide as the legs, limbs of even thickness, in one contour.
     private static func outline(_ rest: GuidePose, _ target: GuidePose, progress: Double, in box: CGRect) -> Path {
-        func point(_ joint: Joint) -> CGPoint? {
+        func pose(_ joint: Joint) -> CGPoint? {
             guard let a = rest[joint], let b = target[joint] else { return nil }
-            return CGPoint(
-                x: box.minX + (a.x + (b.x - a.x) * progress) * box.width,
-                y: box.minY + (a.y + (b.y - a.y) * progress) * box.height
-            )
+            return CGPoint(x: a.x + (b.x - a.x) * progress, y: a.y + (b.y - a.y) * progress)
+        }
+        // The torso is as wide as the legs: each arm moves in by the gap between its shoulder and hip.
+        func inward(_ shoulder: Joint, _ hip: Joint) -> Double {
+            guard let shoulder = pose(shoulder), let hip = pose(hip) else { return 0 }
+            return hip.x - shoulder.x
+        }
+        let leftShift = inward(.leftShoulder, .leftHip), rightShift = inward(.rightShoulder, .rightHip)
+        let leftArm: Set<Joint> = [.leftShoulder, .leftElbow, .leftWrist]
+        let rightArm: Set<Joint> = [.rightShoulder, .rightElbow, .rightWrist]
+        func point(_ joint: Joint) -> CGPoint? {
+            guard var p = pose(joint) else { return nil }
+            if leftArm.contains(joint) { p.x += leftShift }
+            if rightArm.contains(joint) { p.x += rightShift }
+            return CGPoint(x: box.minX + p.x * box.width, y: box.minY + p.y * box.height)
         }
         let thickness = box.height * 0.065
 
@@ -101,12 +112,8 @@ struct MovementGuide: View {
 
         if let leftShoulder = point(.leftShoulder), let rightShoulder = point(.rightShoulder),
            let leftHip = point(.leftHip), let rightHip = point(.rightHip) {
-            // Straight torso: as wide at the hips as at the shoulders.
             var torso = Path()
-            torso.addLines([
-                leftShoulder, rightShoulder,
-                CGPoint(x: rightShoulder.x, y: rightHip.y), CGPoint(x: leftShoulder.x, y: leftHip.y),
-            ])
+            torso.addLines([leftShoulder, rightShoulder, rightHip, leftHip])
             torso.closeSubpath()
             outline = outline.union(torso.strokedPath(StrokeStyle(lineWidth: thickness, lineJoin: .round)).union(torso))
         }
