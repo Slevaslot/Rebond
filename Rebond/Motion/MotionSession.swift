@@ -154,7 +154,7 @@ final class MotionSession {
         heldFault = nil
         faultToHighlight = nil
         lastTempoReminder = -10
-        coach.say("Restez debout, immobile")
+        coach.say("Placez-vous dans la silhouette, puis restez immobile")
     }
 
     private func apply(_ skeleton: PoseSkeleton?, _ update: CounterUpdate) {
@@ -166,7 +166,7 @@ final class MotionSession {
             missedFrames = 0
             if !bodyVisible {
                 bodyVisible = true
-                if phase == .calibrating { coach.say("Restez debout, immobile") }
+                if phase == .calibrating { coach.say("Placez-vous dans la silhouette, puis restez immobile") }
             }
         }
 

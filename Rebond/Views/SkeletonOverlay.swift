@@ -23,12 +23,8 @@ struct SkeletonOverlay: View {
 
     var body: some View {
         Canvas { context, size in
-            // Same "aspect fill" placement as the camera preview.
-            let scale = max(size.width / skeleton.imageSize.width, size.height / skeleton.imageSize.height)
-            let shown = CGSize(width: skeleton.imageSize.width * scale, height: skeleton.imageSize.height * scale)
-            let origin = CGPoint(x: (size.width - shown.width) / 2, y: (size.height - shown.height) / 2)
             func place(_ point: CGPoint) -> CGPoint {
-                CGPoint(x: origin.x + point.x * shown.width, y: origin.y + point.y * shown.height)
+                skeleton.place(point, in: size)
             }
 
             for (a, b) in Self.bones {
@@ -71,5 +67,15 @@ extension Correction {
         case .kneesOverFeet: [.leftKnee, .rightKnee, .leftAnkle, .rightAnkle]
         case .slowDown: []
         }
+    }
+}
+
+nonisolated extension PoseSkeleton {
+    /// Position on screen of a normalized point, with the same "aspect fill" placement as the camera image.
+    func place(_ point: CGPoint, in size: CGSize) -> CGPoint {
+        let scale = max(size.width / imageSize.width, size.height / imageSize.height)
+        let shown = CGSize(width: imageSize.width * scale, height: imageSize.height * scale)
+        let origin = CGPoint(x: (size.width - shown.width) / 2, y: (size.height - shown.height) / 2)
+        return CGPoint(x: origin.x + point.x * shown.width, y: origin.y + point.y * shown.height)
     }
 }

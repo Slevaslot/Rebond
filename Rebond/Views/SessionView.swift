@@ -20,15 +20,7 @@ struct SessionView: View {
     var body: some View {
         ZStack {
             Color.black
-            if motion.cameraUnavailable {
-                ContentUnavailableView(
-                    "Caméra indisponible",
-                    systemImage: "video.slash",
-                    description: motion.cameraAccessDenied
-                        ? Text("Autorisez l'accès à la caméra dans Réglages pour que Rebond suive vos mouvements.")
-                        : Text("Aucune caméra avant n'est disponible. Vous pouvez terminer la série.")
-                )
-            } else {
+            if !motion.cameraUnavailable {
                 CameraFrameView(frame: motion.liveFrame)
                 if let skeleton = motion.skeleton {
                     SkeletonOverlay(
@@ -39,12 +31,28 @@ struct SessionView: View {
                     )
                 }
             }
+            if motion.phase == .calibrating {
+                MovementGuide(exercise: exercise, skeleton: motion.skeleton)
+                    .transition(.opacity)
+            }
         }
         .ignoresSafeArea()
         .overlay(alignment: .top) {
-            if !motion.cameraUnavailable {
-                counter.padding()
+            Group {
+                if motion.cameraUnavailable {
+                    topCard(title: "Caméra indisponible", detail: motion.cameraAccessDenied
+                        ? "Autorisez l'accès à la caméra dans Réglages pour que Rebond suive vos mouvements."
+                        : "Aucune caméra avant n'est disponible. Vous pouvez terminer la série.")
+                } else if motion.phase == .calibrating {
+                    topCard(
+                        title: motion.bodyVisible ? "Restez immobile dans la silhouette" : "Placez-vous dans la silhouette",
+                        detail: "Le corps entier visible, à 2–3 m. La silhouette vous montre le mouvement."
+                    )
+                } else {
+                    counter
+                }
             }
+            .padding()
         }
         .overlay(alignment: .trailing) {
             if motion.phase == .active && motion.bodyVisible {
@@ -55,9 +63,7 @@ struct SessionView: View {
             }
         }
         .overlay {
-            if !motion.cameraUnavailable {
-                statusCard.padding()
-            }
+            statusCard.padding()
         }
         .overlay(alignment: .bottom) {
             VStack(spacing: 16) {
@@ -140,7 +146,20 @@ struct SessionView: View {
         .accessibilityElement(children: .combine)
     }
 
-    /// Placement, calibration and end-of-set messages, in the middle of the screen.
+    private func topCard(title: LocalizedStringKey, detail: LocalizedStringKey) -> some View {
+        VStack(spacing: 4) {
+            Text(title)
+                .font(.headline)
+            Text(detail)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .multilineTextAlignment(.center)
+        .padding()
+        .glassEffect(in: .rect(cornerRadius: 24))
+    }
+
+    /// Body lost during the set and end-of-set messages, in the middle of the screen.
     @ViewBuilder
     private var statusCard: some View {
         if motion.phase == .finished {
@@ -160,14 +179,10 @@ struct SessionView: View {
                 }
                 .controlSize(.extraLarge)
             }
-        } else if !motion.bodyVisible {
+        } else if motion.phase == .active, !motion.bodyVisible {
             card(systemImage: "figure.stand", color: .white,
                  title: "Placez-vous à 2–3 m",
                  detail: "Le corps entier visible, de face ou de profil")
-        } else if motion.phase == .calibrating {
-            card(systemImage: "figure.stand", color: .yellow,
-                 title: "Restez debout, immobile",
-                 detail: "Rebond mesure votre position de départ")
         }
     }
 
