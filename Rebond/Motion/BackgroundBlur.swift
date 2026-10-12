@@ -23,14 +23,23 @@ nonisolated final class BackgroundBlur {
               let maskBuffer = request.results?.first?.pixelBuffer
         else { return context.createCGImage(camera, from: camera.extent) }
 
-        var mask = CIImage(cvPixelBuffer: maskBuffer)
-        mask = mask.transformed(by: CGAffineTransform(
-            scaleX: camera.extent.width / mask.extent.width,
-            y: camera.extent.height / mask.extent.height
-        ))
+        // Widen the sharp area around the body (cheaper at the mask's small size),
+        // then soften its edge so the blur doesn't hug the silhouette.
+        let rawMask = CIImage(cvPixelBuffer: maskBuffer)
+        let widen = CIFilter.morphologyMaximum()
+        widen.inputImage = rawMask
+        widen.radius = Float(rawMask.extent.width * 0.025)
+        let mask = (widen.outputImage ?? rawMask)
+            .transformed(by: CGAffineTransform(
+                scaleX: camera.extent.width / rawMask.extent.width,
+                y: camera.extent.height / rawMask.extent.height
+            ))
+            .clampedToExtent()
+            .applyingGaussianBlur(sigma: camera.extent.width * 0.02)
+            .cropped(to: camera.extent)
 
         let blurred = camera.clampedToExtent()
-            .applyingGaussianBlur(sigma: 25)
+            .applyingGaussianBlur(sigma: 12)
             .cropped(to: camera.extent)
 
         let blend = CIFilter.blendWithMask()
