@@ -67,6 +67,8 @@ final class MotionSession {
     /// Consecutive frames without a body, so a single missed detection doesn't flash the placement hint.
     @ObservationIgnored private var missedFrames = 0
     @ObservationIgnored private var feedbackDismissal: Task<Void, Never>?
+    @ObservationIgnored private var lastAnnouncement = ""
+    @ObservationIgnored private var lastAnnouncementDate = Date.distantPast
     @ObservationIgnored private var heldFault: Correction?
     @ObservationIgnored private var heldFaultRelease: Task<Void, Never>?
     /// "Plus lentement" is said at most once every few repetitions, so it doesn't become noise.
@@ -141,6 +143,18 @@ final class MotionSession {
         )
     }
 
+    /// Says a placement instruction, without talking over itself: the same message is not repeated,
+    /// and a new one waits a few seconds after the previous.
+    func announce(_ message: LocalizedStringResource) {
+        let text = String(localized: message)
+        guard phase == .calibrating, text != lastAnnouncement,
+              Date.now.timeIntervalSince(lastAnnouncementDate) > 3
+        else { return }
+        lastAnnouncement = text
+        lastAnnouncementDate = .now
+        coach.say(text)
+    }
+
     /// Starts the set over, measuring the resting position again.
     func restart() {
         processor.resetCounter()
@@ -154,6 +168,7 @@ final class MotionSession {
         heldFault = nil
         faultToHighlight = nil
         lastTempoReminder = -10
+        lastAnnouncement = ""
         coach.say("Placez-vous dans la silhouette, puis restez immobile")
     }
 
@@ -166,7 +181,6 @@ final class MotionSession {
             missedFrames = 0
             if !bodyVisible {
                 bodyVisible = true
-                if phase == .calibrating { coach.say("Placez-vous dans la silhouette, puis restez immobile") }
             }
         }
 

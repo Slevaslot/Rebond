@@ -8,6 +8,7 @@ struct SessionView: View {
     let onFinish: (SetResult) -> Void
 
     @State private var motion: MotionSession
+    @State private var placement = GuidePlacement.notVisible
     @ScaledMetric private var ringSize = 64
 
     init(exercise: CatalogExercise, targetReps: Int, setTitle: LocalizedStringKey, onFinish: @escaping (SetResult) -> Void) {
@@ -32,8 +33,11 @@ struct SessionView: View {
                 }
             }
             if motion.phase == .calibrating {
-                MovementGuide(exercise: exercise, skeleton: motion.skeleton)
-                    .transition(.opacity)
+                MovementGuide(exercise: exercise, skeleton: motion.skeleton) { placement in
+                    self.placement = placement
+                    motion.announce(placement.message)
+                }
+                .transition(.opacity)
             }
         }
         .ignoresSafeArea()
@@ -44,10 +48,7 @@ struct SessionView: View {
                         ? "Autorisez l'accès à la caméra dans Réglages pour que Rebond suive vos mouvements."
                         : "Aucune caméra avant n'est disponible. Vous pouvez terminer la série.")
                 } else if motion.phase == .calibrating {
-                    topCard(
-                        title: motion.bodyVisible ? "Restez immobile dans la silhouette" : "Placez-vous dans la silhouette",
-                        detail: "Le corps entier visible, à 2–3 m. La silhouette vous montre le mouvement."
-                    )
+                    placementHint
                 } else {
                     counter
                 }
@@ -70,7 +71,8 @@ struct SessionView: View {
                 if let feedback = motion.feedback {
                     feedbackBanner(feedback)
                 }
-                if motion.phase != .finished {
+                // During setup the guide outline needs the space; the back button is still there.
+                if motion.phase == .active || motion.cameraUnavailable {
                     Button("Terminer la série") { onFinish(motion.result) }
                         .buttonStyle(.glass)
                         .controlSize(.extraLarge)
@@ -144,6 +146,22 @@ struct SessionView: View {
         .padding()
         .glassEffect(in: .rect(cornerRadius: 28))
         .accessibilityElement(children: .combine)
+    }
+
+    /// Where to move to fit in the guide outline, in one short line.
+    private var placementHint: some View {
+        Label {
+            Text(placement.message)
+        } icon: {
+            Image(systemName: placement == .aligned ? "checkmark.circle.fill" : "figure.stand")
+                .foregroundStyle(placement == .aligned ? .green : placement == .almost ? .yellow : .white)
+        }
+        .font(.headline)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+        .glassEffect(in: .capsule)
+        .contentTransition(.opacity)
+        .animation(.default, value: placement)
     }
 
     private func topCard(title: LocalizedStringKey, detail: LocalizedStringKey) -> some View {
