@@ -105,7 +105,11 @@ struct MovementGuide: View {
         // Arms a little thinner than legs.
         var arms = Path(), legs = Path()
         for (a, b) in limbs {
-            guard let pointA = point(a), let pointB = point(b) else { continue }
+            guard var pointA = point(a), let pointB = point(b) else { continue }
+            // Arms come out of the side of the torso, a little below its top: no shoulder bump.
+            if a == .leftShoulder || a == .rightShoulder {
+                pointA.y += box.height * 0.06
+            }
             let isArm = leftArm.contains(a) || rightArm.contains(a)
             if isArm {
                 arms.move(to: pointA)

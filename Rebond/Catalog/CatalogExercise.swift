@@ -29,8 +29,8 @@ nonisolated extension CatalogExercise {
             .neck: CGPoint(x: 0.5, y: 0.18),
             .leftShoulder: CGPoint(x: 0.36, y: 0.2), .rightShoulder: CGPoint(x: 0.64, y: 0.2),
             // Straight arms, held out from the body.
-            .leftElbow: CGPoint(x: 0.215, y: 0.295), .rightElbow: CGPoint(x: 0.785, y: 0.295),
-            .leftWrist: CGPoint(x: 0.07, y: 0.39), .rightWrist: CGPoint(x: 0.93, y: 0.39),
+            .leftElbow: CGPoint(x: 0.255, y: 0.38), .rightElbow: CGPoint(x: 0.745, y: 0.38),
+            .leftWrist: CGPoint(x: 0.15, y: 0.5), .rightWrist: CGPoint(x: 0.85, y: 0.5),
             .leftHip: CGPoint(x: 0.42, y: 0.5), .rightHip: CGPoint(x: 0.58, y: 0.5),
             .leftKnee: CGPoint(x: 0.41, y: 0.73), .rightKnee: CGPoint(x: 0.59, y: 0.73),
             .leftAnkle: CGPoint(x: 0.41, y: 0.95), .rightAnkle: CGPoint(x: 0.59, y: 0.95),
@@ -41,8 +41,8 @@ nonisolated extension CatalogExercise {
             .neck: CGPoint(x: 0.5, y: 0.4),
             .leftShoulder: CGPoint(x: 0.36, y: 0.42), .rightShoulder: CGPoint(x: 0.64, y: 0.42),
             // Same arms as standing, moved down with the shoulders: they keep their length.
-            .leftElbow: CGPoint(x: 0.215, y: 0.515), .rightElbow: CGPoint(x: 0.785, y: 0.515),
-            .leftWrist: CGPoint(x: 0.07, y: 0.61), .rightWrist: CGPoint(x: 0.93, y: 0.61),
+            .leftElbow: CGPoint(x: 0.255, y: 0.6), .rightElbow: CGPoint(x: 0.745, y: 0.6),
+            .leftWrist: CGPoint(x: 0.15, y: 0.72), .rightWrist: CGPoint(x: 0.85, y: 0.72),
             .leftHip: CGPoint(x: 0.41, y: 0.69), .rightHip: CGPoint(x: 0.59, y: 0.69),
             .leftKnee: CGPoint(x: 0.34, y: 0.75), .rightKnee: CGPoint(x: 0.66, y: 0.75),
             .leftAnkle: CGPoint(x: 0.39, y: 0.95), .rightAnkle: CGPoint(x: 0.61, y: 0.95),
