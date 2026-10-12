@@ -102,13 +102,21 @@ struct MovementGuide: View {
         }
         let thickness = box.height * 0.08
 
-        var bones = Path()
+        // Arms a little thinner than legs.
+        var arms = Path(), legs = Path()
         for (a, b) in limbs {
             guard let pointA = point(a), let pointB = point(b) else { continue }
-            bones.move(to: pointA)
-            bones.addLine(to: pointB)
+            let isArm = leftArm.contains(a) || rightArm.contains(a)
+            if isArm {
+                arms.move(to: pointA)
+                arms.addLine(to: pointB)
+            } else {
+                legs.move(to: pointA)
+                legs.addLine(to: pointB)
+            }
         }
-        var outline = bones.strokedPath(StrokeStyle(lineWidth: thickness, lineCap: .round, lineJoin: .round))
+        var outline = legs.strokedPath(StrokeStyle(lineWidth: thickness, lineCap: .round, lineJoin: .round))
+            .union(arms.strokedPath(StrokeStyle(lineWidth: thickness * 0.8, lineCap: .round, lineJoin: .round)))
 
         if let leftShoulder = point(.leftShoulder), let rightShoulder = point(.rightShoulder),
            let leftHip = point(.leftHip), let rightHip = point(.rightHip) {
