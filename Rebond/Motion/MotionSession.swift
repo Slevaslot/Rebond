@@ -102,6 +102,18 @@ final class MotionSession {
         videoQueue.async { session.stopRunning() }
     }
 
+    /// Starts the set over, measuring the resting position again.
+    func restart() {
+        processor.resetCounter()
+        phase = .calibrating
+        depthProgress = 0
+        repCount = 0
+        incompleteCount = 0
+        feedbackDismissal?.cancel()
+        feedback = nil
+        coach.say("Restez debout, immobile")
+    }
+
     private func apply(_ skeleton: PoseSkeleton?) {
         self.skeleton = skeleton
         if skeleton == nil {
@@ -177,6 +189,12 @@ nonisolated final class FrameProcessor: NSObject, AVCaptureVideoDataOutputSample
     init(exercise: CatalogExercise) {
         analyzer = PoseAnalyzer(exercise: exercise)
         counter = RepCounter(exercise: exercise)
+    }
+
+    func resetCounter() {
+        analysisQueue.async { [self] in
+            counter = RepCounter(exercise: analyzer.exercise)
+        }
     }
 
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {

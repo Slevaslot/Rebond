@@ -68,6 +68,11 @@ struct SessionView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
+                Button("Recommencer", systemImage: "arrow.counterclockwise") {
+                    motion.restart()
+                }
+            }
+            ToolbarItem(placement: .topBarTrailing) {
                 Button(motion.isMuted ? "Activer la voix" : "Couper la voix",
                        systemImage: motion.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill") {
                     motion.isMuted.toggle()
@@ -128,9 +133,16 @@ struct SessionView: View {
     @ViewBuilder
     private var statusCard: some View {
         if motion.phase == .finished {
-            card(systemImage: "checkmark.circle.fill", color: .green,
-                 title: "Série terminée !",
-                 detail: "\(motion.repCount) répétitions")
+            VStack(spacing: 16) {
+                card(systemImage: "checkmark.circle.fill", color: .green,
+                     title: "Série terminée !",
+                     detail: "\(motion.repCount) répétitions")
+                Button("Recommencer", systemImage: "arrow.counterclockwise") {
+                    motion.restart()
+                }
+                .buttonStyle(.glassProminent)
+                .controlSize(.extraLarge)
+            }
         } else if !motion.bodyVisible {
             card(systemImage: "figure.stand", color: .white,
                  title: "Placez-vous à 2–3 m",
