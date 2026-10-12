@@ -124,8 +124,17 @@ struct MovementGuide: View {
 
         if let leftShoulder = point(.leftShoulder), let rightShoulder = point(.rightShoulder),
            let leftHip = point(.leftHip), let rightHip = point(.rightHip) {
+            // Sloped shoulders: the top narrows toward the neck, the sides meet the arms smoothly.
+            let inset = (rightShoulder.x - leftShoulder.x) * 0.2
+            let slope = box.height * 0.06
             var torso = Path()
-            torso.addLines([leftShoulder, rightShoulder, rightHip, leftHip])
+            torso.addLines([
+                CGPoint(x: leftShoulder.x + inset, y: leftShoulder.y),
+                CGPoint(x: rightShoulder.x - inset, y: rightShoulder.y),
+                CGPoint(x: rightShoulder.x, y: rightShoulder.y + slope),
+                rightHip, leftHip,
+                CGPoint(x: leftShoulder.x, y: leftShoulder.y + slope),
+            ])
             torso.closeSubpath()
             outline = outline.union(torso.strokedPath(StrokeStyle(lineWidth: thickness, lineJoin: .round)).union(torso))
         }
