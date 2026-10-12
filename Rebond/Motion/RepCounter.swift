@@ -6,6 +6,7 @@ nonisolated enum Correction: Sendable {
     case keepBackStraight
     case slowDown
     case keepFeetInPlace
+    case bendBothKnees
 
     var message: LocalizedStringResource {
         switch self {
@@ -13,6 +14,7 @@ nonisolated enum Correction: Sendable {
         case .keepBackStraight: "Gardez le dos plus droit"
         case .slowDown: "Plus lentement"
         case .keepFeetInPlace: "Gardez les pieds en place"
+        case .bendBothKnees: "Pliez les deux genoux ensemble"
         }
     }
 }
@@ -64,11 +66,14 @@ nonisolated struct RepCounter {
     }
 
     private struct Rest {
+        let hipsX: Double
         let hipsHeight: Double
         let torsoLength: Double
         let lean: Double
         let leftAnkle: CGPoint?
         let rightAnkle: CGPoint?
+        /// Distance between the ankles, when both were visible.
+        let stance: Double?
     }
 
     let exercise: CatalogExercise
@@ -89,6 +94,17 @@ nonisolated struct RepCounter {
     private let noiseDepth = 0.4
     /// Maximum ankle movement during a repetition, in torso lengths. Beyond: a step, a lunge, walking.
     private let feetTolerance = 0.5
+    /// Maximum widening of the stance during a repetition, in torso lengths.
+    private let stanceTolerance = 0.25
+    /// Maximum distance between the ankles during a repetition, in torso lengths. Beyond: a lunge or a sumo squat.
+    private let maxStance = 1.0
+    /// Maximum height difference between the knees, in torso lengths. Beyond: a lunge, one knee going down.
+    private let maxKneeGap = 0.4
+    /// Maximum sideways movement of the hips, in torso lengths. Beyond: a side lunge.
+    /// Sitting back in a squat seen from the side moves them about 0.35.
+    private let maxHipShift = 0.45
+    /// Minimum knee angle for a leg to count as straight, in degrees.
+    private let straightLeg = 150.0
     /// A repetition is cancelled when the body isn't measured for this long, in seconds.
     private let lostTimeout = 1.5
     /// Torso lean beyond the resting lean that triggers a correction, in degrees.
@@ -99,7 +115,7 @@ nonisolated struct RepCounter {
     private var recentHips: [Double] = []
     private var recentMeasures: [PoseMeasure] = []
     private var phase = Phase.calibrating
-    private var rest = Rest(hipsHeight: 0, torsoLength: 1, lean: 0, leftAnkle: nil, rightAnkle: nil)
+    private var rest = Rest(hipsX: 0, hipsHeight: 0, torsoLength: 1, lean: 0, leftAnkle: nil, rightAnkle: nil, stance: nil)
     private var maxDepth = 0.0
     private var maxLean = 0.0
     private var repStart = 0.0
@@ -152,12 +168,23 @@ nonisolated struct RepCounter {
         guard torsoLength > 0, hips.max()! - hips.min()! < stillTolerance * torsoLength else { return nil }
 
         let last = recentMeasures.last!
+        let kneeAngles = last.kneeAngles
+        let legsStraight = kneeAngles.allSatisfy { $0 >= straightLeg }
+        // A held lunge is still, but isn't a resting position. Legs hidden can only be accepted at the very start.
+        guard legsStraight, !kneeAngles.isEmpty || phase == .calibrating else { return nil }
+
+        let stances = recentMeasures.compactMap { measure -> Double? in
+            guard let left = measure.leftAnkle, let right = measure.rightAnkle else { return nil }
+            return hypot(left.x - right.x, left.y - right.y)
+        }
         let candidate = Rest(
+            hipsX: Self.median(recentMeasures.map { Double($0.hips.x) }),
             hipsHeight: Self.median(hips),
             torsoLength: torsoLength,
             lean: Self.median(recentMeasures.map(\.torsoLean)),
             leftAnkle: last.leftAnkle,
-            rightAnkle: last.rightAnkle
+            rightAnkle: last.rightAnkle,
+            stance: stances.isEmpty ? nil : Self.median(stances)
         )
 
         switch phase {
@@ -180,9 +207,9 @@ nonisolated struct RepCounter {
         if isInRepetition {
             maxDepth = max(maxDepth, depth)
             maxLean = max(maxLean, measure.torsoLean)
-            if feetMoved(measure) {
+            if let fault = fault(in: measure) {
                 phase = .cancelled
-                return maxDepth >= noiseDepth ? .correction(.keepFeetInPlace) : nil
+                return .correction(fault)
             }
         }
 
@@ -227,6 +254,27 @@ nonisolated struct RepCounter {
             } else if depth <= returnDepth {
                 phase = .rest
                 return .repIncomplete(depth: maxDepth)
+            }
+        }
+        return nil
+    }
+
+    /// What makes this frame something else than a squat: one knee lower than the other (lunge),
+    /// or feet moving or spreading (step, lunge, sumo squat). Measured against the standing torso,
+    /// which doesn't shrink when the patient leans forward.
+    private func fault(in measure: PoseMeasure) -> Correction? {
+        if let leftKnee = measure.leftKnee, let rightKnee = measure.rightKnee,
+           abs(leftKnee.y - rightKnee.y) / rest.torsoLength > maxKneeGap {
+            return .bendBothKnees
+        }
+        if feetMoved(measure) || abs(measure.hips.x - rest.hipsX) / rest.torsoLength > maxHipShift {
+            return .keepFeetInPlace
+        }
+        if let leftAnkle = measure.leftAnkle, let rightAnkle = measure.rightAnkle {
+            let stance = hypot(leftAnkle.x - rightAnkle.x, leftAnkle.y - rightAnkle.y) / rest.torsoLength
+            if stance > maxStance { return .keepFeetInPlace }
+            if let restStance = rest.stance, stance - restStance / rest.torsoLength > stanceTolerance {
+                return .keepFeetInPlace
             }
         }
         return nil

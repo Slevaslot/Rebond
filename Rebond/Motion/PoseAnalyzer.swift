@@ -15,12 +15,41 @@ nonisolated struct PoseSkeleton: Sendable {
 nonisolated struct PoseMeasure: Sendable {
     let hips: CGPoint
     let neck: CGPoint
+    let leftHip: CGPoint?
+    let rightHip: CGPoint?
+    let leftKnee: CGPoint?
+    let rightKnee: CGPoint?
     let leftAnkle: CGPoint?
     let rightAnkle: CGPoint?
 
     /// Neck to hips distance: the body's scale in the image.
     var torsoLength: Double {
         hypot(neck.x - hips.x, neck.y - hips.y)
+    }
+
+    /// Knee angle of each visible leg, in degrees: about 180 when the leg is straight.
+    var kneeAngles: [Double] {
+        [(leftHip, leftKnee, leftAnkle), (rightHip, rightKnee, rightAnkle)].compactMap { hip, knee, ankle in
+            guard let hip, let knee, let ankle else { return nil }
+            let a = CGVector(dx: hip.x - knee.x, dy: hip.y - knee.y)
+            let b = CGVector(dx: ankle.x - knee.x, dy: ankle.y - knee.y)
+            let lengths = hypot(a.dx, a.dy) * hypot(b.dx, b.dy)
+            guard lengths > 0 else { return nil }
+            let cosine = Double((a.dx * b.dx + a.dy * b.dy) / lengths)
+            return acos(max(-1, min(1, cosine))) * 180 / .pi
+        }
+    }
+
+    /// Height difference between both knees, in torso lengths. Large in a lunge, small in a squat.
+    var kneeHeightGap: Double? {
+        guard let leftKnee, let rightKnee, torsoLength > 0 else { return nil }
+        return abs(leftKnee.y - rightKnee.y) / torsoLength
+    }
+
+    /// Distance between both ankles, in torso lengths.
+    var stanceWidth: Double? {
+        guard let leftAnkle, let rightAnkle, torsoLength > 0 else { return nil }
+        return hypot(leftAnkle.x - rightAnkle.x, leftAnkle.y - rightAnkle.y) / torsoLength
     }
 
     /// Torso angle from vertical, in degrees. Visible when standing sideways, close to 0 when facing the camera.
@@ -70,6 +99,10 @@ nonisolated struct PoseAnalyzer {
             measure = PoseMeasure(
                 hips: hips,
                 neck: neck,
+                leftHip: position(.leftHip),
+                rightHip: position(.rightHip),
+                leftKnee: position(.leftKnee),
+                rightKnee: position(.rightKnee),
                 leftAnkle: position(.leftAnkle),
                 rightAnkle: position(.rightAnkle)
             )
