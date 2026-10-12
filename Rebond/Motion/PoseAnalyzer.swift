@@ -76,10 +76,9 @@ nonisolated struct PoseAnalyzer {
         let request = VNDetectHumanBodyPoseRequest()
         let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: orientation)
         guard (try? handler.perform([request])) != nil,
-              let points = try? request.results?.first?.recognizedPoints(.all)
+              let visible = patientPoints(in: request.results ?? [])
         else { return PoseFrame(skeleton: nil, measure: nil) }
 
-        let visible = points.filter { $0.value.confidence >= minimumConfidence }
         guard visible.count >= 4 else { return PoseFrame(skeleton: nil, measure: nil) }
 
         let size = uprightSize(of: pixelBuffer)
@@ -108,6 +107,22 @@ nonisolated struct PoseAnalyzer {
             )
         }
         return PoseFrame(skeleton: skeleton, measure: measure)
+    }
+
+    /// Several people can be in view (family, colleagues in the background): the patient is the one
+    /// standing closest to the phone, so the largest on screen.
+    private func patientPoints(in observations: [VNHumanBodyPoseObservation]) -> [VNHumanBodyPoseObservation.JointName: VNRecognizedPoint]? {
+        let people = observations.compactMap { observation -> [VNHumanBodyPoseObservation.JointName: VNRecognizedPoint]? in
+            guard let points = try? observation.recognizedPoints(.all) else { return nil }
+            return points.filter { $0.value.confidence >= minimumConfidence }
+        }
+        return people.max { Self.area(of: $0) < Self.area(of: $1) }
+    }
+
+    private static func area(of points: [VNHumanBodyPoseObservation.JointName: VNRecognizedPoint]) -> Double {
+        let xs = points.values.map(\.location.x), ys = points.values.map(\.location.y)
+        guard let minX = xs.min(), let maxX = xs.max(), let minY = ys.min(), let maxY = ys.max() else { return 0 }
+        return (maxX - minX) * (maxY - minY)
     }
 
     /// Image size once `orientation` is applied, matching Vision's normalized coordinates.

@@ -8,6 +8,7 @@ nonisolated enum Correction: Sendable {
     case keepFeetInPlace
     case bendBothKnees
     case showBothLegs
+    case kneesOverFeet
 
     var message: LocalizedStringResource {
         switch self {
@@ -17,6 +18,7 @@ nonisolated enum Correction: Sendable {
         case .keepFeetInPlace: "Gardez les pieds en place"
         case .bendBothKnees: "Pliez les deux genoux ensemble"
         case .showBothLegs: "Je ne vois pas vos deux jambes"
+        case .kneesOverFeet: "Gardez les genoux au-dessus des pieds"
         }
     }
 }
@@ -25,8 +27,6 @@ nonisolated struct RepResult: Sendable {
     /// How far the hips went down, in torso lengths (range of motion).
     let depth: Double
     let tooFast: Bool
-    /// Already said during the movement, kept for the report.
-    let leanedForward: Bool
 }
 
 nonisolated enum RepEvent: Sendable {
@@ -104,7 +104,7 @@ nonisolated struct RepCounter {
     private let maxHipShiftFacing = 0.35
     /// Seen from the side, sitting back in a deep squat moves the hips up to about 0.7, but only as they go down:
     /// the allowed movement grows with the depth reached.
-    private let hipShiftSidewaysBase = 0.35
+    private let hipShiftSidewaysBase = 0.45
     private let hipShiftSidewaysPerDepth = 0.5
     /// Hips width on screen, in torso lengths, above which the patient faces the camera.
     /// Measured with Vision: about 0.4 from the front, 0.1 to 0.2 from the side (noisy, hence the median).
@@ -113,11 +113,19 @@ nonisolated struct RepCounter {
     private let straightLeg = 150.0
     /// A repetition is cancelled when the body isn't measured for this long, in seconds.
     private let lostTimeout = 1.5
-    /// Torso lean beyond the resting lean that triggers a correction, in degrees: leaning forward seen
-    /// from the side, tilting sideways seen from the front. Set from the UI-PRMD deep squats
-    /// (correct squats: 90% under 47° from the side and 14° from the front).
+    /// Torso lean beyond the resting lean, seen from the side, in degrees.
+    /// Set from the UI-PRMD deep squats (correct squats: 90% under 47°).
     private let maxLeanIncreaseSideways = 55.0
-    private let maxLeanIncreaseFacing = 25.0
+    /// Seen from the front, leaning toward the camera makes the torso look shorter on screen.
+    /// Correct squats keep at least about 80% of the standing length; a torso bent forward drops to 30–65%.
+    private let minTorsoRatioFacing = 0.7
+    /// Knees spread much wider than the feet ("frog"), seen from the front. Correct squats: up to about 1.4.
+    private let maxKneeToAnkleWidth = 1.8
+    /// A fault must last this many frames (0.2 s) to count: Vision is sometimes wrong on a single frame.
+    private let faultFrames = 3
+    /// Below this torso length (fraction of the standing one), Vision has lost the body: the frame is ignored.
+    /// Except facing the camera during a repetition, where it means the patient bends toward the camera.
+    private let collapsedTorsoRatio = 0.5
     /// Seconds from the start of the descent to the return to rest.
     private let minRepDuration = 1.2
 
@@ -129,8 +137,7 @@ nonisolated struct RepCounter {
     private var repStart = 0.0
     /// Whether the patient faced the camera when the repetition started: some limits depend on the view.
     private var repFacingCamera = true
-    /// The lean correction is said once per repetition, as soon as it happens.
-    private var leanWarned = false
+    private var faultStreak: (fault: Correction, frames: Int)?
     /// Facing the camera, the checks comparing both legs need both knees seen at the bottom,
     /// otherwise a lunge or a collapsed squat would slip through unchecked.
     private var sawBothKneesAtBottom = false
@@ -153,6 +160,12 @@ nonisolated struct RepCounter {
             }
             return CounterUpdate(progress: progress, event: nil)
         }
+        if phase != .calibrating, measure.torsoLength / rest.torsoLength < collapsedTorsoRatio {
+            if isInRepetition, repFacingCamera, let event = record(.keepBackStraight) {
+                return CounterUpdate(progress: progress, event: event, posture: .keepBackStraight)
+            }
+            return CounterUpdate(progress: progress, event: nil, posture: isInRepetition ? faultStreak?.fault : nil)
+        }
         lastMeasureTime = time
 
         recentHips.append(measure.hips.y)
@@ -168,12 +181,7 @@ nonisolated struct RepCounter {
         let depth = (rest.hipsHeight - Self.median(recentHips)) / rest.torsoLength
         progress = max(0, depth / exercise.targetDepth)
         let event = advance(depth: depth, measure: measure, time: time)
-        let leaning = isInRepetition && isLeaning(measure)
-        if leaning, event == nil, !leanWarned {
-            leanWarned = true
-            return CounterUpdate(progress: progress, event: .correction(.keepBackStraight), posture: .keepBackStraight)
-        }
-        return CounterUpdate(progress: progress, event: event, posture: leaning ? .keepBackStraight : nil)
+        return CounterUpdate(progress: progress, event: event, posture: isInRepetition ? faultStreak?.fault : nil)
     }
 
     /// Learns the resting position when the patient stands still,
@@ -230,8 +238,9 @@ nonisolated struct RepCounter {
             }
             maxDepth = max(maxDepth, depth)
             if let fault = fault(in: measure, depth: depth) {
-                phase = .cancelled
-                return .correction(fault)
+                if let event = record(fault) { return event }
+            } else {
+                faultStreak = nil
             }
         }
 
@@ -249,7 +258,7 @@ nonisolated struct RepCounter {
                 maxDepth = depth
                 repStart = time
                 repFacingCamera = isFacingCamera()
-                leanWarned = false
+                faultStreak = nil
                 sawBothKneesAtBottom = false
             }
         case .descending:
@@ -272,8 +281,7 @@ nonisolated struct RepCounter {
                 }
                 return .repCompleted(RepResult(
                     depth: maxDepth,
-                    tooFast: time - repStart < minRepDuration,
-                    leanedForward: leanWarned
+                    tooFast: time - repStart < minRepDuration
                 ))
             }
         case .risingTooEarly:
@@ -287,10 +295,24 @@ nonisolated struct RepCounter {
         return nil
     }
 
+    /// Counts consecutive frames showing the same fault; past `faultFrames`, the repetition is rejected.
+    private mutating func record(_ fault: Correction) -> RepEvent? {
+        let frames = faultStreak?.fault == fault ? faultStreak!.frames + 1 : 1
+        faultStreak = (fault, frames)
+        guard frames >= faultFrames else { return nil }
+        phase = .cancelled
+        return .correction(fault)
+    }
+
     /// What makes this frame something else than a squat: one knee lower than the other (lunge),
     /// or feet moving or spreading (step, lunge, sumo squat). Measured against the standing torso,
     /// which doesn't shrink when the patient leans forward.
     private func fault(in measure: PoseMeasure, depth: Double) -> Correction? {
+        if repFacingCamera
+            ? measure.torsoLength / rest.torsoLength < minTorsoRatioFacing
+            : measure.torsoLean - rest.lean > maxLeanIncreaseSideways {
+            return .keepBackStraight
+        }
         if let leftKnee = measure.leftKnee, let rightKnee = measure.rightKnee,
            abs(leftKnee.y - rightKnee.y) / rest.torsoLength > maxKneeGap {
             return .bendBothKnees
@@ -298,6 +320,14 @@ nonisolated struct RepCounter {
         let maxHipShift = repFacingCamera
             ? maxHipShiftFacing
             : hipShiftSidewaysBase + hipShiftSidewaysPerDepth * max(0, depth)
+        if repFacingCamera,
+           let leftKnee = measure.leftKnee, let rightKnee = measure.rightKnee,
+           let leftAnkle = measure.leftAnkle, let rightAnkle = measure.rightAnkle {
+            let ankleWidth = abs(leftAnkle.x - rightAnkle.x)
+            if ankleWidth / rest.torsoLength > 0.3, abs(leftKnee.x - rightKnee.x) / ankleWidth > maxKneeToAnkleWidth {
+                return .kneesOverFeet
+            }
+        }
         if feetMoved(measure) || abs(measure.hips.x - rest.hipsX) / rest.torsoLength > maxHipShift {
             return .keepFeetInPlace
         }
@@ -309,10 +339,6 @@ nonisolated struct RepCounter {
             }
         }
         return nil
-    }
-
-    private func isLeaning(_ measure: PoseMeasure) -> Bool {
-        measure.torsoLean - rest.lean > (repFacingCamera ? maxLeanIncreaseFacing : maxLeanIncreaseSideways)
     }
 
     /// Seen from the front, both hips are apart on screen; seen from the side, they overlap.

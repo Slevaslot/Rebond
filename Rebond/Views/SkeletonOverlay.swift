@@ -68,6 +68,7 @@ extension Correction {
         case .bendBothKnees: [.leftHip, .rightHip, .leftKnee, .rightKnee, .leftAnkle, .rightAnkle]
         case .keepFeetInPlace: [.leftKnee, .rightKnee, .leftAnkle, .rightAnkle]
         case .showBothLegs: [.leftHip, .rightHip, .leftKnee, .rightKnee, .leftAnkle, .rightAnkle]
+        case .kneesOverFeet: [.leftKnee, .rightKnee, .leftAnkle, .rightAnkle]
         case .slowDown: []
         }
     }
