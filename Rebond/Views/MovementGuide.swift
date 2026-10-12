@@ -39,8 +39,8 @@ struct MovementGuide: View {
                     default: .white
                     }
                     // A dark edge under the line keeps it visible on a bright room.
-                    context.stroke(figure, with: .color(.black.opacity(0.35)), style: StrokeStyle(lineWidth: 7, lineJoin: .round))
-                    context.stroke(figure, with: .color(color), style: StrokeStyle(lineWidth: 3.5, lineJoin: .round))
+                    context.stroke(figure, with: .color(.black.opacity(0.35)), style: StrokeStyle(lineWidth: 11, lineJoin: .round))
+                    context.stroke(figure, with: .color(color), style: StrokeStyle(lineWidth: 6, lineJoin: .round))
                 }
             }
             .onChange(of: placement, initial: true) { onPlacement(placement) }
@@ -101,8 +101,12 @@ struct MovementGuide: View {
 
         if let leftShoulder = point(.leftShoulder), let rightShoulder = point(.rightShoulder),
            let leftHip = point(.leftHip), let rightHip = point(.rightHip) {
+            // Straight torso: as wide at the hips as at the shoulders.
             var torso = Path()
-            torso.addLines([leftShoulder, rightShoulder, rightHip, leftHip])
+            torso.addLines([
+                leftShoulder, rightShoulder,
+                CGPoint(x: rightShoulder.x, y: rightHip.y), CGPoint(x: leftShoulder.x, y: leftHip.y),
+            ])
             torso.closeSubpath()
             outline = outline.union(torso.strokedPath(StrokeStyle(lineWidth: thickness, lineJoin: .round)).union(torso))
         }
