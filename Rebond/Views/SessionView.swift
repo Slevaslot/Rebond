@@ -61,20 +61,6 @@ struct SessionView: View {
                     placementHint
                 } else if motion.phase == .demonstrating {
                     topCard(title: "Regardez d'abord le mouvement", detail: "Restez immobile, vous commencerez après")
-                } else if motion.phase == .countdown {
-                    VStack(spacing: 12) {
-                        Text("Prêt ?")
-                            .font(.title2.bold())
-                        Text(motion.countdownValue, format: .number)
-                            .font(.system(.largeTitle, design: .rounded).weight(.bold))
-                            .monospacedDigit()
-                            .contentTransition(.numericText(countsDown: true))
-                            .padding(28)
-                            .glassEffect(in: .circle)
-                            .animation(.default, value: motion.countdownValue)
-                    }
-                    .accessibilityElement(children: .ignore)
-                    .accessibilityLabel(Text("Début dans \(motion.countdownValue) secondes"))
                 } else {
                     counter
                 }
@@ -193,7 +179,7 @@ struct SessionView: View {
     /// From the demonstration on: one guide that moves between large (demonstrating) and its card.
     private var showsFloatingGuide: Bool {
         switch motion.phase {
-        case .demonstrating, .countdown, .active: true
+        case .demonstrating, .active: true
         case .calibrating, .finished: false
         }
     }
@@ -233,7 +219,7 @@ struct SessionView: View {
             MovementGuide(
                 exercise: exercise,
                 skeleton: nil,
-                isDemonstrating: motion.phase != .countdown,
+                isDemonstrating: true,
                 demonstrationStart: motion.demonstrationStart,
                 isCompact: true
             )

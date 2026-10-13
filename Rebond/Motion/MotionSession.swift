@@ -25,8 +25,6 @@ final class MotionSession {
         case calibrating
         /// In place: the guide shows the movement once, then moves to its corner.
         case demonstrating
-        /// 3, 2, 1 before counting starts.
-        case countdown
         case active
         case finished
     }
@@ -65,8 +63,6 @@ final class MotionSession {
     /// Deepest completed repetition, in torso lengths.
     private(set) var bestDepth = 0.0
     private(set) var feedback: Feedback?
-    /// Seconds left before counting starts, during the countdown.
-    private(set) var countdownValue = 3
     private(set) var guideDisplay = GuideDisplay.large
     /// When the current demonstration started, so the guide begins it standing.
     private(set) var demonstrationStart = Date.now
@@ -85,10 +81,10 @@ final class MotionSession {
     /// Consecutive frames without a body, so a single missed detection doesn't flash the placement hint.
     @ObservationIgnored private var missedFrames = 0
     @ObservationIgnored private var feedbackDismissal: Task<Void, Never>?
-    /// The resting position is measured and the patient stands in the guide: the countdown can start.
+    /// The resting position is measured and the patient stands in the guide: the demonstration can start.
     @ObservationIgnored private var isCalibrated = false
     @ObservationIgnored private var isInPlace = false
-    @ObservationIgnored private var countdown: Task<Void, Never>?
+    @ObservationIgnored private var intro: Task<Void, Never>?
     @ObservationIgnored private var demonstration: Task<Void, Never>?
     /// Movements rejected in a row: after a few, the guide shows the movement again.
     @ObservationIgnored private var failedInARow = 0
@@ -185,31 +181,24 @@ final class MotionSession {
     func updatePlacement(_ placement: GuidePlacement) {
         isInPlace = placement == .aligned || placement == .almost
         announce(placement.message)
-        startCountdownIfReady()
+        startDemonstrationIfReady()
     }
 
     /// Once the patient is in place and still: the guide shows the movement, moves to its corner,
-    /// then 3, 2, 1 and counting starts.
-    private func startCountdownIfReady() {
+    /// then counting starts.
+    private func startDemonstrationIfReady() {
         guard phase == .calibrating, isCalibrated, isInPlace else { return }
         phase = .demonstrating
         guideDisplay = .large
         demonstrationStart = .now
         coach.say("Regardez d'abord le mouvement, restez immobile")
-        countdown = Task {
+        intro = Task {
             try? await Task.sleep(for: .seconds(Self.demonstrationDuration))
             guard !Task.isCancelled else { return }
             guideDisplay = .corner
             // Time for the guide to move to its corner.
             try? await Task.sleep(for: .seconds(0.8))
             guard !Task.isCancelled else { return }
-            phase = .countdown
-            for value in [3, 2, 1] {
-                countdownValue = value
-                coach.say("\(value)")
-                try? await Task.sleep(for: .seconds(1))
-                guard !Task.isCancelled else { return }
-            }
             phase = .active
             demonstrationStart = .now
             coach.say("C'est parti !")
@@ -231,7 +220,7 @@ final class MotionSession {
     /// Starts the set over, measuring the resting position again.
     func restart() {
         processor.resetCounter()
-        countdown?.cancel()
+        intro?.cancel()
         demonstration?.cancel()
         guideDisplay = .large
         failedInARow = 0
@@ -265,9 +254,9 @@ final class MotionSession {
         guard phase != .finished else { return }
         if case .calibrated = update.event {
             isCalibrated = true
-            startCountdownIfReady()
+            startDemonstrationIfReady()
         }
-        // Nothing counts before the end of the countdown.
+        // Nothing counts before the end of the demonstration.
         guard phase == .active else { return }
         depthProgress = update.progress
         faultToHighlight = update.posture ?? heldFault

@@ -23,7 +23,8 @@ nonisolated extension CatalogExercise {
         id: "squat",
         name: "Squat",
         highlightedJoints: [.leftHip, .leftKnee, .leftAnkle, .rightHip, .rightKnee, .rightAnkle],
-        targetDepth: 0.85,
+        // Partial squat: Rebond is for rehabilitation, often for older patients (half squats reach 0.6–0.85).
+        targetDepth: 0.6,
         guideRest: [
             .nose: CGPoint(x: 0.5, y: 0.08),
             .neck: CGPoint(x: 0.5, y: 0.18),
