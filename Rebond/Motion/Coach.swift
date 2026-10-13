@@ -8,8 +8,9 @@ final class Coach {
     private let voice = Coach.bestVoice()
 
     init() {
-        // Audible even with the silent switch on, and lowers music while speaking.
-        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .voicePrompt, options: [.duckOthers])
+        // Audible even with the silent switch on. Not mixed with other audio: Rebond is the "now playing"
+        // app during the session, so the AirPods' play/pause press reaches it (and pauses the music).
+        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio)
     }
 
     func say(_ text: LocalizedStringResource) {

@@ -61,6 +61,8 @@ struct SessionView: View {
                     placementHint
                 } else if motion.phase == .demonstrating {
                     topCard(title: "Regardez d'abord le mouvement", detail: "Restez immobile, vous commencerez après")
+                } else if motion.isPaused {
+                    topCard(title: "En pause", detail: "Appuyez sur vos AirPods ou sur Reprendre pour continuer")
                 } else {
                     counter
                 }
@@ -102,6 +104,14 @@ struct SessionView: View {
         .navigationTitle(Text(exercise.name))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                if motion.phase == .active {
+                    Button(motion.isPaused ? "Reprendre" : "Pause",
+                           systemImage: motion.isPaused ? "play.fill" : "pause.fill") {
+                        motion.togglePause()
+                    }
+                }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button("Recommencer", systemImage: "arrow.counterclockwise") {
                     motion.restart()

@@ -1,4 +1,5 @@
 import AVFoundation
+import MediaPlayer
 import Observation
 import Synchronization
 
@@ -64,6 +65,8 @@ final class MotionSession {
     private(set) var bestDepth = 0.0
     private(set) var feedback: Feedback?
     private(set) var guideDisplay = GuideDisplay.large
+    /// Paused from the screen or the AirPods: nothing is counted until the patient resumes.
+    private(set) var isPaused = false
     /// When the current demonstration started, so the guide begins it standing.
     private(set) var demonstrationStart = Date.now
     /// Fault to show in red on the body: the live posture problem, or the last rejected movement for a moment.
@@ -81,6 +84,7 @@ final class MotionSession {
     /// Consecutive frames without a body, so a single missed detection doesn't flash the placement hint.
     @ObservationIgnored private var missedFrames = 0
     @ObservationIgnored private var feedbackDismissal: Task<Void, Never>?
+    @ObservationIgnored private var remoteTargets: [(MPRemoteCommand, Any)] = []
     /// The resting position is measured and the patient stands in the guide: the demonstration can start.
     @ObservationIgnored private var isCalibrated = false
     @ObservationIgnored private var isInPlace = false
@@ -150,11 +154,55 @@ final class MotionSession {
 
         nonisolated(unsafe) let session = captureSession
         videoQueue.async { session.startRunning() }
+        enableRemoteControls()
     }
 
     func stop() {
         nonisolated(unsafe) let session = captureSession
         videoQueue.async { session.stopRunning() }
+        disableRemoteControls()
+    }
+
+    func togglePause() {
+        guard phase == .active else { return }
+        isPaused.toggle()
+        coach.say(isPaused ? "Pause" : "On reprend")
+        MPNowPlayingInfoCenter.default().nowPlayingInfo?[MPNowPlayingInfoPropertyPlaybackRate] = isPaused ? 0.0 : 1.0
+    }
+
+    /// The AirPods' press (play/pause) pauses and resumes the set, like music.
+    private func enableRemoteControls() {
+        try? AVAudioSession.sharedInstance().setActive(true)
+        let center = MPRemoteCommandCenter.shared()
+        // Remote commands arrive on the main thread.
+        func handler(pause: Bool?) -> (MPRemoteCommandEvent) -> MPRemoteCommandHandlerStatus {
+            { [weak self] _ in
+                MainActor.assumeIsolated {
+                    guard let self, pause == nil || pause != self.isPaused else { return }
+                    self.togglePause()
+                }
+                return .success
+            }
+        }
+        remoteTargets = [
+            (center.togglePlayPauseCommand, center.togglePlayPauseCommand.addTarget(handler: handler(pause: nil))),
+            (center.pauseCommand, center.pauseCommand.addTarget(handler: handler(pause: true))),
+            (center.playCommand, center.playCommand.addTarget(handler: handler(pause: false))),
+        ]
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = [
+            MPMediaItemPropertyTitle: String(localized: exercise.name),
+            MPMediaItemPropertyArtist: "Rebond",
+            MPNowPlayingInfoPropertyPlaybackRate: 1.0,
+        ]
+    }
+
+    private func disableRemoteControls() {
+        for (command, target) in remoteTargets {
+            command.removeTarget(target)
+        }
+        remoteTargets = []
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }
 
     var result: SetResult {
@@ -234,6 +282,7 @@ final class MotionSession {
     func restart() {
         processor.resetCounter()
         intro?.cancel()
+        isPaused = false
         demonstration?.cancel()
         guideDisplay = .large
         failedInARow = 0
@@ -269,8 +318,8 @@ final class MotionSession {
             isCalibrated = true
             startDemonstrationIfReady()
         }
-        // Nothing counts before the end of the demonstration.
-        guard phase == .active else { return }
+        // Nothing counts before the end of the demonstration, nor during a pause.
+        guard phase == .active, !isPaused else { return }
         depthProgress = update.progress
         faultToHighlight = update.posture ?? heldFault
 
