@@ -182,6 +182,11 @@ final class MotionSession {
     func togglePause() {
         guard phase == .active else { return }
         isPaused.toggle()
+        if isPaused {
+            // The set resumes with the model in its card, as it normally is.
+            demonstration?.cancel()
+            guideDisplay = .corner
+        }
         coach.say(isPaused ? "Pause" : "On reprend")
         MPNowPlayingInfoCenter.default().nowPlayingInfo?[MPNowPlayingInfoPropertyPlaybackRate] = isPaused ? 0.0 : 1.0
     }
