@@ -71,6 +71,12 @@ final class MotionSession {
     /// The camera lost the patient during the set: the guide outline shows them where to stand again,
     /// and counting resumes once they are back in it.
     private(set) var isLost = false
+
+    /// The model is large in front of the patient: they watch the movement, the camera is blurred and nothing
+    /// is counted. Once it goes back to its card, it's their turn.
+    var isWatching: Bool {
+        (phase == .demonstrating || phase == .active) && guideDisplay == .large
+    }
     /// When the current demonstration started, so the guide begins it standing.
     private(set) var demonstrationStart = Date.now
     /// Fault to show in red on the body: the live posture problem, or the last rejected movement for a moment.
@@ -274,12 +280,17 @@ final class MotionSession {
         guard phase == .active, guideDisplay == .corner else { return }
         demonstration?.cancel()
         guideDisplay = .large
+        depthProgress = 0
+        demonstrationStart = .now
+        coach.say("Regardez le mouvement")
     }
 
     func shrinkModel() {
         guard phase == .active, guideDisplay == .large else { return }
         demonstration?.cancel()
         guideDisplay = .corner
+        demonstrationStart = .now
+        coach.say("À vous")
     }
 
     /// The guide does the movement once, full screen, then goes back to its card.
@@ -354,7 +365,7 @@ final class MotionSession {
             startDemonstrationIfReady()
         }
         // Nothing counts before the end of the demonstration, during a pause, nor until the patient is back in place.
-        guard phase == .active, !isPaused, !isLost else { return }
+        guard phase == .active, !isPaused, !isLost, !isWatching else { return }
         depthProgress = update.progress
         faultToHighlight = update.posture ?? heldFault
 

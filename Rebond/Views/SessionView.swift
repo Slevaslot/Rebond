@@ -63,6 +63,8 @@ struct SessionView: View {
                     placementHint
                 } else if motion.phase == .demonstrating {
                     topCard(title: "Regardez d'abord le mouvement", detail: "Restez immobile, vous commencerez après")
+                } else if isWatching, !motion.isPaused {
+                    topCard(title: "Regardez le mouvement", detail: "Touchez le modèle pour reprendre")
                 } else if !motion.isPaused {
                     counter
                 }
@@ -88,7 +90,7 @@ struct SessionView: View {
         .animation(.smooth(duration: 0.3), value: motion.isPaused)
         .animation(.smooth(duration: 0.55), value: motion.guideDisplay)
         .overlay(alignment: .trailing) {
-            if motion.phase == .active, motion.bodyVisible, !motion.isPaused, !motion.isLost {
+            if motion.phase == .active, motion.bodyVisible, !motion.isPaused, !motion.isLost, !isWatching {
                 DepthGauge(progress: motion.depthProgress)
                     .containerRelativeFrame(.vertical) { height, _ in height * 0.4 }
                     .padding()
@@ -192,9 +194,9 @@ struct SessionView: View {
         .accessibilityElement(children: .combine)
     }
 
-    /// The first demonstration, before the set: the patient watches, the camera fades back.
+    /// The model is large: the patient watches, the camera fades back.
     private var isWatching: Bool {
-        motion.phase == .demonstrating && motion.guideDisplay == .large
+        motion.isWatching
     }
 
     /// Before the set: the large guide, to get in place.
