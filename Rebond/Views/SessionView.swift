@@ -64,7 +64,7 @@ struct SessionView: View {
                 } else if motion.phase == .demonstrating {
                     topCard(title: "Regardez d'abord le mouvement", detail: "Restez immobile, vous commencerez après")
                 } else if isWatching, !motion.isPaused {
-                    topCard(title: "Regardez le mouvement", detail: "Touchez le modèle, ou faites « OK » avec la main, pour reprendre")
+                    topCard(title: "Regardez le mouvement", detail: "Touchez le modèle, ou pincez pouce et index, pour reprendre")
                 } else if !motion.isPaused {
                     counter
                 }

@@ -7,8 +7,9 @@ import Vision
 nonisolated enum HandGesture: Sendable {
     /// Palm open toward the camera, held a moment: pause or resume.
     case openPalm
-    /// Thumb against index, the other fingers stretched (an "OK" sign), like a tap on Apple Vision Pro:
-    /// open the model large, or put it back in its card. Stretched fingers tell it from a hand moving while talking.
+    /// Thumb and index together, then moving apart, as on a touch screen: open the model large.
+    case spread
+    /// Thumb and index apart, then coming together: put the model back in its card.
     case pinch
 }
 
@@ -52,19 +53,51 @@ nonisolated struct HandGestureDetector {
             }
             return false
         }
+
+        /// Another gesture just used the hand: wait for it to be released.
+        mutating func consume() {
+            used = true
+        }
     }
 
     /// About 0.6 s: a pause shouldn't come from a hand passing by.
     private var palm = Hold(frames: 9)
-    /// About 0.2 s: a quick pinch is enough.
-    private var pinch = Hold(frames: 3)
+
+    /// Gap between the thumb and index tips, in palm sizes: below, they touch; above, they are apart.
+    private let closedGap = 0.35
+    private let openGap = 0.8
+    /// Recent gaps, about one second: a spread or pinch must happen within it.
+    private var gaps: [Double] = []
+    private let gapWindow = 15
 
     mutating func process(_ pixelBuffer: CVPixelBuffer, body: PoseSkeleton?) -> HandGesture? {
         let (hands, raisedArms) = raisedHands(in: pixelBuffer, body: body)
         let hand = raisedArms == 1 && hands.count == 1 ? hands[0] : nil
 
         if palm.update(hand.map(Self.isOpenPalm) ?? false) { return .openPalm }
-        if pinch.update(hand.map(Self.isPinching) ?? false) { return .pinch }
+
+        guard let gap = hand.flatMap(Self.fingerGap) else {
+            // A missed detection doesn't break the gesture, but the window still moves on.
+            gaps = Array(gaps.dropFirst())
+            return nil
+        }
+        defer { gaps = Array(gaps.suffix(gapWindow - 1)) }
+        // Each position is held at least two frames, so a hand moving while talking doesn't count.
+        let wasClosed = gaps.filter { $0 < closedGap }.count >= 2
+        let wasOpen = gaps.filter { $0 > openGap }.count >= 2
+        gaps.append(gap)
+        let lastTwo = gaps.suffix(2)
+        guard lastTwo.count == 2 else { return nil }
+        if lastTwo.allSatisfy({ $0 > openGap }), wasClosed {
+            gaps = []
+            // The spread hand may look like an open palm: it must not pause right after.
+            palm.consume()
+            return .spread
+        }
+        if lastTwo.allSatisfy({ $0 < closedGap }), wasOpen {
+            gaps = []
+            return .pinch
+        }
         return nil
     }
 
@@ -109,12 +142,10 @@ nonisolated struct HandGestureDetector {
         return hypot(thumb.x - index.x, thumb.y - index.y) > palm * 0.5
     }
 
-    /// Thumb and index tips touching, the other fingers stretched.
-    private static func isPinching(_ hand: [VNHumanHandPoseObservation.JointName: CGPoint]) -> Bool {
-        guard let thumb = hand[.thumbTip], let index = hand[.indexTip], let palm = palmSize(hand),
-              hypot(thumb.x - index.x, thumb.y - index.y) < palm * 0.35
-        else { return false }
-        return areStretched([(.middleTip, .middlePIP), (.ringTip, .ringPIP), (.littleTip, .littlePIP)], in: hand)
+    /// Gap between the thumb and index tips, in palm sizes.
+    private static func fingerGap(_ hand: [VNHumanHandPoseObservation.JointName: CGPoint]) -> Double? {
+        guard let thumb = hand[.thumbTip], let index = hand[.indexTip], let palm = palmSize(hand) else { return nil }
+        return hypot(thumb.x - index.x, thumb.y - index.y) / palm
     }
 
     private static func areStretched(

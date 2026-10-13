@@ -186,11 +186,12 @@ final class MotionSession {
         MPNowPlayingInfoCenter.default().nowPlayingInfo?[MPNowPlayingInfoPropertyPlaybackRate] = isPaused ? 0.0 : 1.0
     }
 
-    /// Hand gestures, from where the patient stands: palm to pause, pinch to open or close the model.
+    /// Hand gestures, from where the patient stands: palm to pause, spread or pinch to open or close the model.
     private func handle(_ gesture: HandGesture) {
         switch gesture {
         case .openPalm: togglePause()
-        case .pinch: guideDisplay == .large ? shrinkModel() : expandModel()
+        case .spread: expandModel()
+        case .pinch: shrinkModel()
         }
     }
 
