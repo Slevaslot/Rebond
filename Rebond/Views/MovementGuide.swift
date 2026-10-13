@@ -25,7 +25,7 @@ struct MovementGuide: View {
     var body: some View {
         GeometryReader { geometry in
             let size = geometry.size
-            let box = box(in: size)
+            let box = figureBox(in: size)
             let placement = placement(in: size, box: box)
 
             TimelineView(.animation(paused: reduceMotion || !isDemonstrating)) { timeline in
@@ -54,7 +54,7 @@ struct MovementGuide: View {
     /// Where the figure sits: the size of a person standing about 3 m away (at 2 to 3 m, shoulders to
     /// ankles fill about 56% of the screen height on real videos). Once the feet are seen, the figure stands
     /// on them: their height on screen depends on how the phone is set, not on where the patient stands.
-    private func box(in size: CGSize) -> CGRect {
+    func figureBox(in size: CGSize) -> CGRect {
         if isCompact {
             let height = size.height * 0.9
             let width = height * 0.65

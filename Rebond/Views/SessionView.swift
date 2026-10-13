@@ -10,9 +10,12 @@ struct SessionView: View {
     @State private var motion: MotionSession
     @State private var placement = GuidePlacement.notVisible
     @ScaledMetric private var ringSize = 64
-    @ScaledMetric private var cornerGuideWidth = 84
-    /// Lets the large guide shrink and slide into its corner.
-    @Namespace private var guideSpace
+    @ScaledMetric private var cardWidth = 84
+    /// The guide's card, as the patient placed and sized it.
+    @State private var cardOffset = CGSize.zero
+    @State private var cardScale = 1.0
+    @GestureState private var drag = CGSize.zero
+    @GestureState private var pinch = 1.0
 
     init(exercise: CatalogExercise, targetReps: Int, setTitle: LocalizedStringKey, onFinish: @escaping (SetResult) -> Void) {
         self.exercise = exercise
@@ -40,19 +43,11 @@ struct SessionView: View {
                     )
                 }
             }
-            if showsLargeGuide {
-                MovementGuide(
-                    exercise: exercise,
-                    skeleton: motion.skeleton,
-                    isDemonstrating: motion.phase == .demonstrating || motion.phase == .active,
-                    demonstrationStart: motion.demonstrationStart
-                ) { placement in
+            if showsPlacementGuide {
+                MovementGuide(exercise: exercise, skeleton: motion.skeleton, isDemonstrating: false) { placement in
                     self.placement = placement
                     motion.updatePlacement(placement)
                 }
-                // Demonstrating over the patient during the set: lighter, so their own body stays readable.
-                .opacity(motion.phase == .active ? 0.6 : 1)
-                .matchedGeometryEffect(id: "guide", in: guideSpace)
             }
         }
         .ignoresSafeArea()
@@ -86,13 +81,12 @@ struct SessionView: View {
             }
             .padding()
         }
-        .overlay(alignment: .leading) {
-            if showsCornerGuide {
-                cornerGuide
-                    .padding()
+        .overlay {
+            if showsFloatingGuide {
+                floatingGuide
             }
         }
-        .animation(.spring(duration: 0.5), value: motion.guideDisplay)
+        .animation(.spring(response: 0.7, dampingFraction: 0.8), value: motion.guideDisplay)
         .overlay(alignment: .trailing) {
             if motion.phase == .active && motion.bodyVisible {
                 DepthGauge(progress: motion.depthProgress)
@@ -186,53 +180,94 @@ struct SessionView: View {
         .accessibilityElement(children: .combine)
     }
 
-    /// The guide shows the movement and counts down: the patient watches before starting.
+    /// The guide shows the movement: the patient watches before starting. Clear again once it moves to its card.
     private var isWatching: Bool {
-        motion.phase == .demonstrating || motion.phase == .countdown
+        motion.phase == .demonstrating && motion.guideDisplay == .large
     }
 
-    /// Large guide: to get in place before the set, then whenever it demonstrates the movement.
-    private var showsLargeGuide: Bool {
-        switch motion.phase {
-        case .calibrating: true
-        case .demonstrating, .active: motion.guideDisplay == .large
-        case .countdown, .finished: false
-        }
+    /// Before the set: the large guide, to get in place.
+    private var showsPlacementGuide: Bool {
+        motion.phase == .calibrating
     }
 
-    private var showsCornerGuide: Bool {
+    /// From the demonstration on: one guide that moves between large (demonstrating) and its card.
+    private var showsFloatingGuide: Bool {
         switch motion.phase {
-        case .demonstrating, .countdown, .active: motion.guideDisplay == .corner
+        case .demonstrating, .countdown, .active: true
         case .calibrating, .finished: false
         }
     }
 
-    /// The movement in a loop, small in a corner during the set. A tap hides or shows it.
-    @ViewBuilder
-    private var cornerGuide: some View {
-        Button {
-            motion.showsCornerGuide.toggle()
-        } label: {
-            if motion.showsCornerGuide {
-                MovementGuide(
-                    exercise: exercise,
-                    skeleton: nil,
-                    isDemonstrating: motion.phase == .active,
-                    demonstrationStart: motion.demonstrationStart,
-                    isCompact: true
-                )
-                .frame(width: cornerGuideWidth, height: cornerGuideWidth * 1.5)
-                .padding(8)
-                .matchedGeometryEffect(id: "guide", in: guideSpace)
-            } else {
-                Image(systemName: "figure.strengthtraining.functional")
-                    .font(.title2)
-                    .padding(14)
-            }
+    private var guideInCard: Bool {
+        motion.guideDisplay == .corner
+    }
+
+    /// Frame of the floating guide: over the patient while demonstrating, otherwise its card,
+    /// which the patient can move and resize.
+    private func floatingGuideFrame(in size: CGSize) -> CGRect {
+        let padding = 8.0
+        if !guideInCard {
+            // Same place and size as the guide used to get in place, so it starts exactly there.
+            let figure = MovementGuide(exercise: exercise, skeleton: motion.skeleton, isDemonstrating: false).figureBox(in: size)
+            let height = figure.height / 0.9 + padding * 2
+            let width = height * 0.65
+            return CGRect(x: figure.midX - width / 2, y: figure.midY - height / 2, width: width, height: height)
         }
-        .buttonStyle(.plain)
-        .glassEffect(in: .rect(cornerRadius: 20))
-        .accessibilityLabel(motion.showsCornerGuide ? Text("Masquer le modèle") : Text("Afficher le modèle"))
+        let scale = min(max(cardScale * pinch, 0.8), 3.2)
+        let width = cardWidth * scale
+        let height = width * 1.5
+        let margin = 16.0
+        var center = CGPoint(
+            x: margin + width / 2 + cardOffset.width + drag.width,
+            y: size.height / 2 + cardOffset.height + drag.height
+        )
+        center.x = min(max(center.x, width / 2 + margin), size.width - width / 2 - margin)
+        center.y = min(max(center.y, height / 2 + margin * 4), size.height - height / 2 - margin * 4)
+        return CGRect(x: center.x - width / 2, y: center.y - height / 2, width: width, height: height)
+    }
+
+    /// The model: drag it anywhere, pinch to resize, tap to switch between small and large.
+    private var floatingGuide: some View {
+        GeometryReader { geometry in
+            let frame = floatingGuideFrame(in: geometry.size)
+            MovementGuide(
+                exercise: exercise,
+                skeleton: nil,
+                isDemonstrating: motion.phase != .countdown,
+                demonstrationStart: motion.demonstrationStart,
+                isCompact: true
+            )
+            .padding(8)
+            .background {
+                Color.clear
+                    .glassEffect(in: .rect(cornerRadius: 20))
+                    .opacity(guideInCard ? 1 : 0)
+            }
+            .contentShape(.rect(cornerRadius: 20))
+            .frame(width: frame.width, height: frame.height)
+            .position(x: frame.midX, y: frame.midY)
+            .onTapGesture {
+                guard guideInCard else { return }
+                withAnimation(.spring(duration: 0.4)) { cardScale = cardScale > 1.5 ? 1 : 2.6 }
+            }
+            .gesture(
+                DragGesture()
+                    .updating($drag) { value, state, _ in state = value.translation }
+                    .onEnded { value in
+                        cardOffset.width += value.translation.width
+                        cardOffset.height += value.translation.height
+                    }
+                    .simultaneously(with: MagnifyGesture()
+                        .updating($pinch) { value, state, _ in state = value.magnification }
+                        .onEnded { value in cardScale = min(max(cardScale * value.magnification, 0.8), 3.2) }),
+                isEnabled: guideInCard
+            )
+            .accessibilityElement()
+            .accessibilityLabel(Text("Modèle du mouvement"))
+            .accessibilityHint(Text("Touchez pour agrandir ou réduire, faites glisser pour déplacer"))
+            .accessibilityAddTraits(.isButton)
+        }
+        .ignoresSafeArea()
     }
 
     /// Where to move to fit in the guide outline, in one short line.

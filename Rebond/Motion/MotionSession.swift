@@ -70,8 +70,6 @@ final class MotionSession {
     private(set) var guideDisplay = GuideDisplay.large
     /// When the current demonstration started, so the guide begins it standing.
     private(set) var demonstrationStart = Date.now
-    /// The patient can hide the small guide in the corner.
-    var showsCornerGuide = true
     /// Fault to show in red on the body: the live posture problem, or the last rejected movement for a moment.
     private(set) var faultToHighlight: Correction?
     var isMuted = false {
