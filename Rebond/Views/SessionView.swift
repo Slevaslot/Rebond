@@ -11,6 +11,7 @@ struct SessionView: View {
     @State private var placement = GuidePlacement.notVisible
     @ScaledMetric private var ringSize = 64
     @ScaledMetric private var cardWidth = 84
+    @ScaledMetric private var pauseIconSize = 72
     /// The guide's card, as the patient placed and sized it.
     @State private var cardOffset = CGSize.zero
     @State private var cardScale = 1.0
@@ -29,12 +30,13 @@ struct SessionView: View {
             Color.black
             if !motion.cameraUnavailable {
                 // While the guide demonstrates, the camera fades back: it is not the patient's turn yet.
+                // Watching the demonstration or paused: the whole picture is blurred like the background.
                 CameraFrameView(frame: motion.liveFrame)
-                    .blur(radius: isWatching ? 24 : 0)
-                if isWatching {
-                    Color.black.opacity(0.5)
+                    .blur(radius: isWatching || motion.isPaused ? 12 : 0)
+                if isWatching || motion.isPaused {
+                    Color.black.opacity(0.3)
                 }
-                if let skeleton = motion.skeleton, !isWatching {
+                if let skeleton = motion.skeleton, !isWatching, !motion.isPaused {
                     SkeletonOverlay(
                         skeleton: skeleton,
                         highlightedJoints: exercise.highlightedJoints,
@@ -62,7 +64,7 @@ struct SessionView: View {
                 } else if motion.phase == .demonstrating {
                     topCard(title: "Regardez d'abord le mouvement", detail: "Restez immobile, vous commencerez après")
                 } else if motion.isPaused {
-                    topCard(title: "En pause", detail: "Appuyez sur vos AirPods ou sur Reprendre pour continuer")
+                    topCard(title: "En pause", detail: "Appuyez sur vos AirPods ou sur le bouton pour reprendre")
                 } else {
                     counter
                 }
@@ -74,6 +76,18 @@ struct SessionView: View {
                 floatingGuide
             }
         }
+        .overlay {
+            if motion.isPaused {
+                Button("Reprendre", systemImage: "pause.fill") { motion.togglePause() }
+                    .labelStyle(.iconOnly)
+                    .font(.system(size: pauseIconSize))
+                    .padding(pauseIconSize * 0.4)
+                    .glassEffect(in: .circle)
+                    .buttonStyle(.plain)
+                    .transition(.scale.combined(with: .opacity))
+            }
+        }
+        .animation(.smooth(duration: 0.3), value: motion.isPaused)
         .animation(.smooth(duration: 0.55), value: motion.guideDisplay)
         .overlay(alignment: .trailing) {
             if motion.phase == .active && motion.bodyVisible {
@@ -217,13 +231,18 @@ struct SessionView: View {
         return CGRect(x: center.x - width / 2, y: center.y - height / 2, width: width, height: height)
     }
 
-    /// Full screen, the figure keeps the size and place it had to get in place; in the card, it fills the card.
-    private func figureFrame(in card: CGRect, screen: CGSize) -> CGRect {
-        let padding = 8.0
-        guard !guideInCard else { return card.insetBy(dx: padding, dy: padding) }
+    /// Where the figure is drawn when large: the size and place it had to get in place.
+    private func largeFigureFrame(in screen: CGSize) -> CGRect {
         let figure = MovementGuide(exercise: exercise, skeleton: nil, isDemonstrating: false).figureBox(in: screen)
         let height = figure.height / 0.9
         return CGRect(x: figure.midX - height / 2, y: figure.midY - height / 2, width: height, height: height)
+    }
+
+    /// Where the figure goes: large in front of the patient, or filling its card.
+    private func figureFrame(in card: CGRect, screen: CGSize) -> CGRect {
+        guard guideInCard else { return largeFigureFrame(in: screen) }
+        let side = min(card.width, card.height) - 16
+        return CGRect(x: card.midX - side / 2, y: card.midY - side / 2, width: side, height: side)
     }
 
     /// One card for the model at every size: it shrinks from large into its card, and opens back up.
@@ -233,6 +252,9 @@ struct SessionView: View {
         GeometryReader { geometry in
             let card = floatingGuideFrame(in: geometry.size)
             let figure = figureFrame(in: card, screen: geometry.size)
+            // Always drawn at its large size and scaled down: it shrinks smoothly, like its card.
+            let large = largeFigureFrame(in: geometry.size)
+            let scale = figure.height / large.height
             ZStack {
                 RoundedRectangle(cornerRadius: guideInCard ? 20 : 0)
                     .fill(.clear)
@@ -245,9 +267,11 @@ struct SessionView: View {
                     skeleton: nil,
                     isDemonstrating: true,
                     demonstrationStart: motion.demonstrationStart,
-                    isCompact: true
+                    isCompact: true,
+                    lineWidth: guideInCard ? 3 / scale : 6
                 )
-                .frame(width: figure.width, height: figure.height)
+                .frame(width: large.width, height: large.height)
+                .scaleEffect(scale)
                 .position(x: figure.midX, y: figure.midY)
             }
             .frame(width: geometry.size.width, height: geometry.size.height)

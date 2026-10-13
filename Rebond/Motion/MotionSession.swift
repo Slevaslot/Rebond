@@ -2,6 +2,7 @@ import AVFoundation
 import MediaPlayer
 import Observation
 import Synchronization
+import Vision
 
 /// What one set produced, saved in the session.
 nonisolated struct SetResult: Sendable {
@@ -174,21 +175,15 @@ final class MotionSession {
     private func enableRemoteControls() {
         try? AVAudioSession.sharedInstance().setActive(true)
         let center = MPRemoteCommandCenter.shared()
+        // Rebond plays no continuous sound, so iOS may send "play" even to pause: every press toggles.
         // Remote commands arrive on the main thread.
-        func handler(pause: Bool?) -> (MPRemoteCommandEvent) -> MPRemoteCommandHandlerStatus {
-            { [weak self] _ in
-                MainActor.assumeIsolated {
-                    guard let self, pause == nil || pause != self.isPaused else { return }
-                    self.togglePause()
-                }
-                return .success
-            }
+        let toggle: (MPRemoteCommandEvent) -> MPRemoteCommandHandlerStatus = { [weak self] _ in
+            MainActor.assumeIsolated { self?.togglePause() }
+            return .success
         }
-        remoteTargets = [
-            (center.togglePlayPauseCommand, center.togglePlayPauseCommand.addTarget(handler: handler(pause: nil))),
-            (center.pauseCommand, center.pauseCommand.addTarget(handler: handler(pause: true))),
-            (center.playCommand, center.playCommand.addTarget(handler: handler(pause: false))),
-        ]
+        remoteTargets = [center.togglePlayPauseCommand, center.pauseCommand, center.playCommand].map {
+            ($0, $0.addTarget(handler: toggle))
+        }
         MPNowPlayingInfoCenter.default().nowPlayingInfo = [
             MPMediaItemPropertyTitle: String(localized: exercise.name),
             MPMediaItemPropertyArtist: "Rebond",
@@ -398,6 +393,8 @@ nonisolated final class FrameProcessor: NSObject, AVCaptureVideoDataOutputSample
     private let exercise: CatalogExercise
     private let analyzer = PoseAnalyzer()
     private let blur = BackgroundBlur()
+    /// Where the patient was last seen, normalized, origin top-left.
+    private var patient: CGPoint?
     private var counter: RepCounter
     private var lastAnalysisTime = CMTime.zero
     /// 15 analyses per second are enough to follow the movement.
@@ -417,17 +414,20 @@ nonisolated final class FrameProcessor: NSObject, AVCaptureVideoDataOutputSample
 
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         guard let pixelBuffer = sampleBuffer.imageBuffer else { return }
-        onImage?(blur.apply(to: pixelBuffer))
 
         let time = sampleBuffer.presentationTimeStamp
-        guard time - lastAnalysisTime >= minAnalysisInterval else { return }
-        lastAnalysisTime = time
-
-        if resetRequested.withLock({ requested in defer { requested = false }; return requested }) {
-            counter = RepCounter(exercise: exercise)
+        if time - lastAnalysisTime >= minAnalysisInterval {
+            lastAnalysisTime = time
+            if resetRequested.withLock({ requested in defer { requested = false }; return requested }) {
+                counter = RepCounter(exercise: exercise)
+            }
+            let frame = analyzer.analyze(pixelBuffer)
+            let update = counter.process(frame.measure, at: time.seconds)
+            onAnalysis?(frame.skeleton, update)
+            // The background blur keeps only this person sharp.
+            patient = frame.skeleton.flatMap { $0.points[.root] ?? $0.points[.neck] } ?? patient
         }
-        let frame = analyzer.analyze(pixelBuffer)
-        let update = counter.process(frame.measure, at: time.seconds)
-        onAnalysis?(frame.skeleton, update)
+
+        onImage?(blur.apply(to: pixelBuffer, patient: patient))
     }
 }

@@ -15,6 +15,8 @@ struct MovementGuide: View {
     var demonstrationStart = Date.distantPast
     /// Small version in a corner: the figure fills its frame.
     var isCompact = false
+    /// Line thickness, in points.
+    var lineWidth: Double?
     var onPlacement: (GuidePlacement) -> Void = { _ in }
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -40,7 +42,7 @@ struct MovementGuide: View {
                         }
                     }
                     // A dark edge under the line keeps it visible on a bright room.
-                    let line = isCompact ? 3.0 : 6.0
+                    let line = lineWidth ?? (isCompact ? 3.0 : 6.0)
                     context.stroke(figure, with: .color(.black.opacity(0.35)), style: StrokeStyle(lineWidth: line * 1.8, lineJoin: .round))
                     context.stroke(figure, with: .color(color), style: StrokeStyle(lineWidth: line, lineJoin: .round))
                 }
