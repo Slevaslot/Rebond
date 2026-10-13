@@ -32,11 +32,13 @@ struct SessionView: View {
                     )
                 }
             }
-            if motion.phase == .calibrating {
-                MovementGuide(exercise: exercise, skeleton: motion.skeleton) { placement in
+            if motion.phase != .finished {
+                MovementGuide(exercise: exercise, skeleton: motion.skeleton, isDemonstrating: motion.phase == .active) { placement in
                     self.placement = placement
-                    motion.announce(placement.message)
+                    motion.updatePlacement(placement)
                 }
+                // During the set it is a model to follow: lighter, so the patient's own body stays readable.
+                .opacity(motion.phase == .active ? 0.5 : 1)
                 .transition(.opacity)
             }
         }
@@ -49,6 +51,15 @@ struct SessionView: View {
                         : "Aucune caméra avant n'est disponible. Vous pouvez terminer la série.")
                 } else if motion.phase == .calibrating {
                     placementHint
+                } else if motion.phase == .countdown {
+                    Text(motion.countdownValue, format: .number)
+                        .font(.system(.largeTitle, design: .rounded).weight(.bold))
+                        .monospacedDigit()
+                        .contentTransition(.numericText(countsDown: true))
+                        .padding(28)
+                        .glassEffect(in: .circle)
+                        .animation(.default, value: motion.countdownValue)
+                        .accessibilityLabel(Text("Début dans \(motion.countdownValue) secondes"))
                 } else {
                     counter
                 }

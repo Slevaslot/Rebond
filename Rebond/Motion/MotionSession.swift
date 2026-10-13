@@ -21,8 +21,10 @@ final class LiveFrame {
 @Observable
 final class MotionSession {
     enum Phase {
-        /// Waiting for the patient to stand still so the resting position can be measured.
+        /// Waiting for the patient to stand in the guide outline, still, so the resting position can be measured.
         case calibrating
+        /// In place: 3, 2, 1 before counting starts.
+        case countdown
         case active
         case finished
     }
@@ -52,6 +54,8 @@ final class MotionSession {
     /// Deepest completed repetition, in torso lengths.
     private(set) var bestDepth = 0.0
     private(set) var feedback: Feedback?
+    /// Seconds left before counting starts, during the countdown.
+    private(set) var countdownValue = 3
     /// Fault to show in red on the body: the live posture problem, or the last rejected movement for a moment.
     private(set) var faultToHighlight: Correction?
     var isMuted = false {
@@ -67,6 +71,10 @@ final class MotionSession {
     /// Consecutive frames without a body, so a single missed detection doesn't flash the placement hint.
     @ObservationIgnored private var missedFrames = 0
     @ObservationIgnored private var feedbackDismissal: Task<Void, Never>?
+    /// The resting position is measured and the patient stands in the guide: the countdown can start.
+    @ObservationIgnored private var isCalibrated = false
+    @ObservationIgnored private var isInPlace = false
+    @ObservationIgnored private var countdown: Task<Void, Never>?
     @ObservationIgnored private var lastAnnouncement = ""
     @ObservationIgnored private var lastAnnouncementDate = Date.distantPast
     @ObservationIgnored private var heldFault: Correction?
@@ -155,9 +163,34 @@ final class MotionSession {
         coach.say(text)
     }
 
+    /// Where the patient stands compared with the guide outline, reported by the screen.
+    func updatePlacement(_ placement: GuidePlacement) {
+        isInPlace = placement == .aligned || placement == .almost
+        announce(placement.message)
+        startCountdownIfReady()
+    }
+
+    /// Once the patient is in place and still: 3, 2, 1, then counting starts.
+    private func startCountdownIfReady() {
+        guard phase == .calibrating, isCalibrated, isInPlace else { return }
+        phase = .countdown
+        countdown = Task {
+            for value in [3, 2, 1] {
+                countdownValue = value
+                coach.say("\(value)")
+                try? await Task.sleep(for: .seconds(1))
+                guard !Task.isCancelled else { return }
+            }
+            phase = .active
+            coach.say("C'est parti !")
+        }
+    }
+
     /// Starts the set over, measuring the resting position again.
     func restart() {
         processor.resetCounter()
+        countdown?.cancel()
+        isCalibrated = false
         phase = .calibrating
         depthProgress = 0
         repCount = 0
@@ -185,13 +218,18 @@ final class MotionSession {
         }
 
         guard phase != .finished else { return }
+        if case .calibrated = update.event {
+            isCalibrated = true
+            startCountdownIfReady()
+        }
+        // Nothing counts before the end of the countdown.
+        guard phase == .active else { return }
         depthProgress = update.progress
         faultToHighlight = update.posture ?? heldFault
 
         switch update.event {
         case .calibrated:
-            phase = .active
-            coach.say("C'est parti !")
+            break
         case .repCompleted(let result):
             repCount += 1
             bestDepth = max(bestDepth, result.depth)

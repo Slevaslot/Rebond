@@ -1,25 +1,20 @@
 import SwiftUI
 import Vision
 
-/// Simple outline of a person doing the exercise in a loop. The patient steps inside it to be well framed:
-/// it turns yellow when they are close, then green and still once their body lines up with it.
+/// Pictogram of a person. Before the set it stands still, showing where to stand: it turns yellow when the
+/// patient is close, then green once their body lines up with it. During the set it does the exercise in a loop.
 struct MovementGuide: View {
     typealias Joint = VNHumanBodyPoseObservation.JointName
 
     let exercise: CatalogExercise
     /// The patient's detected body, to check the placement.
     let skeleton: PoseSkeleton?
+    /// Doing the exercise (during the set) or standing still (before).
+    let isDemonstrating: Bool
     let onPlacement: (GuidePlacement) -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private static let limbs: [(Joint, Joint)] = [
-        (.neck, .nose),
-        (.leftShoulder, .leftElbow), (.leftElbow, .leftWrist),
-        (.rightShoulder, .rightElbow), (.rightElbow, .rightWrist),
-        (.leftHip, .leftKnee), (.leftKnee, .leftAnkle),
-        (.rightHip, .rightKnee), (.rightKnee, .rightAnkle),
-    ]
     /// Seconds for one full movement, down and back up.
     private static let cycle = 4.0
 
@@ -29,14 +24,16 @@ struct MovementGuide: View {
             let box = box(in: size)
             let placement = placement(in: size, box: box)
 
-            TimelineView(.animation(paused: reduceMotion || placement == .aligned)) { timeline in
+            TimelineView(.animation(paused: reduceMotion || !isDemonstrating)) { timeline in
                 Canvas { context, _ in
-                    let progress = placement == .aligned || reduceMotion ? 0 : Self.progress(at: timeline.date)
+                    let progress = isDemonstrating && !reduceMotion ? Self.progress(at: timeline.date) : 0
                     let figure = Self.outline(exercise.guideRest, exercise.guideTarget, progress: progress, in: box)
-                    let color: Color = switch placement {
-                    case .aligned: .green
-                    case .almost: .yellow
-                    default: .white
+                    let color: Color = if isDemonstrating { .white } else {
+                        switch placement {
+                        case .aligned: .green
+                        case .almost: .yellow
+                        default: .white
+                        }
                     }
                     // A dark edge under the line keeps it visible on a bright room.
                     context.stroke(figure, with: .color(.black.opacity(0.35)), style: StrokeStyle(lineWidth: 11, lineJoin: .round))
@@ -80,69 +77,103 @@ struct MovementGuide: View {
         return held * held * (3 - 2 * held)
     }
 
-    /// A simple pictogram: round head, a torso as wide as the legs, limbs of even thickness, in one contour.
+    /// A signage-style pictogram drawn as one single contour: round head, torso with rounded corners,
+    /// arms and legs of even thickness.
+    /// Going down, the hands come together in front of the body, as in a real squat.
     private static func outline(_ rest: GuidePose, _ target: GuidePose, progress: Double, in box: CGRect) -> Path {
-        func pose(_ joint: Joint) -> CGPoint? {
+        func point(_ joint: Joint, at progress: Double) -> CGPoint? {
             guard let a = rest[joint], let b = target[joint] else { return nil }
-            return CGPoint(x: a.x + (b.x - a.x) * progress, y: a.y + (b.y - a.y) * progress)
+            return CGPoint(
+                x: box.minX + (a.x + (b.x - a.x) * progress) * box.width,
+                y: box.minY + (a.y + (b.y - a.y) * progress) * box.height
+            )
         }
-        // The torso is as wide as the legs: each arm moves in by the gap between its shoulder and hip.
-        func inward(_ shoulder: Joint, _ hip: Joint) -> Double {
-            guard let shoulder = pose(shoulder), let hip = pose(hip) else { return 0 }
-            return hip.x - shoulder.x
-        }
-        let leftShift = inward(.leftShoulder, .leftHip), rightShift = inward(.rightShoulder, .rightHip)
-        let leftArm: Set<Joint> = [.leftShoulder, .leftElbow, .leftWrist]
-        let rightArm: Set<Joint> = [.rightShoulder, .rightElbow, .rightWrist]
-        func point(_ joint: Joint) -> CGPoint? {
-            guard var p = pose(joint) else { return nil }
-            if leftArm.contains(joint) { p.x += leftShift }
-            if rightArm.contains(joint) { p.x += rightShift }
-            return CGPoint(x: box.minX + p.x * box.width, y: box.minY + p.y * box.height)
-        }
-        let thickness = box.height * 0.08
+        let limb = box.height * 0.075
+        let arm = limb * 0.8
 
-        // Arms a little thinner than legs.
-        var arms = Path(), legs = Path()
-        for (a, b) in limbs {
-            guard var pointA = point(a), let pointB = point(b) else { continue }
-            // Arms come out of the side of the torso, a little below its top: no shoulder bump.
-            if a == .leftShoulder || a == .rightShoulder {
-                pointA.y += box.height * 0.06
-            }
-            let isArm = leftArm.contains(a) || rightArm.contains(a)
-            if isArm {
-                arms.move(to: pointA)
-                arms.addLine(to: pointB)
-            } else {
-                legs.move(to: pointA)
-                legs.addLine(to: pointB)
-            }
+        func torso(at progress: Double) -> CGRect? {
+            guard let leftShoulder = point(.leftShoulder, at: progress), let rightShoulder = point(.rightShoulder, at: progress),
+                  let leftHip = point(.leftHip, at: progress), let rightHip = point(.rightHip, at: progress)
+            else { return nil }
+            let top = (leftShoulder.y + rightShoulder.y) / 2
+            return CGRect(
+                x: leftHip.x - limb / 2,
+                y: top,
+                width: rightHip.x - leftHip.x + limb,
+                height: (leftHip.y + rightHip.y) / 2 - top + limb / 2
+            )
         }
-        var outline = legs.strokedPath(StrokeStyle(lineWidth: thickness, lineCap: .round, lineJoin: .round))
-            .union(arms.strokedPath(StrokeStyle(lineWidth: thickness * 0.8, lineCap: .round, lineJoin: .round)))
+        guard let body = torso(at: progress), let standing = torso(at: 0) else { return Path() }
 
-        if let leftShoulder = point(.leftShoulder), let rightShoulder = point(.rightShoulder),
-           let leftHip = point(.leftHip), let rightHip = point(.rightHip) {
-            // Sloped shoulders: the top narrows toward the neck, the sides meet the arms smoothly.
-            let inset = (rightShoulder.x - leftShoulder.x) * 0.2
-            let slope = box.height * 0.06
-            var torso = Path()
-            torso.addLines([
-                CGPoint(x: leftShoulder.x + inset, y: leftShoulder.y),
-                CGPoint(x: rightShoulder.x - inset, y: rightShoulder.y),
-                CGPoint(x: rightShoulder.x, y: rightShoulder.y + slope),
-                rightHip, leftHip,
-                CGPoint(x: leftShoulder.x, y: leftShoulder.y + slope),
-            ])
-            torso.closeSubpath()
-            outline = outline.union(torso.strokedPath(StrokeStyle(lineWidth: thickness, lineJoin: .round)).union(torso))
+        // Top corners rounded like the end of the arms, so each arm covers its corner exactly.
+        var outline = Path(roundedRect: body, cornerRadius: arm / 2)
+
+        // Arms from the top corners of the torso: straight when standing, then the elbows bend and the
+        // hands come together in front of the chest. Upper arm and forearm keep their length.
+        var armShape = Path()
+        func addSegment(_ a: CGPoint, _ b: CGPoint) {
+            var segment = Path()
+            segment.move(to: a)
+            segment.addLine(to: b)
+            armShape = armShape.union(segment.strokedPath(StrokeStyle(lineWidth: arm, lineCap: .round)))
         }
-        if let head = point(.nose) {
-            let radius = box.height * 0.06
-            outline = outline.union(Path(ellipseIn: CGRect(x: head.x - radius, y: head.y - radius, width: radius * 2, height: radius * 2)))
+        let sides: [(x: (CGRect) -> CGFloat, wrist: Joint, outward: CGFloat)] = [
+            ({ $0.minX + arm / 2 }, .leftWrist, -1), ({ $0.maxX - arm / 2 }, .rightWrist, 1),
+        ]
+        func unit(_ v: CGVector) -> CGVector {
+            let length = max(hypot(v.dx, v.dy), 0.0001)
+            return CGVector(dx: v.dx / length, dy: v.dy / length)
         }
+        func mix(_ a: CGVector, _ b: CGVector) -> CGVector {
+            unit(CGVector(dx: a.dx + (b.dx - a.dx) * progress, dy: a.dy + (b.dy - a.dy) * progress))
+        }
+        for side in sides {
+            guard let standingHand = point(side.wrist, at: 0) else { continue }
+            let standingStart = CGPoint(x: side.x(standing), y: standing.minY + arm / 2)
+            let straight = CGVector(dx: standingHand.x - standingStart.x, dy: standingHand.y - standingStart.y)
+            let segment = hypot(straight.dx, straight.dy) / 2
+            let start = CGPoint(x: side.x(body), y: body.minY + arm / 2)
+
+            // At the bottom: hands joined in front of the chest, elbows out and down.
+            let chest = CGPoint(x: body.midX, y: body.minY + body.height * 0.3)
+            let reach = min(hypot(chest.x - start.x, chest.y - start.y), segment * 2 * 0.999)
+            let toChest = unit(CGVector(dx: chest.x - start.x, dy: chest.y - start.y))
+            let bend = sqrt(max(0, segment * segment - reach * reach / 4))
+            var normal = CGVector(dx: -toChest.dy, dy: toChest.dx)
+            if normal.dx * side.outward < 0 { normal = CGVector(dx: -normal.dx, dy: -normal.dy) }
+            let bottomElbow = CGPoint(
+                x: start.x + toChest.dx * reach / 2 + normal.dx * bend,
+                y: start.y + toChest.dy * reach / 2 + normal.dy * bend
+            )
+            let bottomUpper = unit(CGVector(dx: bottomElbow.x - start.x, dy: bottomElbow.y - start.y))
+            let bottomFore = unit(CGVector(dx: chest.x - bottomElbow.x, dy: chest.y - bottomElbow.y))
+
+            // In between, each segment turns smoothly from straight to bent, keeping its length.
+            let upper = mix(unit(straight), bottomUpper)
+            let fore = mix(unit(straight), bottomFore)
+            let elbow = CGPoint(x: start.x + upper.dx * segment, y: start.y + upper.dy * segment)
+            let hand = CGPoint(x: elbow.x + fore.dx * segment, y: elbow.y + fore.dy * segment)
+            addSegment(start, elbow)
+            addSegment(elbow, hand)
+        }
+
+        var legs = Path()
+        for (hip, knee, ankle) in [(Joint.leftHip, Joint.leftKnee, Joint.leftAnkle), (.rightHip, .rightKnee, .rightAnkle)] {
+            guard let hip = point(hip, at: progress), let knee = point(knee, at: progress), let ankle = point(ankle, at: progress) else { continue }
+            legs.move(to: CGPoint(x: hip.x, y: body.maxY - limb))
+            legs.addLine(to: knee)
+            legs.addLine(to: ankle)
+        }
+        outline = outline.union(legs.strokedPath(StrokeStyle(lineWidth: limb, lineCap: .round, lineJoin: .round)))
+
+        // Head joined to the torso by a short neck: the whole figure is a single contour.
+        let radius = box.height * 0.065
+        let head = CGRect(x: body.midX - radius, y: body.minY - box.height * 0.02 - radius * 2, width: radius * 2, height: radius * 2)
+        let neck = CGRect(x: body.midX - radius * 0.45, y: head.midY, width: radius * 0.9, height: body.minY - head.midY + arm)
         return outline
+            .union(Path(ellipseIn: head))
+            .union(Path(roundedRect: neck, cornerRadius: radius * 0.3))
+            .union(armShape)
     }
 
     private func placement(in size: CGSize, box: CGRect) -> GuidePlacement {
