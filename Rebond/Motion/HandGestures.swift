@@ -3,84 +3,68 @@ import CoreVideo
 import Vision
 
 /// Gestures to control the session from 2–3 m away, without touching the phone.
+/// Both are made with one hand raised to shoulder height, the other one down.
 nonisolated enum HandGesture: Sendable {
-    /// One open hand raised, palm toward the camera, the other hand down: pause or resume.
-    /// Both hands up is left out: some exercises raise both arms, palms forward.
+    /// Palm open toward the camera, held a moment: pause or resume.
     case openPalm
-    /// Both hands pinching and moving apart, like zooming on Apple Vision Pro: open the model large.
-    case pinchApart
-    /// Both hands pinching and coming together: put the model back in its card.
-    case pinchTogether
+    /// Thumb against index, the other fingers stretched (an "OK" sign), like a tap on Apple Vision Pro:
+    /// open the model large, or put it back in its card. Stretched fingers tell it from a hand moving while talking.
+    case pinch
 }
 
 /// Recognizes `HandGesture`s with Vision's hand pose.
-/// A gesture only counts with the hands raised above the shoulders: during a squat they stay at chest height,
-/// so the exercise itself never triggers one. Hands are only analyzed then, which also saves work.
+/// A gesture only counts with one hand up at shoulder height: during a squat the hands stay lower, together at
+/// chest height, and an exercise raising both arms is left out. Hands are only analyzed then, which also saves work.
 nonisolated struct HandGestureDetector {
     /// Orientation of the frames. Camera frames are already upright.
     var orientation = CGImagePropertyOrientation.up
 
-    /// Frames in a row with the open palm before it counts (about 0.6 s at 15 analyses per second).
-    private let palmHoldFrames = 9
-    /// Change of distance between both pinches that zooms, as a ratio of the starting distance.
-    private let zoomInRatio = 1.4
-    private let zoomOutRatio = 0.7
-    /// Frames without the gesture before it is considered released.
-    private let releaseFrames = 4
+    /// A wrist this far below the shoulders, in torso lengths, still counts as raised: the elbow can stay bent.
+    private let raisedMargin = 0.15
     private let minimumConfidence: Float = 0.3
 
-    private var palmFrames = 0
-    /// The palm already triggered: the hand must go down or close before it can again.
-    private var palmUsed = false
-    private var pinchStartDistance: Double?
-    private var pinchUsed = false
-    private var framesWithoutPalm = 0
-    private var framesWithoutPinch = 0
+    /// A hand shape held for a few frames in a row, then released before it can count again.
+    private struct Hold {
+        /// Frames needed, at 15 analyses per second.
+        let frames: Int
+        private var count = 0
+        private var missed = 0
+        private var used = false
+
+        init(frames: Int) { self.frames = frames }
+
+        /// True once, when the shape has been held long enough.
+        mutating func update(_ seen: Bool) -> Bool {
+            if seen {
+                missed = 0
+                count += 1
+                if count >= frames, !used {
+                    used = true
+                    return true
+                }
+            } else {
+                // A missed detection or two doesn't release the shape.
+                missed += 1
+                if missed >= 3 {
+                    count = 0
+                    used = false
+                }
+            }
+            return false
+        }
+    }
+
+    /// About 0.6 s: a pause shouldn't come from a hand passing by.
+    private var palm = Hold(frames: 9)
+    /// About 0.2 s: a quick pinch is enough.
+    private var pinch = Hold(frames: 3)
 
     mutating func process(_ pixelBuffer: CVPixelBuffer, body: PoseSkeleton?) -> HandGesture? {
         let (hands, raisedArms) = raisedHands(in: pixelBuffer, body: body)
+        let hand = raisedArms == 1 && hands.count == 1 ? hands[0] : nil
 
-        // Pause: a single raised arm, with the palm open, held.
-        if raisedArms == 1, hands.count == 1, Self.isOpenPalm(hands[0]) {
-            framesWithoutPalm = 0
-            palmFrames += 1
-            if palmFrames >= palmHoldFrames, !palmUsed {
-                palmUsed = true
-                return .openPalm
-            }
-        } else {
-            framesWithoutPalm += 1
-            if framesWithoutPalm >= releaseFrames {
-                palmFrames = 0
-                palmUsed = false
-            }
-        }
-
-        // Zoom: two pinches moving apart or together.
-        let pinches = hands.compactMap { Self.pinchPoint($0) }
-        if pinches.count == 2 {
-            framesWithoutPinch = 0
-            let distance = hypot(pinches[0].x - pinches[1].x, pinches[0].y - pinches[1].y)
-            guard let start = pinchStartDistance else {
-                pinchStartDistance = distance
-                return nil
-            }
-            guard !pinchUsed, start > 0 else { return nil }
-            if distance / start > zoomInRatio {
-                pinchUsed = true
-                return .pinchApart
-            }
-            if distance / start < zoomOutRatio {
-                pinchUsed = true
-                return .pinchTogether
-            }
-        } else {
-            framesWithoutPinch += 1
-            if framesWithoutPinch >= releaseFrames {
-                pinchStartDistance = nil
-                pinchUsed = false
-            }
-        }
+        if palm.update(hand.map(Self.isOpenPalm) ?? false) { return .openPalm }
+        if pinch.update(hand.map(Self.isPinching) ?? false) { return .pinch }
         return nil
     }
 
@@ -92,8 +76,9 @@ nonisolated struct HandGestureDetector {
         func pixels(_ point: CGPoint) -> CGPoint { CGPoint(x: point.x * size.width, y: point.y * size.height) }
 
         let shoulders = [body.points[.leftShoulder], body.points[.rightShoulder], body.points[.neck]].compactMap { $0 }
-        guard let shoulderLine = shoulders.map(\.y).min(), let neck = body.points[.neck], let hips = body.points[.root] else { return ([], 0) }
-        let raisedWrists = [body.points[.leftWrist], body.points[.rightWrist]].compactMap { $0 }.filter { $0.y < shoulderLine }
+        guard let shoulderLine = shoulders.map(\.y).max(), let neck = body.points[.neck], let hips = body.points[.root] else { return ([], 0) }
+        let raisedLine = shoulderLine + (hips.y - neck.y) * raisedMargin
+        let raisedWrists = [body.points[.leftWrist], body.points[.rightWrist]].compactMap { $0 }.filter { $0.y < raisedLine }
         guard !raisedWrists.isEmpty else { return ([], 0) }
 
         let request = VNDetectHumanHandPoseRequest()
@@ -118,25 +103,29 @@ nonisolated struct HandGestureDetector {
 
     /// All four fingers stretched out and the thumb away from them.
     private static func isOpenPalm(_ hand: [VNHumanHandPoseObservation.JointName: CGPoint]) -> Bool {
-        guard let wrist = hand[.wrist], let palm = palmSize(hand) else { return false }
-        func distance(_ a: CGPoint, _ b: CGPoint) -> Double { hypot(a.x - b.x, a.y - b.y) }
-        let fingers: [(tip: VNHumanHandPoseObservation.JointName, pip: VNHumanHandPoseObservation.JointName)] = [
-            (.indexTip, .indexPIP), (.middleTip, .middlePIP), (.ringTip, .ringPIP), (.littleTip, .littlePIP),
-        ]
-        let stretched = fingers.allSatisfy { finger in
-            guard let tip = hand[finger.tip], let pip = hand[finger.pip] else { return false }
-            return distance(wrist, tip) > distance(wrist, pip) * 1.15
-        }
-        guard stretched, let thumb = hand[.thumbTip], let index = hand[.indexMCP] else { return false }
-        return distance(thumb, index) > palm * 0.5
+        guard areStretched([(.indexTip, .indexPIP), (.middleTip, .middlePIP), (.ringTip, .ringPIP), (.littleTip, .littlePIP)], in: hand),
+              let thumb = hand[.thumbTip], let index = hand[.indexMCP], let palm = palmSize(hand)
+        else { return false }
+        return hypot(thumb.x - index.x, thumb.y - index.y) > palm * 0.5
     }
 
-    /// Where the thumb and the index touch, if they do.
-    private static func pinchPoint(_ hand: [VNHumanHandPoseObservation.JointName: CGPoint]) -> CGPoint? {
+    /// Thumb and index tips touching, the other fingers stretched.
+    private static func isPinching(_ hand: [VNHumanHandPoseObservation.JointName: CGPoint]) -> Bool {
         guard let thumb = hand[.thumbTip], let index = hand[.indexTip], let palm = palmSize(hand),
               hypot(thumb.x - index.x, thumb.y - index.y) < palm * 0.35
-        else { return nil }
-        return CGPoint(x: (thumb.x + index.x) / 2, y: (thumb.y + index.y) / 2)
+        else { return false }
+        return areStretched([(.middleTip, .middlePIP), (.ringTip, .ringPIP), (.littleTip, .littlePIP)], in: hand)
+    }
+
+    private static func areStretched(
+        _ fingers: [(tip: VNHumanHandPoseObservation.JointName, pip: VNHumanHandPoseObservation.JointName)],
+        in hand: [VNHumanHandPoseObservation.JointName: CGPoint]
+    ) -> Bool {
+        guard let wrist = hand[.wrist] else { return false }
+        return fingers.allSatisfy { finger in
+            guard let tip = hand[finger.tip], let pip = hand[finger.pip] else { return false }
+            return hypot(wrist.x - tip.x, wrist.y - tip.y) > hypot(wrist.x - pip.x, wrist.y - pip.y) * 1.15
+        }
     }
 
     /// Wrist to the base of the middle finger: the hand's scale in the image.
