@@ -11,6 +11,8 @@ struct SessionView: View {
     @State private var placement = GuidePlacement.notVisible
     @ScaledMetric private var ringSize = 64
     @ScaledMetric private var cornerGuideWidth = 84
+    /// Lets the large guide shrink and slide into its corner.
+    @Namespace private var guideSpace
 
     init(exercise: CatalogExercise, targetReps: Int, setTitle: LocalizedStringKey, onFinish: @escaping (SetResult) -> Void) {
         self.exercise = exercise
@@ -37,15 +39,15 @@ struct SessionView: View {
                 MovementGuide(
                     exercise: exercise,
                     skeleton: motion.skeleton,
-                    isDemonstrating: motion.phase == .active,
+                    isDemonstrating: motion.phase == .demonstrating || motion.phase == .active,
                     demonstrationStart: motion.demonstrationStart
                 ) { placement in
                     self.placement = placement
                     motion.updatePlacement(placement)
                 }
-                // Demonstrating over the patient: lighter, so their own body stays readable.
+                // Demonstrating over the patient during the set: lighter, so their own body stays readable.
                 .opacity(motion.phase == .active ? 0.6 : 1)
-                .transition(.opacity)
+                .matchedGeometryEffect(id: "guide", in: guideSpace)
             }
         }
         .ignoresSafeArea()
@@ -57,6 +59,12 @@ struct SessionView: View {
                         : "Aucune caméra avant n'est disponible. Vous pouvez terminer la série.")
                 } else if motion.phase == .calibrating {
                     placementHint
+                } else if motion.phase == .demonstrating {
+                    Label("Regardez le mouvement", systemImage: "eye")
+                        .font(.headline)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 12)
+                        .glassEffect(in: .capsule)
                 } else if motion.phase == .countdown {
                     Text(motion.countdownValue, format: .number)
                         .font(.system(.largeTitle, design: .rounded).weight(.bold))
@@ -73,10 +81,9 @@ struct SessionView: View {
             .padding()
         }
         .overlay(alignment: .leading) {
-            if motion.phase == .active, motion.guideDisplay == .corner {
+            if showsCornerGuide {
                 cornerGuide
                     .padding()
-                    .transition(.opacity.combined(with: .scale(scale: 0.8, anchor: .leading)))
             }
         }
         .animation(.spring(duration: 0.5), value: motion.guideDisplay)
@@ -176,9 +183,16 @@ struct SessionView: View {
     /// Large guide: to get in place before the set, then whenever it demonstrates the movement.
     private var showsLargeGuide: Bool {
         switch motion.phase {
-        case .calibrating, .countdown: true
-        case .active: motion.guideDisplay == .large
-        case .finished: false
+        case .calibrating: true
+        case .demonstrating, .active: motion.guideDisplay == .large
+        case .countdown, .finished: false
+        }
+    }
+
+    private var showsCornerGuide: Bool {
+        switch motion.phase {
+        case .demonstrating, .countdown, .active: motion.guideDisplay == .corner
+        case .calibrating, .finished: false
         }
     }
 
@@ -192,12 +206,13 @@ struct SessionView: View {
                 MovementGuide(
                     exercise: exercise,
                     skeleton: nil,
-                    isDemonstrating: true,
+                    isDemonstrating: motion.phase == .active,
                     demonstrationStart: motion.demonstrationStart,
                     isCompact: true
                 )
                 .frame(width: cornerGuideWidth, height: cornerGuideWidth * 1.5)
                 .padding(8)
+                .matchedGeometryEffect(id: "guide", in: guideSpace)
             } else {
                 Image(systemName: "figure.strengthtraining.functional")
                     .font(.title2)

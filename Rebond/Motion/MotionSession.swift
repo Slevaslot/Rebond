@@ -23,7 +23,9 @@ final class MotionSession {
     enum Phase {
         /// Waiting for the patient to stand in the guide outline, still, so the resting position can be measured.
         case calibrating
-        /// In place: 3, 2, 1 before counting starts.
+        /// In place: the guide shows the movement once, then moves to its corner.
+        case demonstrating
+        /// 3, 2, 1 before counting starts.
         case countdown
         case active
         case finished
@@ -188,11 +190,22 @@ final class MotionSession {
         startCountdownIfReady()
     }
 
-    /// Once the patient is in place and still: 3, 2, 1, then counting starts.
+    /// Once the patient is in place and still: the guide shows the movement, moves to its corner,
+    /// then 3, 2, 1 and counting starts.
     private func startCountdownIfReady() {
         guard phase == .calibrating, isCalibrated, isInPlace else { return }
-        phase = .countdown
+        phase = .demonstrating
+        guideDisplay = .large
+        demonstrationStart = .now
+        coach.say("Regardez le mouvement")
         countdown = Task {
+            try? await Task.sleep(for: .seconds(Self.demonstrationDuration))
+            guard !Task.isCancelled else { return }
+            guideDisplay = .corner
+            // Time for the guide to move to its corner.
+            try? await Task.sleep(for: .seconds(0.8))
+            guard !Task.isCancelled else { return }
+            phase = .countdown
             for value in [3, 2, 1] {
                 countdownValue = value
                 coach.say("\(value)")
@@ -200,8 +213,8 @@ final class MotionSession {
                 guard !Task.isCancelled else { return }
             }
             phase = .active
+            demonstrationStart = .now
             coach.say("C'est parti !")
-            demonstrate()
         }
     }
 
