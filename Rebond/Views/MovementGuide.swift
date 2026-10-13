@@ -3,7 +3,7 @@ import Vision
 
 /// Pictogram of a person. Before the set it stands still, showing where to stand: it turns yellow when the
 /// patient is close, then green once their body lines up with it. During the set it does the exercise in a loop.
-struct MovementGuide: View {
+struct MovementGuide: View, Animatable {
     typealias Joint = VNHumanBodyPoseObservation.JointName
 
     let exercise: CatalogExercise
@@ -18,6 +18,12 @@ struct MovementGuide: View {
     /// Line thickness, in points.
     var lineWidth: Double?
     var onPlacement: (GuidePlacement) -> Void = { _ in }
+
+    /// The line follows the figure's size change instead of jumping from one thickness to the other.
+    var animatableData: Double {
+        get { lineWidth ?? 0 }
+        set { if lineWidth != nil { lineWidth = newValue } }
+    }
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
