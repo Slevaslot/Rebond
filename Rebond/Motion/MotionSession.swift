@@ -124,6 +124,9 @@ final class MotionSession {
         processor.onAnalysis = { [weak self] skeleton, update in
             Task { @MainActor [self] in self?.apply(skeleton, update) }
         }
+        processor.onGesture = { [weak self] gesture in
+            Task { @MainActor [self] in self?.handle(gesture) }
+        }
     }
 
     func start() async {
@@ -181,6 +184,15 @@ final class MotionSession {
         isPaused.toggle()
         coach.say(isPaused ? "Pause" : "On reprend")
         MPNowPlayingInfoCenter.default().nowPlayingInfo?[MPNowPlayingInfoPropertyPlaybackRate] = isPaused ? 0.0 : 1.0
+    }
+
+    /// Hand gestures, from where the patient stands: palm to pause, pinch with both hands to zoom.
+    private func handle(_ gesture: HandGesture) {
+        switch gesture {
+        case .openPalm: togglePause()
+        case .pinchApart: expandModel()
+        case .pinchTogether: shrinkModel()
+        }
     }
 
     /// The AirPods' press (play/pause) pauses and resumes the set, like music.
@@ -440,9 +452,11 @@ final class MotionSession {
 nonisolated final class FrameProcessor: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, @unchecked Sendable {
     var onImage: (@Sendable (CGImage?) -> Void)?
     var onAnalysis: (@Sendable (PoseSkeleton?, CounterUpdate) -> Void)?
+    var onGesture: (@Sendable (HandGesture) -> Void)?
 
     private let exercise: CatalogExercise
     private let analyzer = PoseAnalyzer()
+    private var gestures = HandGestureDetector()
     private let blur = BackgroundBlur()
     /// Where the patient was last seen, normalized, origin top-left.
     private var patient: CGPoint?
@@ -475,6 +489,9 @@ nonisolated final class FrameProcessor: NSObject, AVCaptureVideoDataOutputSample
             let frame = analyzer.analyze(pixelBuffer)
             let update = counter.process(frame.measure, at: time.seconds)
             onAnalysis?(frame.skeleton, update)
+            if let gesture = gestures.process(pixelBuffer, body: frame.skeleton) {
+                onGesture?(gesture)
+            }
             // The background blur keeps only this person sharp.
             patient = frame.skeleton.flatMap { $0.points[.root] ?? $0.points[.neck] } ?? patient
         }
