@@ -86,6 +86,7 @@ final class MotionSession {
     @ObservationIgnored private var missedFrames = 0
     @ObservationIgnored private var feedbackDismissal: Task<Void, Never>?
     @ObservationIgnored private var remoteTargets: [(MPRemoteCommand, Any)] = []
+    @ObservationIgnored private var volumeObservation: NSKeyValueObservation?
     /// The resting position is measured and the patient stands in the guide: the demonstration can start.
     @ObservationIgnored private var isCalibrated = false
     @ObservationIgnored private var isInPlace = false
@@ -189,6 +190,15 @@ final class MotionSession {
             MPMediaItemPropertyArtist: "Rebond",
             MPNowPlayingInfoPropertyPlaybackRate: 1.0,
         ]
+
+        // Swiping up or down on the AirPods' stem changes the volume: the only way for an app to catch it.
+        // Up opens the model large in front of the patient, down puts it back in its card.
+        volumeObservation = AVAudioSession.sharedInstance().observe(\.outputVolume, options: [.old, .new]) { [weak self] _, change in
+            guard let old = change.oldValue, let new = change.newValue, old != new else { return }
+            Task { @MainActor [self] in
+                if new > old { self?.expandModel() } else { self?.shrinkModel() }
+            }
+        }
     }
 
     private func disableRemoteControls() {
@@ -196,6 +206,7 @@ final class MotionSession {
             command.removeTarget(target)
         }
         remoteTargets = []
+        volumeObservation = nil
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }

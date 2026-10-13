@@ -63,16 +63,14 @@ struct SessionView: View {
                     placementHint
                 } else if motion.phase == .demonstrating {
                     topCard(title: "Regardez d'abord le mouvement", detail: "Restez immobile, vous commencerez après")
-                } else if motion.isPaused {
-                    topCard(title: "En pause", detail: "Appuyez sur vos AirPods ou sur le bouton pour reprendre")
-                } else {
+                } else if !motion.isPaused {
                     counter
                 }
             }
             .padding()
         }
         .overlay {
-            if showsFloatingGuide {
+            if showsFloatingGuide, !motion.isPaused {
                 floatingGuide
             }
         }
@@ -90,7 +88,7 @@ struct SessionView: View {
         .animation(.smooth(duration: 0.3), value: motion.isPaused)
         .animation(.smooth(duration: 0.55), value: motion.guideDisplay)
         .overlay(alignment: .trailing) {
-            if motion.phase == .active && motion.bodyVisible {
+            if motion.phase == .active, motion.bodyVisible, !motion.isPaused {
                 DepthGauge(progress: motion.depthProgress)
                     .containerRelativeFrame(.vertical) { height, _ in height * 0.4 }
                     .padding()
@@ -101,19 +99,22 @@ struct SessionView: View {
             statusCard.padding()
         }
         .overlay(alignment: .bottom) {
-            VStack(spacing: 16) {
-                if let feedback = motion.feedback {
-                    feedbackBanner(feedback)
+            // While paused, only the top bar and the pause button remain.
+            if !motion.isPaused {
+                VStack(spacing: 16) {
+                    if let feedback = motion.feedback {
+                        feedbackBanner(feedback)
+                    }
+                    // During setup the guide outline needs the space; the back button is still there.
+                    if motion.phase == .active || motion.cameraUnavailable {
+                        Button("Terminer la série") { onFinish(motion.result) }
+                            .buttonStyle(.glass)
+                            .controlSize(.extraLarge)
+                    }
                 }
-                // During setup the guide outline needs the space; the back button is still there.
-                if motion.phase == .active || motion.cameraUnavailable {
-                    Button("Terminer la série") { onFinish(motion.result) }
-                        .buttonStyle(.glass)
-                        .controlSize(.extraLarge)
-                }
+                .padding()
+                .animation(.spring(duration: 0.35), value: motion.feedback)
             }
-            .padding()
-            .animation(.spring(duration: 0.35), value: motion.feedback)
         }
         .navigationTitle(Text(exercise.name))
         .navigationBarTitleDisplayMode(.inline)
