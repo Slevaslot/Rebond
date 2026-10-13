@@ -19,11 +19,11 @@ nonisolated final class BackgroundBlur {
         if frameIndex.isMultiple(of: 2) || lastMask == nil {
             lastMask = patientMask(in: pixelBuffer, patient: patient, size: camera.extent.size)
         }
-        guard let mask = lastMask else { return context.createCGImage(camera, from: camera.extent) }
-
         let blurred = camera.clampedToExtent()
             .applyingGaussianBlur(sigma: 12)
             .cropped(to: camera.extent)
+        // Nobody in view yet: the whole room stays blurred.
+        guard let mask = lastMask else { return context.createCGImage(blurred, from: camera.extent) }
 
         let blend = CIFilter.blendWithMask()
         blend.inputImage = camera
