@@ -197,7 +197,7 @@ final class MotionSession {
         phase = .demonstrating
         guideDisplay = .large
         demonstrationStart = .now
-        coach.say("Regardez le mouvement")
+        coach.say("Regardez d'abord le mouvement, restez immobile")
         countdown = Task {
             try? await Task.sleep(for: .seconds(Self.demonstrationDuration))
             guard !Task.isCancelled else { return }

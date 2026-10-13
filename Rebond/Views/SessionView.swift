@@ -25,8 +25,13 @@ struct SessionView: View {
         ZStack {
             Color.black
             if !motion.cameraUnavailable {
+                // While the guide demonstrates, the camera fades back: it is not the patient's turn yet.
                 CameraFrameView(frame: motion.liveFrame)
-                if let skeleton = motion.skeleton {
+                    .blur(radius: isWatching ? 24 : 0)
+                if isWatching {
+                    Color.black.opacity(0.5)
+                }
+                if let skeleton = motion.skeleton, !isWatching {
                     SkeletonOverlay(
                         skeleton: skeleton,
                         highlightedJoints: exercise.highlightedJoints,
@@ -60,20 +65,21 @@ struct SessionView: View {
                 } else if motion.phase == .calibrating {
                     placementHint
                 } else if motion.phase == .demonstrating {
-                    Label("Regardez le mouvement", systemImage: "eye")
-                        .font(.headline)
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 12)
-                        .glassEffect(in: .capsule)
+                    topCard(title: "Regardez d'abord le mouvement", detail: "Restez immobile, vous commencerez après")
                 } else if motion.phase == .countdown {
-                    Text(motion.countdownValue, format: .number)
-                        .font(.system(.largeTitle, design: .rounded).weight(.bold))
-                        .monospacedDigit()
-                        .contentTransition(.numericText(countsDown: true))
-                        .padding(28)
-                        .glassEffect(in: .circle)
-                        .animation(.default, value: motion.countdownValue)
-                        .accessibilityLabel(Text("Début dans \(motion.countdownValue) secondes"))
+                    VStack(spacing: 12) {
+                        Text("Prêt ?")
+                            .font(.title2.bold())
+                        Text(motion.countdownValue, format: .number)
+                            .font(.system(.largeTitle, design: .rounded).weight(.bold))
+                            .monospacedDigit()
+                            .contentTransition(.numericText(countsDown: true))
+                            .padding(28)
+                            .glassEffect(in: .circle)
+                            .animation(.default, value: motion.countdownValue)
+                    }
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(Text("Début dans \(motion.countdownValue) secondes"))
                 } else {
                     counter
                 }
@@ -178,6 +184,11 @@ struct SessionView: View {
         .padding()
         .glassEffect(in: .rect(cornerRadius: 28))
         .accessibilityElement(children: .combine)
+    }
+
+    /// The guide shows the movement and counts down: the patient watches before starting.
+    private var isWatching: Bool {
+        motion.phase == .demonstrating || motion.phase == .countdown
     }
 
     /// Large guide: to get in place before the set, then whenever it demonstrates the movement.
