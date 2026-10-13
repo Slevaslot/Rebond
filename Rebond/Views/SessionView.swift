@@ -61,6 +61,8 @@ struct SessionView: View {
                     placementHint
                 } else if motion.phase == .demonstrating {
                     topCard(title: "Regardez d'abord le mouvement", detail: "Restez immobile, vous commencerez après")
+                } else if motion.guideDisplay == .large {
+                    topCard(title: "Pause", detail: "Touchez l'écran ou pincez pour reprendre")
                 } else {
                     counter
                 }
@@ -72,7 +74,7 @@ struct SessionView: View {
                 floatingGuide
             }
         }
-        .animation(.spring(response: 0.7, dampingFraction: 0.8), value: motion.guideDisplay)
+        .animation(.smooth(duration: 0.55), value: motion.guideDisplay)
         .overlay(alignment: .trailing) {
             if motion.phase == .active && motion.bodyVisible {
                 DepthGauge(progress: motion.depthProgress)
@@ -166,9 +168,9 @@ struct SessionView: View {
         .accessibilityElement(children: .combine)
     }
 
-    /// The guide shows the movement: the patient watches before starting. Clear again once it moves to its card.
+    /// The model is full screen: the patient watches, the camera fades back. Clear again once it is in its card.
     private var isWatching: Bool {
-        motion.phase == .demonstrating && motion.guideDisplay == .large
+        (motion.phase == .demonstrating || motion.phase == .active) && motion.guideDisplay == .large
     }
 
     /// Before the set: the large guide, to get in place.
@@ -188,18 +190,13 @@ struct SessionView: View {
         motion.guideDisplay == .corner
     }
 
-    /// Frame of the floating guide: over the patient while demonstrating, otherwise its card,
-    /// which the patient can move and resize.
+    /// Card size limits, as a multiple of its base size. Pinching open past the largest opens it full screen.
+    private let cardScales = 0.8...3.2
+
+    /// The model card: full screen to watch the movement, or a card the patient can move and resize.
     private func floatingGuideFrame(in size: CGSize) -> CGRect {
-        let padding = 8.0
-        if !guideInCard {
-            // Same place and size as the guide used to get in place, so it starts exactly there.
-            let figure = MovementGuide(exercise: exercise, skeleton: motion.skeleton, isDemonstrating: false).figureBox(in: size)
-            let height = figure.height / 0.9 + padding * 2
-            let width = height * 0.65
-            return CGRect(x: figure.midX - width / 2, y: figure.midY - height / 2, width: width, height: height)
-        }
-        let scale = min(max(cardScale * pinch, 0.8), 3.2)
+        guard guideInCard else { return CGRect(origin: .zero, size: size) }
+        let scale = min(max(cardScale * pinch, cardScales.lowerBound), cardScales.upperBound)
         let width = cardWidth * scale
         let height = width * 1.5
         let margin = 16.0
@@ -212,48 +209,88 @@ struct SessionView: View {
         return CGRect(x: center.x - width / 2, y: center.y - height / 2, width: width, height: height)
     }
 
-    /// The model: drag it anywhere, pinch to resize, tap to switch between small and large.
+    /// Full screen, the figure keeps the size and place it had to get in place; in the card, it fills the card.
+    private func figureFrame(in card: CGRect, screen: CGSize) -> CGRect {
+        let padding = 8.0
+        guard !guideInCard else { return card.insetBy(dx: padding, dy: padding) }
+        let figure = MovementGuide(exercise: exercise, skeleton: nil, isDemonstrating: false).figureBox(in: screen)
+        let height = figure.height / 0.9
+        return CGRect(x: figure.midX - height / 2, y: figure.midY - height / 2, width: height, height: height)
+    }
+
+    /// One card for the model at every size: it shrinks from full screen into its card, and opens back up.
+    /// In the card: drag to move, pinch to resize, pinch wide open or double-tap for full screen.
+    /// Full screen: tap or pinch closed to go back to the card.
     private var floatingGuide: some View {
         GeometryReader { geometry in
-            let frame = floatingGuideFrame(in: geometry.size)
-            MovementGuide(
-                exercise: exercise,
-                skeleton: nil,
-                isDemonstrating: true,
-                demonstrationStart: motion.demonstrationStart,
-                isCompact: true
-            )
-            .padding(8)
-            .background {
-                Color.clear
-                    .glassEffect(in: .rect(cornerRadius: 20))
+            let card = floatingGuideFrame(in: geometry.size)
+            let figure = figureFrame(in: card, screen: geometry.size)
+            ZStack {
+                RoundedRectangle(cornerRadius: guideInCard ? 20 : 0)
+                    .fill(.clear)
+                    .glassEffect(in: .rect(cornerRadius: guideInCard ? 20 : 0))
                     .opacity(guideInCard ? 1 : 0)
+                    .frame(width: card.width, height: card.height)
+                    .position(x: card.midX, y: card.midY)
+                MovementGuide(
+                    exercise: exercise,
+                    skeleton: nil,
+                    isDemonstrating: true,
+                    demonstrationStart: motion.demonstrationStart,
+                    isCompact: true
+                )
+                .frame(width: figure.width, height: figure.height)
+                .position(x: figure.midX, y: figure.midY)
             }
-            .contentShape(.rect(cornerRadius: 20))
-            .frame(width: frame.width, height: frame.height)
-            .position(x: frame.midX, y: frame.midY)
+            .frame(width: geometry.size.width, height: geometry.size.height)
+            // In its card, only the card reacts to touches: the rest of the screen stays usable.
+            .contentShape(guideInCard
+                ? Path(roundedRect: card, cornerRadius: 20)
+                : Path(CGRect(origin: .zero, size: geometry.size)))
+            .gesture(cardGestures, isEnabled: guideInCard && motion.phase == .active)
+            .onTapGesture(count: 2) {
+                if guideInCard { motion.expandModel() }
+            }
             .onTapGesture {
-                guard guideInCard else { return }
-                withAnimation(.spring(duration: 0.4)) { cardScale = cardScale > 1.5 ? 1 : 2.6 }
+                if !guideInCard { motion.shrinkModel() }
             }
             .gesture(
-                DragGesture()
-                    .updating($drag) { value, state, _ in state = value.translation }
-                    .onEnded { value in
-                        cardOffset.width += value.translation.width
-                        cardOffset.height += value.translation.height
-                    }
-                    .simultaneously(with: MagnifyGesture()
-                        .updating($pinch) { value, state, _ in state = value.magnification }
-                        .onEnded { value in cardScale = min(max(cardScale * value.magnification, 0.8), 3.2) }),
-                isEnabled: guideInCard
+                MagnifyGesture().onEnded { value in
+                    if value.magnification < 0.8 { motion.shrinkModel() }
+                },
+                isEnabled: !guideInCard && motion.phase == .active
             )
-            .accessibilityElement()
-            .accessibilityLabel(Text("Modèle du mouvement"))
-            .accessibilityHint(Text("Touchez pour agrandir ou réduire, faites glisser pour déplacer"))
-            .accessibilityAddTraits(.isButton)
+            .allowsHitTesting(motion.phase == .active)
         }
         .ignoresSafeArea()
+        .accessibilityElement()
+        .accessibilityLabel(Text("Modèle du mouvement"))
+        .accessibilityHint(guideInCard
+            ? Text("Touchez deux fois pour le voir en plein écran, faites glisser pour le déplacer")
+            : Text("Touchez pour revenir à la séance"))
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction {
+            if guideInCard { motion.expandModel() } else { motion.shrinkModel() }
+        }
+    }
+
+    private var cardGestures: some Gesture {
+        DragGesture()
+            .updating($drag) { value, state, _ in state = value.translation }
+            .onEnded { value in
+                cardOffset.width += value.translation.width
+                cardOffset.height += value.translation.height
+            }
+            .simultaneously(with: MagnifyGesture()
+                .updating($pinch) { value, state, _ in state = value.magnification }
+                .onEnded { value in
+                    let scale = cardScale * value.magnification
+                    if scale > cardScales.upperBound {
+                        motion.expandModel()
+                    } else {
+                        cardScale = min(max(scale, cardScales.lowerBound), cardScales.upperBound)
+                    }
+                })
     }
 
     /// Where to move to fit in the guide outline, in one short line.
