@@ -29,7 +29,7 @@ final class MotionSession {
         case finished
     }
 
-    /// Where the model is: full screen to watch the movement (counting paused), or in its card during the set.
+    /// Where the model is: large in front of the patient, or in its card during the set.
     enum GuideDisplay {
         case large
         case corner
@@ -205,20 +205,17 @@ final class MotionSession {
         }
     }
 
-    /// The patient opens the model full screen to watch the movement: counting pauses until it goes back to its card.
+    /// The patient opens the model large, in front of them, to follow it while doing the movement.
     func expandModel() {
         guard phase == .active, guideDisplay == .corner else { return }
         demonstration?.cancel()
         guideDisplay = .large
-        demonstrationStart = .now
-        coach.say("Pause. Regardez le mouvement")
     }
 
     func shrinkModel() {
         guard phase == .active, guideDisplay == .large else { return }
         demonstration?.cancel()
         guideDisplay = .corner
-        coach.say("On reprend")
     }
 
     /// The guide does the movement once, full screen, then goes back to its card.
@@ -272,8 +269,8 @@ final class MotionSession {
             isCalibrated = true
             startDemonstrationIfReady()
         }
-        // Nothing counts before the end of the demonstration, nor while the model is full screen.
-        guard phase == .active, guideDisplay == .corner else { return }
+        // Nothing counts before the end of the demonstration.
+        guard phase == .active else { return }
         depthProgress = update.progress
         faultToHighlight = update.posture ?? heldFault
 

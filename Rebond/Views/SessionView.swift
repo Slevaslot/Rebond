@@ -61,8 +61,6 @@ struct SessionView: View {
                     placementHint
                 } else if motion.phase == .demonstrating {
                     topCard(title: "Regardez d'abord le mouvement", detail: "Restez immobile, vous commencerez après")
-                } else if motion.guideDisplay == .large {
-                    topCard(title: "Pause", detail: "Touchez l'écran ou pincez pour reprendre")
                 } else {
                     counter
                 }
@@ -168,9 +166,9 @@ struct SessionView: View {
         .accessibilityElement(children: .combine)
     }
 
-    /// The model is full screen: the patient watches, the camera fades back. Clear again once it is in its card.
+    /// The first demonstration, before the set: the patient watches, the camera fades back.
     private var isWatching: Bool {
-        (motion.phase == .demonstrating || motion.phase == .active) && motion.guideDisplay == .large
+        motion.phase == .demonstrating && motion.guideDisplay == .large
     }
 
     /// Before the set: the large guide, to get in place.
@@ -218,9 +216,9 @@ struct SessionView: View {
         return CGRect(x: figure.midX - height / 2, y: figure.midY - height / 2, width: height, height: height)
     }
 
-    /// One card for the model at every size: it shrinks from full screen into its card, and opens back up.
-    /// In the card: drag to move, pinch to resize, pinch wide open or double-tap for full screen.
-    /// Full screen: tap or pinch closed to go back to the card.
+    /// One card for the model at every size: it shrinks from large into its card, and opens back up.
+    /// In the card: drag to move, pinch to resize, pinch wide open or double-tap to open it large in front of
+    /// the patient, without pausing. Large: tap or pinch closed to put it back in its card.
     private var floatingGuide: some View {
         GeometryReader { geometry in
             let card = floatingGuideFrame(in: geometry.size)
@@ -243,10 +241,8 @@ struct SessionView: View {
                 .position(x: figure.midX, y: figure.midY)
             }
             .frame(width: geometry.size.width, height: geometry.size.height)
-            // In its card, only the card reacts to touches: the rest of the screen stays usable.
-            .contentShape(guideInCard
-                ? Path(roundedRect: card, cornerRadius: 20)
-                : Path(CGRect(origin: .zero, size: geometry.size)))
+            // Only the model itself reacts to touches: the rest of the screen stays usable.
+            .contentShape(guideInCard ? Path(roundedRect: card, cornerRadius: 20) : Path(figure))
             .gesture(cardGestures, isEnabled: guideInCard && motion.phase == .active)
             .onTapGesture(count: 2) {
                 if guideInCard { motion.expandModel() }
@@ -266,8 +262,8 @@ struct SessionView: View {
         .accessibilityElement()
         .accessibilityLabel(Text("Modèle du mouvement"))
         .accessibilityHint(guideInCard
-            ? Text("Touchez deux fois pour le voir en plein écran, faites glisser pour le déplacer")
-            : Text("Touchez pour revenir à la séance"))
+            ? Text("Touchez deux fois pour l'agrandir devant vous, faites glisser pour le déplacer")
+            : Text("Touchez pour le ranger dans sa vignette"))
         .accessibilityAddTraits(.isButton)
         .accessibilityAction {
             if guideInCard { motion.expandModel() } else { motion.shrinkModel() }
