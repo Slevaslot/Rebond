@@ -59,7 +59,7 @@ struct SessionView: View {
                     topCard(title: "Caméra indisponible", detail: motion.cameraAccessDenied
                         ? "Autorisez l'accès à la caméra dans Réglages pour que Rebond suive vos mouvements."
                         : "Aucune caméra avant n'est disponible. Vous pouvez terminer la série.")
-                } else if motion.phase == .calibrating {
+                } else if motion.phase == .calibrating || motion.isLost {
                     placementHint
                 } else if motion.phase == .demonstrating {
                     topCard(title: "Regardez d'abord le mouvement", detail: "Restez immobile, vous commencerez après")
@@ -70,7 +70,7 @@ struct SessionView: View {
             .padding()
         }
         .overlay {
-            if showsFloatingGuide, !motion.isPaused {
+            if showsFloatingGuide, !motion.isPaused, !motion.isLost {
                 floatingGuide
             }
         }
@@ -88,7 +88,7 @@ struct SessionView: View {
         .animation(.smooth(duration: 0.3), value: motion.isPaused)
         .animation(.smooth(duration: 0.55), value: motion.guideDisplay)
         .overlay(alignment: .trailing) {
-            if motion.phase == .active, motion.bodyVisible, !motion.isPaused {
+            if motion.phase == .active, motion.bodyVisible, !motion.isPaused, !motion.isLost {
                 DepthGauge(progress: motion.depthProgress)
                     .containerRelativeFrame(.vertical) { height, _ in height * 0.4 }
                     .padding()
@@ -145,6 +145,7 @@ struct SessionView: View {
         .sensoryFeedback(.warning, trigger: motion.incompleteCount)
         .animation(.default, value: motion.phase)
         .animation(.default, value: motion.bodyVisible)
+        .animation(.default, value: motion.isLost)
     }
 
     private var counter: some View {
@@ -197,8 +198,9 @@ struct SessionView: View {
     }
 
     /// Before the set: the large guide, to get in place.
+    /// Before the set, and during it when the camera lost the patient.
     private var showsPlacementGuide: Bool {
-        motion.phase == .calibrating
+        motion.phase == .calibrating || motion.isLost
     }
 
     /// From the demonstration on: one guide that moves between large (demonstrating) and its card.
@@ -373,10 +375,6 @@ struct SessionView: View {
                 }
                 .controlSize(.extraLarge)
             }
-        } else if motion.phase == .active, !motion.bodyVisible {
-            card(systemImage: "figure.stand", color: .white,
-                 title: "Placez-vous à 2–3 m",
-                 detail: "Le corps entier visible, de face ou de profil")
         }
     }
 

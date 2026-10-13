@@ -68,6 +68,9 @@ final class MotionSession {
     private(set) var guideDisplay = GuideDisplay.large
     /// Paused from the screen or the AirPods: nothing is counted until the patient resumes.
     private(set) var isPaused = false
+    /// The camera lost the patient during the set: the guide outline shows them where to stand again,
+    /// and counting resumes once they are back in it.
+    private(set) var isLost = false
     /// When the current demonstration started, so the guide begins it standing.
     private(set) var demonstrationStart = Date.now
     /// Fault to show in red on the body: the live posture problem, or the last rejected movement for a moment.
@@ -84,6 +87,8 @@ final class MotionSession {
     @ObservationIgnored private var rotationObservation: NSKeyValueObservation?
     /// Consecutive frames without a body, so a single missed detection doesn't flash the placement hint.
     @ObservationIgnored private var missedFrames = 0
+    /// Waits a moment before showing the outline again, so a short loss of the body doesn't flash it.
+    @ObservationIgnored private var lostDelay: Task<Void, Never>?
     @ObservationIgnored private var feedbackDismissal: Task<Void, Never>?
     @ObservationIgnored private var remoteTargets: [(MPRemoteCommand, Any)] = []
     @ObservationIgnored private var volumeObservation: NSKeyValueObservation?
@@ -223,7 +228,7 @@ final class MotionSession {
     /// and a new one waits a few seconds after the previous.
     func announce(_ message: LocalizedStringResource) {
         let text = String(localized: message)
-        guard phase == .calibrating, text != lastAnnouncement,
+        guard phase == .calibrating || isLost, text != lastAnnouncement,
               Date.now.timeIntervalSince(lastAnnouncementDate) > 3
         else { return }
         lastAnnouncement = text
@@ -234,6 +239,11 @@ final class MotionSession {
     /// Where the patient stands compared with the guide outline, reported by the screen.
     func updatePlacement(_ placement: GuidePlacement) {
         isInPlace = placement == .aligned || placement == .almost
+        if isLost, isInPlace {
+            isLost = false
+            coach.say("On reprend")
+            return
+        }
         announce(placement.message)
         startDemonstrationIfReady()
     }
@@ -284,11 +294,26 @@ final class MotionSession {
         }
     }
 
+    /// The body has been missing for about half a second: one more second, then the outline comes back.
+    private func showOutlineIfStillLost() {
+        lostDelay?.cancel()
+        lostDelay = Task {
+            try? await Task.sleep(for: .seconds(1))
+            guard !Task.isCancelled, phase == .active, !isPaused else { return }
+            isLost = true
+            depthProgress = 0
+            lastAnnouncement = ""
+            announce(GuidePlacement.notVisible.message)
+        }
+    }
+
     /// Starts the set over, measuring the resting position again.
     func restart() {
         processor.resetCounter()
         intro?.cancel()
         isPaused = false
+        isLost = false
+        lostDelay?.cancel()
         demonstration?.cancel()
         guideDisplay = .large
         failedInARow = 0
@@ -311,9 +336,13 @@ final class MotionSession {
         self.skeleton = skeleton
         if skeleton == nil {
             missedFrames += 1
-            if missedFrames >= 8 { bodyVisible = false }
+            if missedFrames >= 8, bodyVisible {
+                bodyVisible = false
+                if phase == .active { showOutlineIfStillLost() }
+            }
         } else {
             missedFrames = 0
+            lostDelay?.cancel()
             if !bodyVisible {
                 bodyVisible = true
             }
@@ -324,8 +353,8 @@ final class MotionSession {
             isCalibrated = true
             startDemonstrationIfReady()
         }
-        // Nothing counts before the end of the demonstration, nor during a pause.
-        guard phase == .active, !isPaused else { return }
+        // Nothing counts before the end of the demonstration, during a pause, nor until the patient is back in place.
+        guard phase == .active, !isPaused, !isLost else { return }
         depthProgress = update.progress
         faultToHighlight = update.posture ?? heldFault
 
