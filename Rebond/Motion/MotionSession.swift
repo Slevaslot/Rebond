@@ -29,6 +29,15 @@ final class MotionSession {
         case finished
     }
 
+    /// Where the guide pictogram is during the set: large over the patient to demonstrate, or small in a corner.
+    enum GuideDisplay {
+        case large
+        case corner
+    }
+
+    /// One demonstration of the movement by the guide pictogram, in seconds.
+    static let demonstrationDuration = 4.0
+
     struct Feedback: Identifiable, Equatable {
         let id = UUID()
         let message: LocalizedStringResource
@@ -56,6 +65,11 @@ final class MotionSession {
     private(set) var feedback: Feedback?
     /// Seconds left before counting starts, during the countdown.
     private(set) var countdownValue = 3
+    private(set) var guideDisplay = GuideDisplay.large
+    /// When the current demonstration started, so the guide begins it standing.
+    private(set) var demonstrationStart = Date.now
+    /// The patient can hide the small guide in the corner.
+    var showsCornerGuide = true
     /// Fault to show in red on the body: the live posture problem, or the last rejected movement for a moment.
     private(set) var faultToHighlight: Correction?
     var isMuted = false {
@@ -75,6 +89,10 @@ final class MotionSession {
     @ObservationIgnored private var isCalibrated = false
     @ObservationIgnored private var isInPlace = false
     @ObservationIgnored private var countdown: Task<Void, Never>?
+    @ObservationIgnored private var demonstration: Task<Void, Never>?
+    /// Movements rejected in a row: after a few, the guide shows the movement again.
+    @ObservationIgnored private var failedInARow = 0
+    private let failuresBeforeDemonstration = 2
     @ObservationIgnored private var lastAnnouncement = ""
     @ObservationIgnored private var lastAnnouncementDate = Date.distantPast
     @ObservationIgnored private var heldFault: Correction?
@@ -183,6 +201,19 @@ final class MotionSession {
             }
             phase = .active
             coach.say("C'est parti !")
+            demonstrate()
+        }
+    }
+
+    /// The guide does the movement once, large over the patient, then moves to a corner.
+    private func demonstrate() {
+        guideDisplay = .large
+        demonstrationStart = .now
+        demonstration?.cancel()
+        demonstration = Task {
+            try? await Task.sleep(for: .seconds(Self.demonstrationDuration))
+            guard !Task.isCancelled else { return }
+            guideDisplay = .corner
         }
     }
 
@@ -190,6 +221,9 @@ final class MotionSession {
     func restart() {
         processor.resetCounter()
         countdown?.cancel()
+        demonstration?.cancel()
+        guideDisplay = .large
+        failedInARow = 0
         isCalibrated = false
         phase = .calibrating
         depthProgress = 0
@@ -231,6 +265,7 @@ final class MotionSession {
         case .calibrated:
             break
         case .repCompleted(let result):
+            failedInARow = 0
             repCount += 1
             bestDepth = max(bestDepth, result.depth)
             if repCount >= targetReps {
@@ -255,8 +290,15 @@ final class MotionSession {
             coach.say("Remontez")
         case .correction(let correction):
             show(Feedback(message: correction.message, isPositive: false))
-            coach.say(correction.message)
             hold(correction)
+            failedInARow += 1
+            if failedInARow >= failuresBeforeDemonstration, guideDisplay == .corner {
+                failedInARow = 0
+                coach.say("\(String(localized: correction.message)). Regardez le mouvement")
+                demonstrate()
+            } else {
+                coach.say(correction.message)
+            }
         case nil:
             break
         }

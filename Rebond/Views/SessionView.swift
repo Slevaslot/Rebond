@@ -10,6 +10,7 @@ struct SessionView: View {
     @State private var motion: MotionSession
     @State private var placement = GuidePlacement.notVisible
     @ScaledMetric private var ringSize = 64
+    @ScaledMetric private var cornerGuideWidth = 84
 
     init(exercise: CatalogExercise, targetReps: Int, setTitle: LocalizedStringKey, onFinish: @escaping (SetResult) -> Void) {
         self.exercise = exercise
@@ -32,13 +33,18 @@ struct SessionView: View {
                     )
                 }
             }
-            if motion.phase != .finished {
-                MovementGuide(exercise: exercise, skeleton: motion.skeleton, isDemonstrating: motion.phase == .active) { placement in
+            if showsLargeGuide {
+                MovementGuide(
+                    exercise: exercise,
+                    skeleton: motion.skeleton,
+                    isDemonstrating: motion.phase == .active,
+                    demonstrationStart: motion.demonstrationStart
+                ) { placement in
                     self.placement = placement
                     motion.updatePlacement(placement)
                 }
-                // During the set it is a model to follow: lighter, so the patient's own body stays readable.
-                .opacity(motion.phase == .active ? 0.5 : 1)
+                // Demonstrating over the patient: lighter, so their own body stays readable.
+                .opacity(motion.phase == .active ? 0.6 : 1)
                 .transition(.opacity)
             }
         }
@@ -66,6 +72,14 @@ struct SessionView: View {
             }
             .padding()
         }
+        .overlay(alignment: .leading) {
+            if motion.phase == .active, motion.guideDisplay == .corner {
+                cornerGuide
+                    .padding()
+                    .transition(.opacity.combined(with: .scale(scale: 0.8, anchor: .leading)))
+            }
+        }
+        .animation(.spring(duration: 0.5), value: motion.guideDisplay)
         .overlay(alignment: .trailing) {
             if motion.phase == .active && motion.bodyVisible {
                 DepthGauge(progress: motion.depthProgress)
@@ -157,6 +171,42 @@ struct SessionView: View {
         .padding()
         .glassEffect(in: .rect(cornerRadius: 28))
         .accessibilityElement(children: .combine)
+    }
+
+    /// Large guide: to get in place before the set, then whenever it demonstrates the movement.
+    private var showsLargeGuide: Bool {
+        switch motion.phase {
+        case .calibrating, .countdown: true
+        case .active: motion.guideDisplay == .large
+        case .finished: false
+        }
+    }
+
+    /// The movement in a loop, small in a corner during the set. A tap hides or shows it.
+    @ViewBuilder
+    private var cornerGuide: some View {
+        Button {
+            motion.showsCornerGuide.toggle()
+        } label: {
+            if motion.showsCornerGuide {
+                MovementGuide(
+                    exercise: exercise,
+                    skeleton: nil,
+                    isDemonstrating: true,
+                    demonstrationStart: motion.demonstrationStart,
+                    isCompact: true
+                )
+                .frame(width: cornerGuideWidth, height: cornerGuideWidth * 1.5)
+                .padding(8)
+            } else {
+                Image(systemName: "figure.strengthtraining.functional")
+                    .font(.title2)
+                    .padding(14)
+            }
+        }
+        .buttonStyle(.plain)
+        .glassEffect(in: .rect(cornerRadius: 20))
+        .accessibilityLabel(motion.showsCornerGuide ? Text("Masquer le modèle") : Text("Afficher le modèle"))
     }
 
     /// Where to move to fit in the guide outline, in one short line.

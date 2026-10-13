@@ -11,12 +11,16 @@ struct MovementGuide: View {
     let skeleton: PoseSkeleton?
     /// Doing the exercise (during the set) or standing still (before).
     let isDemonstrating: Bool
-    let onPlacement: (GuidePlacement) -> Void
+    /// When the movement starts, so it begins standing.
+    var demonstrationStart = Date.distantPast
+    /// Small version in a corner: the figure fills its frame.
+    var isCompact = false
+    var onPlacement: (GuidePlacement) -> Void = { _ in }
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Seconds for one full movement, down and back up.
-    private static let cycle = 4.0
+    private static let cycle = MotionSession.demonstrationDuration
 
     var body: some View {
         GeometryReader { geometry in
@@ -26,7 +30,7 @@ struct MovementGuide: View {
 
             TimelineView(.animation(paused: reduceMotion || !isDemonstrating)) { timeline in
                 Canvas { context, _ in
-                    let progress = isDemonstrating && !reduceMotion ? Self.progress(at: timeline.date) : 0
+                    let progress = isDemonstrating && !reduceMotion ? Self.progress(since: demonstrationStart, at: timeline.date) : 0
                     let figure = Self.outline(exercise.guideRest, exercise.guideTarget, progress: progress, in: box)
                     let color: Color = if isDemonstrating { .white } else {
                         switch placement {
@@ -36,8 +40,9 @@ struct MovementGuide: View {
                         }
                     }
                     // A dark edge under the line keeps it visible on a bright room.
-                    context.stroke(figure, with: .color(.black.opacity(0.35)), style: StrokeStyle(lineWidth: 11, lineJoin: .round))
-                    context.stroke(figure, with: .color(color), style: StrokeStyle(lineWidth: 6, lineJoin: .round))
+                    let line = isCompact ? 3.0 : 6.0
+                    context.stroke(figure, with: .color(.black.opacity(0.35)), style: StrokeStyle(lineWidth: line * 1.8, lineJoin: .round))
+                    context.stroke(figure, with: .color(color), style: StrokeStyle(lineWidth: line, lineJoin: .round))
                 }
             }
             .onChange(of: placement, initial: true) { onPlacement(placement) }
@@ -50,6 +55,11 @@ struct MovementGuide: View {
     /// ankles fill about 56% of the screen height on real videos). Once the feet are seen, the figure stands
     /// on them: their height on screen depends on how the phone is set, not on where the patient stands.
     private func box(in size: CGSize) -> CGRect {
+        if isCompact {
+            let height = size.height * 0.9
+            let width = height * 0.65
+            return CGRect(x: (size.width - width) / 2, y: (size.height - height) / 2, width: width, height: height)
+        }
         let height = size.height * 0.6
         let width = height * 0.65
         var top = size.height * 0.28
@@ -70,8 +80,8 @@ struct MovementGuide: View {
     }
 
     /// 0 standing, 1 at the bottom, with a pause at each end.
-    private static func progress(at date: Date) -> Double {
-        let phase = date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: cycle) / cycle
+    private static func progress(since start: Date, at date: Date) -> Double {
+        let phase = max(0, date.timeIntervalSince(start)).truncatingRemainder(dividingBy: cycle) / cycle
         let wave = (1 - cos(phase * 2 * .pi)) / 2
         let held = min(1, max(0, (wave - 0.15) / 0.7))
         return held * held * (3 - 2 * held)
