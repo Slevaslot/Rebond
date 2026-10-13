@@ -29,10 +29,9 @@ struct SessionView: View {
         ZStack {
             Color.black
             if !motion.cameraUnavailable {
-                // While the guide demonstrates, the camera fades back: it is not the patient's turn yet.
-                // Watching the demonstration or paused: the whole picture is blurred like the background.
+                // Watching the model or paused, the camera fades back: the whole picture is blurred by the camera
+                // processing itself, in a single blur with the background, and dimmed here.
                 CameraFrameView(frame: motion.liveFrame)
-                    .blur(radius: isWatching || motion.isPaused ? 12 : 0)
                 if isWatching || motion.isPaused {
                     Color.black.opacity(0.3)
                 }
@@ -140,6 +139,9 @@ struct SessionView: View {
                     motion.isMuted.toggle()
                 }
             }
+        }
+        .onChange(of: isWatching || motion.isPaused, initial: true) { _, blurred in
+            motion.blurWholePicture(blurred)
         }
         .task { await motion.start() }
         .onDisappear { motion.stop() }

@@ -191,6 +191,11 @@ final class MotionSession {
         MPNowPlayingInfoCenter.default().nowPlayingInfo?[MPNowPlayingInfoPropertyPlaybackRate] = isPaused ? 0.0 : 1.0
     }
 
+    /// While the patient watches the model or pauses, the whole picture is blurred, in one blur with the background.
+    func blurWholePicture(_ blurred: Bool) {
+        processor.blursEverything.withLock { $0 = blurred }
+    }
+
     /// Hand gestures, from where the patient stands: palm to pause, spread or pinch to open or close the model.
     private func handle(_ gesture: HandGesture) {
         switch gesture {
@@ -482,6 +487,9 @@ nonisolated final class FrameProcessor: NSObject, AVCaptureVideoDataOutputSample
 
     private let resetRequested = Mutex(false)
 
+    /// Set from the main thread: blur the patient too, not only the background.
+    let blursEverything = Mutex(false)
+
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         guard let pixelBuffer = sampleBuffer.imageBuffer else { return }
 
@@ -501,6 +509,6 @@ nonisolated final class FrameProcessor: NSObject, AVCaptureVideoDataOutputSample
             patient = frame.skeleton.flatMap { $0.points[.root] ?? $0.points[.neck] } ?? patient
         }
 
-        onImage?(blur.apply(to: pixelBuffer, patient: patient))
+        onImage?(blur.apply(to: pixelBuffer, patient: patient, everything: blursEverything.withLock { $0 }))
     }
 }

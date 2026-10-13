@@ -11,9 +11,11 @@ nonisolated final class BackgroundBlur {
     private var lastMask: CIImage?
     private var frameIndex = 0
 
-    /// - Parameter patient: where the patient is (their hips), normalized, origin top-left.
-    ///   Without it, every person in view stays sharp.
-    func apply(to pixelBuffer: CVPixelBuffer, patient: CGPoint?) -> CGImage? {
+    /// - Parameters:
+    ///   - patient: where the patient is (their hips), normalized, origin top-left.
+    ///     Without it, every person in view stays sharp.
+    ///   - everything: blur the patient too (while watching the model or paused), in a single blur.
+    func apply(to pixelBuffer: CVPixelBuffer, patient: CGPoint?, everything: Bool = false) -> CGImage? {
         let camera = CIImage(cvPixelBuffer: pixelBuffer)
         frameIndex += 1
         if frameIndex.isMultiple(of: 2) || lastMask == nil {
@@ -22,8 +24,8 @@ nonisolated final class BackgroundBlur {
         let blurred = camera.clampedToExtent()
             .applyingGaussianBlur(sigma: 12)
             .cropped(to: camera.extent)
-        // Nobody in view yet: the whole room stays blurred.
-        guard let mask = lastMask else { return context.createCGImage(blurred, from: camera.extent) }
+        // Nobody in view yet, or nothing should be sharp: the whole picture is blurred.
+        guard !everything, let mask = lastMask else { return context.createCGImage(blurred, from: camera.extent) }
 
         let blend = CIFilter.blendWithMask()
         blend.inputImage = camera
