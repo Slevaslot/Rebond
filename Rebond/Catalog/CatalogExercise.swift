@@ -17,6 +17,10 @@ nonisolated struct CatalogExercise: Identifiable, Sendable {
         case legRaise(targetLift: Double)
         /// One knee raised, bent, either side: the same lift as the leg raise.
         case kneeRaise(targetLift: Double)
+        /// Lunge with one foot in front of the other, in torso lengths of hips drop.
+        case forwardLunge(targetDrop: Double)
+        /// Lunge to one side, either side, in torso lengths of hips shifting sideways.
+        case sideLunge(targetShift: Double)
     }
 
     /// How the guide pictogram moves its arms.
@@ -52,6 +56,8 @@ nonisolated struct CatalogExercise: Identifiable, Sendable {
         case .sitToStand(let targetRise): SitToStandCounter(targetRise: targetRise)
         case .legRaise(let targetLift): LegRaiseCounter(targetLift: targetLift)
         case .kneeRaise(let targetLift): LegRaiseCounter(targetLift: targetLift, style: .bentKnee)
+        case .forwardLunge(let targetDrop): LungeCounter(direction: .forward, target: targetDrop)
+        case .sideLunge(let targetShift): LungeCounter(direction: .side, target: targetShift)
         }
     }
 }
@@ -245,8 +251,68 @@ nonisolated extension CatalogExercise {
         armStyle: .straight
     )
 
+    /// Forward lunge, one foot in front of the other: the hips go straight down, the back knee toward the floor,
+    /// then back up. Seen from the front, the knees overlap: the hips are followed, as for the squat.
+    static let forwardLunge = CatalogExercise(
+        id: "forward-lunge",
+        name: "Fente avant",
+        symbol: "figure.strengthtraining.functional",
+        // A shallow lunge: UI-PRMD inline lunges go down 0.43–0.98 torso lengths. At 0.45 (front view, phone at
+        // 2–3 m): 97% of correct ones counted, 54% of incorrect ones (torso leaning forward or to the side).
+        analysis: .forwardLunge(targetDrop: 0.45),
+        highlightedJoints: [.leftHip, .leftKnee, .leftAnkle, .rightHip, .rightKnee, .rightAnkle],
+        returnCue: "Remontez",
+        amplitudeMeaning: "Profondeur de la descente, en % de la profondeur visée",
+        guideRest: standingBody.merging([
+            .leftWrist: CGPoint(x: 0.3, y: 0.5), .rightWrist: CGPoint(x: 0.7, y: 0.5),
+        ]) { $1 },
+        // Down, the torso straight: the front knee bends over the foot, the back knee comes down lower.
+        guideTarget: [
+            .nose: CGPoint(x: 0.5, y: 0.26),
+            .neck: CGPoint(x: 0.5, y: 0.36),
+            .leftShoulder: CGPoint(x: 0.36, y: 0.38), .rightShoulder: CGPoint(x: 0.64, y: 0.38),
+            .leftWrist: CGPoint(x: 0.3, y: 0.68), .rightWrist: CGPoint(x: 0.7, y: 0.68),
+            .leftHip: CGPoint(x: 0.42, y: 0.68), .rightHip: CGPoint(x: 0.58, y: 0.68),
+            .leftKnee: CGPoint(x: 0.4, y: 0.78), .rightKnee: CGPoint(x: 0.6, y: 0.86),
+            .leftAnkle: CGPoint(x: 0.41, y: 0.95), .rightAnkle: CGPoint(x: 0.59, y: 0.95),
+        ],
+        armStyle: .straight
+    )
+
+    /// Side lunge, either side: one leg steps out and bends, the other stays straight; the hips go over the bent
+    /// leg, then come back to the middle.
+    static let sideLunge = CatalogExercise(
+        id: "side-lunge",
+        name: "Fente latérale",
+        symbol: "figure.strengthtraining.functional",
+        // UI-PRMD side lunges shift the hips 0.38–0.77 torso lengths. At 0.4 (front view, phone at 2–3 m):
+        // 98% of correct ones counted, 43% of incorrect ones (torso leaning to the side, knee not bent).
+        analysis: .sideLunge(targetShift: 0.4),
+        highlightedJoints: [.leftHip, .leftKnee, .leftAnkle, .rightHip, .rightKnee, .rightAnkle],
+        returnCue: "Revenez au centre",
+        amplitudeMeaning: "Écart sur le côté, en % de l'écart visé",
+        guideRest: standingBody.merging([
+            .leftWrist: CGPoint(x: 0.3, y: 0.5), .rightWrist: CGPoint(x: 0.7, y: 0.5),
+            .leftAnkle: CGPoint(x: 0.36, y: 0.95), .rightAnkle: CGPoint(x: 0.64, y: 0.95),
+        ]) { $1 },
+        // Hips over the bent left leg, the right leg straight and slanted, hands joined in front of the chest.
+        guideTarget: [
+            .nose: CGPoint(x: 0.4, y: 0.24),
+            .neck: CGPoint(x: 0.4, y: 0.34),
+            .leftShoulder: CGPoint(x: 0.26, y: 0.36), .rightShoulder: CGPoint(x: 0.54, y: 0.36),
+            .leftWrist: CGPoint(x: 0.2, y: 0.62), .rightWrist: CGPoint(x: 0.6, y: 0.62),
+            .leftHip: CGPoint(x: 0.32, y: 0.64), .rightHip: CGPoint(x: 0.48, y: 0.64),
+            .leftKnee: CGPoint(x: 0.2, y: 0.78), .rightKnee: CGPoint(x: 0.66, y: 0.8),
+            .leftAnkle: CGPoint(x: 0.18, y: 0.95), .rightAnkle: CGPoint(x: 0.84, y: 0.95),
+        ],
+        armStyle: .handsToChest
+    )
+
     /// Exercises the camera knows how to follow.
-    static let all: [CatalogExercise] = [.squat, .lateralRaise, .shoulderAbduction, .scaption, .sitToStand, .legRaise, .hurdleStep]
+    static let all: [CatalogExercise] = [
+        .squat, .lateralRaise, .shoulderAbduction, .scaption, .sitToStand, .legRaise, .hurdleStep,
+        .forwardLunge, .sideLunge,
+    ]
 
     static func find(_ id: String) -> CatalogExercise? {
         all.first { $0.id == id }
@@ -254,8 +320,12 @@ nonisolated extension CatalogExercise {
 }
 
 nonisolated extension CatalogExercise {
-    /// Raised arms or leg and standing up fill the amplitude gauge upward; a squat fills it downward.
+    /// Raised arms or leg and standing up fill the amplitude gauge upward; a squat or a forward lunge fills it
+    /// downward.
     var fillsGaugeUpward: Bool {
-        if case .squat = analysis { false } else { true }
+        switch analysis {
+        case .squat, .forwardLunge: false
+        default: true
+        }
     }
 }

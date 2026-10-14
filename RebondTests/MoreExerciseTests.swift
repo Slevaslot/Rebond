@@ -19,6 +19,29 @@ enum MoreBody {
     }
 }
 
+extension MoreBody {
+    /// Standing, then lunging: the hips go down by `drop` and sideways by `shift` torso lengths, the left knee
+    /// bends to `leftKnee` degrees (seen from the front), the right leg stays straight. Feet stay in place.
+    static func lunge(drop: Double = 0, shift: Double = 0, leftKnee: Double = 178, lean: Double = 0) -> PoseMeasure {
+        let hips = CGPoint(x: 0.5 + shift * torso, y: 0.5 - drop * torso)
+        let leftHip = CGPoint(x: hips.x - 0.05, y: hips.y), rightHip = CGPoint(x: hips.x + 0.05, y: hips.y)
+        let leftAnkle = CGPoint(x: 0.43, y: 0.1), rightAnkle = CGPoint(x: 0.57, y: 0.1)
+        return PoseMeasure(
+            hips: hips, neck: CGPoint(x: hips.x + lean * torso, y: hips.y + torso),
+            leftHip: leftHip, rightHip: rightHip,
+            leftKnee: knee(leftHip, leftAnkle, angle: leftKnee, outward: -1), rightKnee: knee(rightHip, rightAnkle, angle: 178, outward: 1),
+            leftAnkle: leftAnkle, rightAnkle: rightAnkle
+        )
+    }
+
+    /// The knee between hip and ankle, pushed outward so the leg bends to `angle` degrees.
+    private static func knee(_ hip: CGPoint, _ ankle: CGPoint, angle: Double, outward: Double) -> CGPoint {
+        let half = hypot(hip.x - ankle.x, hip.y - ankle.y) / 2
+        let offset = half / tan(angle / 2 * .pi / 180)
+        return CGPoint(x: (hip.x + ankle.x) / 2 + outward * offset, y: (hip.y + ankle.y) / 2)
+    }
+}
+
 @Suite("Montée de genou")
 struct HurdleStepTests {
     private func standing() -> Feeder<LegRaiseCounter> {
@@ -70,5 +93,126 @@ struct HurdleStepTests {
     @Test func isInTheCatalog() {
         #expect(ExerciseKind.hurdleStep.catalogID == "hurdle-step")
         #expect(CatalogExercise.find("hurdle-step")?.makeCounter() is LegRaiseCounter)
+    }
+}
+
+@Suite("Fente avant")
+struct ForwardLungeTests {
+    private func standing() -> Feeder<LungeCounter> {
+        var feeder = Feeder(counter: LungeCounter(direction: .forward, target: 0.45))
+        feeder.feed(MoreBody.lunge(), frames: 10)
+        return feeder
+    }
+
+    private func lunge(_ feeder: inout Feeder<LungeCounter>, to drop: Double, knee: Double = 120, lean: Double = 0) {
+        let body = { (drop: Double) in
+            let depth = drop / 0.6
+            return MoreBody.lunge(drop: drop, leftKnee: 178 - (178 - knee) * depth, lean: lean * depth)
+        }
+        feeder.move(from: 0, to: drop, seconds: 1, measure: body)
+        feeder.feed(body(drop), frames: 3)
+        feeder.move(from: drop, to: 0, seconds: 1, measure: body)
+        feeder.feed(body(0), frames: 5)
+    }
+
+    @Test func calibratesStanding() {
+        #expect(standing().calibrated)
+    }
+
+    @Test func countsLunges() throws {
+        var feeder = standing()
+        lunge(&feeder, to: 0.6)
+        lunge(&feeder, to: 0.6)
+        #expect(feeder.completed.count == 2)
+        let amplitude = try #require(feeder.completed.first?.amplitude)
+        #expect(amplitude > 1.25 && amplitude < 1.4)
+        #expect(feeder.corrections.isEmpty)
+    }
+
+    @Test func shallowLungeIsIncomplete() {
+        var feeder = standing()
+        lunge(&feeder, to: 0.3)
+        #expect(feeder.completed.isEmpty)
+        #expect(feeder.incomplete == 1)
+        #expect(feeder.corrections == [.goLower])
+    }
+
+    @Test func leaningToTheSideIsRejected() {
+        var feeder = standing()
+        lunge(&feeder, to: 0.6, lean: 0.4)
+        #expect(feeder.completed.isEmpty)
+        #expect(feeder.corrections.contains(.keepBackStraight))
+    }
+
+    @Test func goingDownWithoutBendingTheKneeIsRejected() {
+        var feeder = standing()
+        lunge(&feeder, to: 0.6, knee: 170)
+        #expect(feeder.completed.isEmpty)
+        #expect(feeder.corrections.contains(.bendFrontKnee))
+    }
+}
+
+@Suite("Fente latérale")
+struct SideLungeTests {
+    private func standing() -> Feeder<LungeCounter> {
+        var feeder = Feeder(counter: LungeCounter(direction: .side, target: 0.4))
+        feeder.feed(MoreBody.lunge(), frames: 10)
+        return feeder
+    }
+
+    private func lunge(_ feeder: inout Feeder<LungeCounter>, to shift: Double, knee: Double = 130, lean: Double = 0) {
+        let body = { (shift: Double) in
+            let depth = abs(shift) / 0.5
+            return MoreBody.lunge(drop: 0.3 * depth, shift: shift, leftKnee: 178 - (178 - knee) * depth, lean: lean * depth)
+        }
+        feeder.move(from: 0, to: shift, seconds: 1, measure: body)
+        feeder.feed(body(shift), frames: 3)
+        feeder.move(from: shift, to: 0, seconds: 1, measure: body)
+        feeder.feed(body(0), frames: 5)
+    }
+
+    @Test func calibratesStanding() {
+        #expect(standing().calibrated)
+    }
+
+    @Test func countsLungesOnEitherSide() throws {
+        var feeder = standing()
+        lunge(&feeder, to: -0.5)
+        lunge(&feeder, to: 0.5)
+        #expect(feeder.completed.count == 2)
+        let amplitude = try #require(feeder.completed.first?.amplitude)
+        #expect(amplitude > 1.15 && amplitude < 1.35)
+        #expect(feeder.corrections.isEmpty)
+    }
+
+    @Test func shortLungeIsIncomplete() {
+        var feeder = standing()
+        lunge(&feeder, to: -0.25)
+        #expect(feeder.completed.isEmpty)
+        #expect(feeder.incomplete == 1)
+        #expect(feeder.corrections == [.lungeFurther])
+    }
+
+    @Test func movingTheHipsWithoutBendingTheKneeIsRejected() {
+        var feeder = standing()
+        lunge(&feeder, to: -0.5, knee: 170)
+        #expect(feeder.completed.isEmpty)
+        #expect(feeder.corrections.contains(.bendFrontKnee))
+    }
+}
+
+@Suite("Catalogue des exercices ajoutés")
+struct MoreCatalogTests {
+    @Test func sheetKindsMapToTheCatalog() {
+        let kinds: [(ExerciseKind, String)] = [(.forwardLunge, "forward-lunge"), (.sideLunge, "side-lunge")]
+        for (kind, id) in kinds {
+            #expect(kind.catalogID == id)
+            #expect(CatalogExercise.find(id)?.makeCounter() is LungeCounter)
+        }
+    }
+
+    @Test func forwardLungeFillsTheGaugeDownward() {
+        #expect(!CatalogExercise.forwardLunge.fillsGaugeUpward)
+        #expect(CatalogExercise.sideLunge.fillsGaugeUpward)
     }
 }

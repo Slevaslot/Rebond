@@ -23,6 +23,10 @@ nonisolated enum Correction: Sendable {
     case keepStandingLegStraight
     /// Hurdle step: the knee doesn't come up high enough.
     case raiseKneeHigher
+    /// Side lunge: the hips don't go far enough over the bent leg.
+    case lungeFurther
+    /// Lunges: the hips move without the leading knee bending.
+    case bendFrontKnee
 
     var message: LocalizedStringResource {
         switch self {
@@ -42,6 +46,8 @@ nonisolated enum Correction: Sendable {
         case .raiseLegHigher: "Levez la jambe un peu plus haut"
         case .keepLegStraight: "Gardez la jambe tendue"
         case .raiseKneeHigher: "Montez le genou un peu plus haut"
+        case .lungeFurther: "Allez un peu plus loin sur le côté"
+        case .bendFrontKnee: "Pliez le genou de la jambe qui avance"
         case .keepStandingLegStraight: "Gardez la jambe d'appui tendue"
         }
     }
