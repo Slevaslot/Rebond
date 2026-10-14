@@ -2,7 +2,7 @@ import Charts
 import SwiftData
 import SwiftUI
 
-/// The follow-up part of the Aujourd'hui page, after Health's "Points clés": one card per measure,
+/// The follow-up part of the Accueil page, after Health's "Points clés": one card per measure,
 /// with a sentence, two values and a chart. Each card opens its detail in a sheet.
 struct FollowUpSection: View {
     let sessions: [Session]
@@ -219,7 +219,7 @@ private struct WeekRing: View {
 }
 
 /// The seven days: done (filled), planned (outlined, dashed when still to come), the others as a small dot.
-private struct WeekDots: View {
+struct WeekDots: View {
     let week: WeekProgress
 
     var body: some View {

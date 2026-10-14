@@ -126,6 +126,19 @@ private struct ExerciseDraftRow: View {
             }
             .font(.subheadline)
             .foregroundStyle(.secondary)
+            // How the session will follow it: a symbol and a word, as on the Programme page.
+            Group {
+                if exercise.mode == .hold {
+                    Label("Minuteur", systemImage: "timer")
+                } else if exercise.catalogID.flatMap(CatalogExercise.find) != nil {
+                    Label("Suivi caméra", systemImage: "camera.viewfinder")
+                        .foregroundStyle(.tint)
+                } else {
+                    Label("Comptage manuel", systemImage: "hand.tap")
+                }
+            }
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.secondary)
             if !exercise.guessed.isEmpty {
                 Label("À vérifier", systemImage: "questionmark.circle.fill")
                     .font(.caption.bold())
