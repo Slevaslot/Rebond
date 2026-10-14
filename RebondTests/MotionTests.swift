@@ -197,6 +197,49 @@ struct SquatCounterTests {
         #expect(feeder.corrections.contains(.goLower))
     }
 
+    /// A squat with the left ankle moved sideways by `shift` torso lengths.
+    private func squat(depth: Double, leftAnkleShift shift: Double) -> PoseMeasure {
+        let m = Body.squat(depth: depth)
+        let torso = Body.neck.y - Body.hips.y
+        return PoseMeasure(
+            hips: m.hips, neck: m.neck, leftHip: m.leftHip, rightHip: m.rightHip,
+            leftKnee: m.leftKnee, rightKnee: m.rightKnee,
+            leftAnkle: m.leftAnkle.map { CGPoint(x: $0.x - shift * torso, y: $0.y) }, rightAnkle: m.rightAnkle
+        )
+    }
+
+    @Test func briefAnkleJitterDoesNotCancel() {
+        var feeder = Feeder(counter: RepCounter(targetDepth: 0.6))
+        feeder.feed(Body.squat(depth: 0), frames: 10)
+        feeder.move(from: 0, to: 0.7, seconds: 1) { Body.squat(depth: $0) }
+        // Vision puts the ankle far off for a few frames.
+        feeder.feed(squat(depth: 0.7, leftAnkleShift: 1.5), frames: 4)
+        feeder.move(from: 0.7, to: 0, seconds: 1) { Body.squat(depth: $0) }
+        feeder.feed(Body.squat(depth: 0), frames: 3)
+        #expect(feeder.completed.count == 1)
+        #expect(feeder.corrections.isEmpty)
+    }
+
+    @Test func smallFootMovementIsAccepted() {
+        var feeder = Feeder(counter: RepCounter(targetDepth: 0.6))
+        feeder.feed(Body.squat(depth: 0), frames: 10)
+        // A foot sliding out by 0.3 torso lengths: rejected before (0.25), accepted now.
+        feeder.move(from: 0, to: 0.7, seconds: 1) { squat(depth: $0, leftAnkleShift: $0 * 0.43) }
+        feeder.move(from: 0.7, to: 0, seconds: 1) { squat(depth: $0, leftAnkleShift: 0.3) }
+        feeder.feed(squat(depth: 0, leftAnkleShift: 0.3), frames: 3)
+        #expect(feeder.completed.count == 1)
+        #expect(feeder.corrections.isEmpty)
+    }
+
+    @Test func stepAsideIsRejected() {
+        var feeder = Feeder(counter: RepCounter(targetDepth: 0.6))
+        feeder.feed(Body.squat(depth: 0), frames: 10)
+        feeder.move(from: 0, to: 0.7, seconds: 1) { squat(depth: $0, leftAnkleShift: $0 * 1.5) }
+        feeder.move(from: 0.7, to: 0, seconds: 1) { squat(depth: $0, leftAnkleShift: 1.05) }
+        #expect(feeder.completed.isEmpty)
+        #expect(feeder.corrections == [.keepFeetInPlace])
+    }
+
     @Test func countsFromSeventyPercentOfTheTarget() throws {
         var feeder = Feeder(counter: RepCounter(targetDepth: 0.6))
         feeder.feed(Body.squat(depth: 0), frames: 10)

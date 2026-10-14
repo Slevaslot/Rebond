@@ -137,15 +137,16 @@ nonisolated struct RepCounter: MovementCounter {
     /// from which it counts, so a squat a little short is still told to go lower.
     private var noiseDepth: Double { targetDepth * 0.5 }
     /// Maximum ankle movement during a repetition, in torso lengths. Beyond: a step, a lunge, walking.
-    private let feetTolerance = 0.5
+    /// Vision's ankles are unreliable: the margin is wide (UI-PRMD: 0.5 rejected 10% of the correct squats).
+    private let feetTolerance = 0.7
     /// Maximum widening of the stance during a repetition, in torso lengths.
-    private let stanceTolerance = 0.25
+    private let stanceTolerance = 0.35
     /// Maximum distance between the ankles during a repetition, in torso lengths. Beyond: a lunge or a sumo squat.
-    private let maxStance = 1.0
+    private let maxStance = 1.2
     /// Maximum height difference between the knees, in torso lengths. Beyond: a lunge, one knee going down.
     private let maxKneeGap = 0.4
     /// Maximum horizontal movement of the hips, in torso lengths. Beyond: a side lunge.
-    private let maxHipShiftFacing = 0.35
+    private let maxHipShiftFacing = 0.4
     /// Seen from the side, sitting back in a deep squat moves the hips up to about 0.7, but only as they go down:
     /// the allowed movement grows with the depth reached.
     private let hipShiftSidewaysBase = 0.45
@@ -167,6 +168,8 @@ nonisolated struct RepCounter: MovementCounter {
     private let maxKneeToAnkleWidth = 1.8
     /// A fault must last this many frames (0.2 s) to count: Vision is sometimes wrong on a single frame.
     private let faultFrames = 3
+    /// The feet, less reliable, must look moved for longer (0.4 s) before a repetition is cancelled.
+    private let feetFaultFrames = 6
     /// Below this torso length (fraction of the standing one), Vision has lost the body: the frame is ignored.
     /// Except facing the camera during a repetition, where it means the patient bends toward the camera.
     private let collapsedTorsoRatio = 0.5
@@ -346,7 +349,7 @@ nonisolated struct RepCounter: MovementCounter {
     private mutating func record(_ fault: Correction) -> RepEvent? {
         let frames = faultStreak?.fault == fault ? faultStreak!.frames + 1 : 1
         faultStreak = (fault, frames)
-        guard frames >= faultFrames else { return nil }
+        guard frames >= (fault == .keepFeetInPlace ? feetFaultFrames : faultFrames) else { return nil }
         phase = .cancelled
         return .correction(fault)
     }
@@ -375,10 +378,12 @@ nonisolated struct RepCounter: MovementCounter {
                 return .kneesOverFeet
             }
         }
-        if feetMoved(measure) || abs(measure.hips.x - rest.hipsX) / rest.torsoLength > maxHipShift {
+        // The ankles' median over the last frames: a single wrong detection doesn't move the feet.
+        let feet = smoothedAnkles()
+        if feetMoved(feet) || abs(measure.hips.x - rest.hipsX) / rest.torsoLength > maxHipShift {
             return .keepFeetInPlace
         }
-        if let leftAnkle = measure.leftAnkle, let rightAnkle = measure.rightAnkle {
+        if let leftAnkle = feet.left, let rightAnkle = feet.right {
             let stance = hypot(leftAnkle.x - rightAnkle.x, leftAnkle.y - rightAnkle.y) / rest.torsoLength
             if stance > maxStance { return .keepFeetInPlace }
             if let restStance = rest.stance, stance - restStance / rest.torsoLength > stanceTolerance {
@@ -400,13 +405,27 @@ nonisolated struct RepCounter: MovementCounter {
 
     /// True when a visible ankle moved away from its resting position.
     private func feetMoved(_ measure: PoseMeasure) -> Bool {
+        feetMoved((measure.leftAnkle, measure.rightAnkle))
+    }
+
+    private func feetMoved(_ ankles: (left: CGPoint?, right: CGPoint?)) -> Bool {
         let limit = feetTolerance * rest.torsoLength
-        for (now, before) in [(measure.leftAnkle, rest.leftAnkle), (measure.rightAnkle, rest.rightAnkle)] {
+        for (now, before) in [(ankles.left, rest.leftAnkle), (ankles.right, rest.rightAnkle)] {
             if let now, let before, hypot(now.x - before.x, now.y - before.y) > limit {
                 return true
             }
         }
         return false
+    }
+
+    /// Each ankle's median position over the last frames where it was seen.
+    private func smoothedAnkles() -> (left: CGPoint?, right: CGPoint?) {
+        func median(_ points: [CGPoint]) -> CGPoint? {
+            guard !points.isEmpty else { return nil }
+            return CGPoint(x: Self.median(points.map { Double($0.x) }), y: Self.median(points.map { Double($0.y) }))
+        }
+        let recent = recentMeasures.suffix(smoothingWindow)
+        return (median(recent.compactMap(\.leftAnkle)), median(recent.compactMap(\.rightAnkle)))
     }
 
     static func median(_ values: [Double]) -> Double {
