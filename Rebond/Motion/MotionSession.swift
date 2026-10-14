@@ -35,6 +35,8 @@ final class MotionSession {
         let id = UUID()
         let message: LocalizedStringResource
         let isPositive: Bool
+        /// For a counted repetition: how far it went.
+        var tier: AmplitudeTier? = nil
 
         static func == (lhs: Feedback, rhs: Feedback) -> Bool { lhs.id == rhs.id }
     }
@@ -320,7 +322,7 @@ final class MotionSession {
         faultToHighlight = nil
         lastTempoReminder = -10
         lastAnnouncement = ""
-        coach.say("Placez-vous dans la silhouette, puis restez immobile")
+        coach.say("Posez votre téléphone debout, reculez, puis placez-vous dans la silhouette")
     }
 
     private func apply(_ skeleton: PoseSkeleton?, _ update: CounterUpdate) {
@@ -369,7 +371,8 @@ final class MotionSession {
                     coach.say("\(repCount)")
                 }
             } else {
-                show(Feedback(message: "Bien !", isPositive: true))
+                let tier = AmplitudeTier(amplitude: result.amplitude)
+                show(Feedback(message: tier.message, isPositive: true, tier: tier))
                 coach.say("\(repCount)")
             }
         case .repIncomplete:
