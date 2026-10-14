@@ -260,7 +260,7 @@ private struct WeekCard: View {
     let week: WeekProgress
 
     var body: some View {
-        SummaryCard(title: Text("Régularité"), systemImage: nil, color: .accentColor, sectionHeader: true) {
+        SummaryCard(title: Text("Régularité"), systemImage: "checkmark.circle.fill", color: .mint) {
             Text("Cette semaine")
         } content: {
             HStack(alignment: .bottom) {
@@ -278,7 +278,7 @@ private struct WeekCard: View {
                         x: .value("Jour", day.date, unit: .day),
                         y: .value("Séances", day.done ? 1 : 0.06)
                     )
-                    .foregroundStyle(day.done ? Color.accentColor : Color(.tertiaryLabel))
+                    .foregroundStyle(day.done ? Color.mint : Color(.tertiaryLabel))
                     .clipShape(.rect(cornerRadius: 2))
                 }
                 .chartXAxis {
