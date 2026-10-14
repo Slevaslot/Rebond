@@ -19,7 +19,23 @@ Lire d'abord `CLAUDE.md` (règles du projet), `TECHNIQUE.md` (architecture) et `
 | Fente latérale | `side-lunge` | `LungeCounter(direction: .side)` | décalage des hanches sur le côté, en longueurs de buste | 0,4 |
 | Rotation de l'épaule (90/90) | `shoulder-rotation` | `ShoulderRotationCounter` | descente du poignet vers le coude, en longueurs d'avant-bras | 0,6 |
 
-Résultats sur UI-PRMD (bons comptés / mauvais encore comptés) : squat 85–91 % / 26–39 %, assis-debout 100 % / 51 %, jambe 100 % / 69 %, un bras 99 % / 53 %, diagonale 100 % / 41 %, montée de genou 94 % / 41 %, fente avant 97 % / 54 %, fente latérale 98 % / 43 %, rotation 100 % / 42 %.
+Une répétition **compte dès 70 % de l'objectif** (palier « Bien », `AmplitudeTier.goodThreshold`) ; l'objectif reste le 100 % et l'amplitude peut le dépasser (0,7 à 1,2 et plus).
+
+Résultats sur UI-PRMD, téléphone à 2,5 m (bons comptés / mauvais encore comptés) :
+
+| Exercice | Bons | Mauvais |
+|---|---|---|
+| Squat | 90 % | 41 % |
+| Montée de genou | 99 % | 59 % |
+| Fente avant | 99 % | 58 % |
+| Fente latérale | 100 % | 46 % |
+| Assis-debout | 100 % | 51 % |
+| Jambe tendue | 100 % (1 double) | 72 % |
+| Un bras | 99 % | 60 % |
+| Rotation de l'épaule | 100 % (1 double) | 49 % |
+| Diagonale | 100 % | 55 % |
+
+Les mauvais mouvements d'UI-PRMD sont souvent trop courts : depuis le seuil à 70 %, ceux qui atteignent 70 % sont comptés (palier « Bien »), c'est voulu. Les défauts de posture les refusent toujours.
 
 L'extension d'épaule (n° 8) n'est **pas** suivie par la caméra : de face, le bras qui recule ne se distingue pas d'un bras levé devant ou sur le côté (détails dans `JOURNAL.md`). Elle reste en comptage manuel.
 
@@ -83,7 +99,7 @@ DEBUG=s03e05 ./Tools/Replay/replay ~/uiprmd/correct c <n°> <objectif>
 ## Étape 4 · Le compteur
 
 - Un `nonisolated struct` conforme à `MovementCounter` : `mutating func process(_ measure: PoseMeasure?, at time: Double) -> CounterUpdate`.
-- **Réutiliser `RepCycle`** (`Motion/RepCycle.swift`) : repos → aller → objectif → retour, répétitions incomplètes, défaut confirmé sur 3 images, « trop rapide ». Le compteur ne fait que calculer **une valeur** (0 au repos, l'objectif à atteindre) et dire quel défaut il voit. Modèle : `SitToStandCounter` ou `LegRaiseCounter`.
+- **Réutiliser `RepCycle`** (`Motion/RepCycle.swift`) : repos → aller → 70 % de l'objectif (`counted`) → retour, répétitions incomplètes sous 70 %, défaut confirmé sur 3 images, « trop rapide ». Le compteur ne fait que calculer **une valeur** (0 au repos, l'objectif à atteindre) et dire quel défaut il voit. Modèle : `SitToStandCounter` ou `LegRaiseCounter`.
 - **Calibrage** : mesurer la position de départ quand le patient est immobile (environ 8 images, 0,5 s), puis émettre `.calibrated`. Tout se mesure ensuite par rapport à elle.
 - **Normaliser** les distances par la longueur du buste mesurée au repos (`torsoLength`) : l'échelle à l'écran dépend de la distance au téléphone.
 - **Lisser** la valeur (médiane sur 3 images) : Vision se trompe parfois sur une image.
@@ -91,13 +107,13 @@ DEBUG=s03e05 ./Tools/Replay/replay ~/uiprmd/correct c <n°> <objectif>
 - **Corps perdu** : sans mesure pendant plus de 1,5 s, abandonner la répétition (`abandon()`).
 - **Objectifs adaptés à la rééducation** : patients souvent âgés, amplitudes partielles (le squat vise 0,6 buste, pas un squat profond).
 - **Corrections** : une ou deux, les plus utiles. Message court à l'impératif, vouvoiement (« Gardez la jambe tendue »). Ce sont des conseils, jamais des consignes médicales.
-- `progress` : 0 au repos, 1 à l'objectif (la jauge à l'écran le suit). `RepResult.amplitude` : fraction de l'objectif (1 = atteint).
+- `progress` : 0 au repos, 1 à l'objectif (la jauge à l'écran le suit). `RepResult.amplitude` : fraction de l'objectif (1 = atteint), comptée dès 0,7. Le seuil de bruit (`noise`) se met à la moitié de l'objectif : entre 50 et 70 %, le patient entend la correction « plus loin ».
 
 ## Étape 5 · Le catalogue et la lecture de la feuille
 
 Dans `CatalogExercise.swift` :
 - un cas d'`Analysis` avec son objectif, et la ligne dans `makeCounter()` ;
-- l'entrée : `id` stable en kebab-case, `name` en français, `symbol` (SF Symbol de repli), `highlightedJoints`, `returnCue` (dit à l'objectif : « Redescendez doucement »), `amplitudeMeaning` (« Hauteur de la jambe, en % de la hauteur visée ») ;
+- l'entrée : `id` stable en kebab-case, `name` en français, `symbol` (SF Symbol de repli), `highlightedJoints`, `returnCue` (dit dès 70 % de l'objectif : « Redescendez doucement »), `amplitudeMeaning` (« Hauteur de la jambe, en % de la hauteur visée ») ;
 - `guideRest` et `guideTarget` : les poses du pictogramme animé, vu de face, en miroir, dans une boîte unité (origine en haut à gauche) ;
 - `armStyle` et `fillsGaugeUpward` ;
 - l'ajouter à `all`.

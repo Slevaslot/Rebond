@@ -197,3 +197,59 @@ Les six exercices existants donnent exactement les mêmes chiffres avant et apr�
 - Fentes : grand pas en avant ou sur le côté, le patient reste-t-il dans le cadre et la silhouette de placement ? Distance minimale à revoir.
 - Rotation : Vision suit-il le poignet quand l'avant-bras pointe vers la caméra (raccourci, devant le coude) ?
 - Rejeu : le squat donne 70 % des bons comptés et 20 % des mauvais avec la perspective actuelle de `Tools/Replay`, loin des 85–91 % notés plus haut avec l'ancien rejeu. Ce n'est pas lié à ces ajouts, mais à vérifier.
+- ~~Rejeu : le squat donne 70 % des bons comptés…~~ Expliqué le 14 octobre au soir : les pieds (voir ci-dessous).
+
+## Retours du test sur iPhone (14 octobre, soir)
+
+Avant : fusion d'`origin/graphique` (`AmplitudeTier` : Bien ≥ 0,70, Très bien ≥ 0,85, Parfait ≥ 1,0 de l'objectif ; message du palier à chaque répétition).
+
+### 1. Une répétition compte dès 70 % de l'objectif
+
+- Trop strict à 100 % sur l'iPhone. `RepCycle.counted` = objectif × `AmplitudeTier.goodThreshold` : passé ce seuil, `.bottomReached` (la phrase de retour est dite) puis répétition comptée au retour. Même chose dans `RepCounter` (squat, qui n'utilise pas `RepCycle`).
+- L'objectif reste le 100 % : `RepResult.amplitude` = pic / objectif, de 0,7 à 1,2 et plus. Sous 70 % : incomplète.
+- Seuil de bruit abaissé de 60 % à 50 % de l'objectif (squat : 0,4 → 0,3 buste) : sinon « Descendez encore un peu » n'aurait plus été dit qu'entre 60 et 70 %. Les élévations de bras gardent 50° (déjà sous 70 % des objectifs 80°, 90° et 110°).
+- Le rejeu compile `Views/Session/AmplitudeTier.swift` avec les compteurs.
+
+### 2. « Gardez les pieds en place » moins strict
+
+- Sur UI-PRMD, ce contrôle refusait déjà 20 bons squats sur 100 : c'était la cause des 70 % notés plus haut.
+- Tolérances élargies : cheville déplacée 0,5 → 0,7 buste, élargissement de l'appui 0,25 → 0,35, écart des chevilles 1,0 → 1,2, hanches sur le côté 0,35 → 0,4.
+- Chevilles lissées (médiane des 3 dernières images) et défaut confirmé sur 6 images (0,4 s) au lieu de 3 : un saut de Vision sur les chevilles n'annule plus la répétition.
+- Squat : bons comptés 70 % → 90 % (les 10 restants : buste penché), mauvais encore comptés 35 % → 41 %. Les vrais pas de côté restent refusés (test `stepAsideIsRejected`).
+
+### 3. La détection du corps disparaissait par moments
+
+Causes trouvées :
+- `PoseAnalyzer` exigeait les points `root` et `neck` de Vision (confiance ≥ 0,3). Ce sont des points calculés, dont la confiance chute avant celle des hanches et des épaules (bras devant le buste, vêtements amples) : plus de mesure, alors que le corps était bien vu.
+- `MotionSession.apply` effaçait le squelette à la première image manquée (clignotement).
+- Le corps était déclaré caché après 8 images (0,5 s), la silhouette revenait 1 s plus tard, et on n'en sortait **qu'en se replaçant dans la silhouette**, pieds visibles compris : un patient un peu trop près restait bloqué en « corps perdu ».
+
+Corrections :
+- Hanches et cou reconstruits au milieu des deux hanches et des deux épaules quand Vision perd `root` ou `neck`.
+- Le dernier squelette reste affiché 0,4 s (6 images) pendant un trou.
+- Corps suivi = articulations utiles à l'exercice visibles (`CatalogExercise.canFollow`) : hanches et cou pour le squat, les fentes et l'assis-debout ; les deux bras pour les élévations ; les deux genoux pour les jambes ; un bras entier pour la rotation. Les pieds hors champ ne font plus perdre le patient d'un exercice de bras.
+- Hystérésis : caché après 0,8 s sans ces articulations, silhouette 1,2 s plus tard (2 s en tout) ; retour après 0,5 s de corps suivi, sans devoir revenir dans la silhouette.
+- Le seuil de confiance des articulations (0,3) n'a pas changé : plus bas, Vision invente des points.
+
+### Résultats UI-PRMD (bons comptés / mauvais encore comptés)
+
+| Exercice | Avant (100 %) | Après (70 %, pieds) | 2 m | 3 m |
+|---|---|---|---|---|
+| Squat (0,6) | 70 / 20 | **90 / 41** | 91 / 44 | 90 / 43 |
+| Montée de genou (0,45) | 94 / 41 | **99 / 59** | 99 / 59 | 99 / 60 |
+| Fente avant (0,45) | 97 / 54 | **99 / 58** | 99 / 59 | 99 / 58 |
+| Fente latérale (0,4) | 98 / 43 | **100 / 46** | 100 / 46 | 100 / 46 |
+| Assis-debout (0,6) | 100 / 51 | **100 / 51** | 100 / 45 | 100 / 50 |
+| Jambe tendue (0,3) | 100 / 69 | **101 / 72** | 100 / 70 | 101 / 72 |
+| Un bras (110°) | 99 / 53 | **99 / 60** | 99 / 60 | 99 / 60 |
+| Rotation (0,6) | 101 / 42 | **101 / 49** | 101 / 43 | 101 / 53 |
+| Diagonale (90°) | 100 / 41 | **100 / 55** | 100 / 57 | 100 / 54 |
+
+(« 101 » : un bon mouvement compté deux fois.) La hausse des mauvais comptés vient surtout des mouvements trop courts d'UI-PRMD qui atteignent maintenant 70 % : c'est l'effet voulu, ils reçoivent le palier « Bien ». Les défauts de posture les refusent toujours.
+
+### À vérifier sur l'iPhone
+
+- Que le squelette ne clignote plus et que la séance ne passe plus en « corps perdu » en se penchant ou en levant les bras.
+- Que la séance reprend seule quand on revient, même les pieds hors champ.
+- Que « Gardez les pieds en place » ne se déclenche plus sans pas réel.
+
