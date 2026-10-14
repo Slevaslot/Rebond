@@ -8,8 +8,20 @@ struct StartSessionIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult {
-        AppRouter.shared.startWorkout()
+        AppRouter.shared.startWorkoutIfProgram()
         return .result()
+    }
+}
+
+extension AppRouter {
+    /// Starts the session from outside the app (widget, Shortcuts, Spotlight). Without a program yet,
+    /// shows the Aujourd'hui page, which explains how to add one, rather than an empty session.
+    func startWorkoutIfProgram() {
+        if WidgetSnapshot.load()?.hasProgram == false {
+            tab = .today
+        } else {
+            startWorkout()
+        }
     }
 }
 

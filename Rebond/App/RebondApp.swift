@@ -14,7 +14,7 @@ import SwiftUI
                 // Widgets: the snapshot they read, and the link that opens today's session.
                 .modifier(WidgetSync())
                 .onOpenURL { url in
-                    if DeepLink.isSession(url) { router.startWorkout() }
+                    if DeepLink.isSession(url) { router.startWorkoutIfProgram() }
                 }
         }
         .modelContainer(for: [Program.self, Session.self, TrackedPatient.self])
