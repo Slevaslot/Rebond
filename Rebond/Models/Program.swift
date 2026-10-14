@@ -25,18 +25,28 @@ final class PlannedExercise {
     var catalogID: String?
     var name: String
     var sets: Int
+    /// Repetitions per set, for an exercise done in repetitions.
     var reps: Int
+    /// Seconds to hold per set, for a held exercise (plank…). Nil for repetitions.
+    var holdSeconds: Int? = nil
     var order: Int
 
-    init(catalogID: String?, name: String, sets: Int, reps: Int, order: Int) {
+    init(catalogID: String?, name: String, sets: Int, reps: Int, holdSeconds: Int? = nil, order: Int) {
         self.catalogID = catalogID
         self.name = name
         self.sets = sets
         self.reps = reps
+        self.holdSeconds = holdSeconds
         self.order = order
     }
 
     var catalogExercise: CatalogExercise? {
-        catalogID.flatMap(CatalogExercise.find)
+        guard holdSeconds == nil else { return nil }
+        return catalogID.flatMap(CatalogExercise.find)
+    }
+
+    var symbol: String {
+        if let catalogExercise { return catalogExercise.symbol }
+        return holdSeconds == nil ? "figure.cooldown" : "timer"
     }
 }

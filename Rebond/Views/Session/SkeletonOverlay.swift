@@ -65,6 +65,11 @@ extension Correction {
         case .keepFeetInPlace: [.leftKnee, .rightKnee, .leftAnkle, .rightAnkle]
         case .showBothLegs: [.leftHip, .rightHip, .leftKnee, .rightKnee, .leftAnkle, .rightAnkle]
         case .kneesOverFeet: [.leftKnee, .rightKnee, .leftAnkle, .rightAnkle]
+        case .raiseHigher, .raiseBothArms: [.leftShoulder, .rightShoulder, .leftElbow, .rightElbow, .leftWrist, .rightWrist]
+        case .keepArmsStraight, .keepArmStraight: [.leftElbow, .rightElbow, .leftWrist, .rightWrist]
+        case .standUpFully: [.root, .leftHip, .rightHip, .leftKnee, .rightKnee]
+        case .useBothLegs: [.neck, .root, .leftHip, .rightHip, .leftKnee, .rightKnee]
+        case .raiseLegHigher, .keepLegStraight, .keepStandingLegStraight: [.leftHip, .rightHip, .leftKnee, .rightKnee, .leftAnkle, .rightAnkle]
         case .slowDown: []
         }
     }

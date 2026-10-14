@@ -1,7 +1,1333 @@
 {
   "sourceLanguage" : "fr",
   "strings" : {
+    "%@ : %lld × %lld" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ : %2$lld × %3$lld"
+          }
+        }
+      }
+    },
+    "%@ : %lld × %lld s" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ : %2$lld × %3$lld s"
+          }
+        }
+      }
+    },
+    "%@ a modifié votre programme. Vérifiez-le puis enregistrez-le." : {
 
+    },
+    "%@ d'exercices" : {
+
+    },
+    "%lld %%" : {
+
+    },
+    "%lld / %lld" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld / %2$lld"
+          }
+        }
+      }
+    },
+    "%lld incomplètes" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%#@count@"
+          },
+          "substitutions" : {
+            "count" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg incomplète"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg incomplètes"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld répétitions" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%#@count@"
+          },
+          "substitutions" : {
+            "count" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg répétition"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg répétitions"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld répétitions incomplètes (amplitude insuffisante)" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%#@count@"
+          },
+          "substitutions" : {
+            "count" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg répétition incomplète"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg répétitions incomplètes"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld répétitions sur %lld" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$#@count@ sur %2$lld"
+          },
+          "substitutions" : {
+            "count" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg répétition"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg répétitions"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld répétitions sur %lld prévues" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$#@count@ sur %2$lld prévues"
+          },
+          "substitutions" : {
+            "count" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg répétition"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg répétitions"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld s tenues sur %lld s" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld s tenues sur %2$lld s"
+          }
+        }
+      }
+    },
+    "%lld secondes" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%#@count@"
+          },
+          "substitutions" : {
+            "count" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg seconde"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg secondes"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld secondes restantes" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%#@count@"
+          },
+          "substitutions" : {
+            "count" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg seconde restante"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg secondes restantes"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld sur 10" : {
+
+    },
+    "%lld séances par semaine" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%#@count@ par semaine"
+          },
+          "substitutions" : {
+            "count" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg séance"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg séances"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld séances sur %lld" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$#@count@ sur %2$lld"
+          },
+          "substitutions" : {
+            "count" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg séance"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg séances"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld séances sur %lld · bilan du %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$#@count@ sur %2$lld · bilan du %3$@"
+          },
+          "substitutions" : {
+            "count" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg séance"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg séances"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld séries" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%#@count@"
+          },
+          "substitutions" : {
+            "count" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg série"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg séries"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld × %lld" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld × %2$lld"
+          }
+        }
+      }
+    },
+    "%lld × %lld s" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld × %2$lld s"
+          }
+        }
+      }
+    },
+    ", " : {
+
+    },
+    "0" : {
+
+    },
+    "0 : aucune douleur. 10 : douleur insupportable." : {
+
+    },
+    "10" : {
+
+    },
+    "Abandonner la séance" : {
+
+    },
+    "Activer la voix" : {
+
+    },
+    "Activer les rappels" : {
+
+    },
+    "Activez Apple Intelligence dans Réglages pour lire la feuille automatiquement." : {
+
+    },
+    "Adresse du serveur" : {
+
+    },
+    "Affiché sur le bilan que vous envoyez à votre kiné." : {
+
+    },
+    "Affiché à vos patients quand ils reçoivent un programme." : {
+
+    },
+    "Ajouter un exercice" : {
+
+    },
+    "Ajouter une répétition" : {
+
+    },
+    "Amplitude" : {
+
+    },
+    "Amplitude (% de l'objectif)" : {
+
+    },
+    "Amplitude : %lld %% de l'objectif" : {
+
+    },
+    "Amplitude : %lld %% → %lld %% de l'objectif" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Amplitude : %1$lld %% → %2$lld %% de l'objectif"
+          }
+        }
+      }
+    },
+    "Amplitude des mouvements, en pourcentage de l'objectif" : {
+
+    },
+    "Annuler" : {
+
+    },
+    "Apple Intelligence lit vos exercices sur l'iPhone. Rien n'est envoyé." : {
+
+    },
+    "Apple Intelligence se prépare. Réessayez dans quelques minutes." : {
+
+    },
+    "Approchez-vous un peu" : {
+
+    },
+    "Appuyez-vous sur les deux jambes" : {
+
+    },
+    "Arrêter la séance" : {
+
+    },
+    "Arrêter la séance ?" : {
+
+    },
+    "Assis-debout" : {
+
+    },
+    "Aucun exercice n'a été fait pendant cette séance." : {
+
+    },
+    "Aucune caméra avant n'est disponible. Vous pouvez terminer la série." : {
+
+    },
+    "Aucune douleur" : {
+
+    },
+    "Aucune séance ces 7 derniers jours." : {
+
+    },
+    "Autorisez l'accès à la caméra dans Réglages pour que Rebond suive vos mouvements." : {
+
+    },
+    "Bien !" : {
+
+    },
+    "Bilan Rebond" : {
+
+    },
+    "Bilan Rebond.pdf" : {
+
+    },
+    "Bilan d'un patient" : {
+
+    },
+    "Bilan de la semaine" : {
+
+    },
+    "Bilan hebdomadaire Rebond" : {
+
+    },
+    "Bilan illisible" : {
+
+    },
+    "Bilan pour mon kiné" : {
+
+    },
+    "C'est l'heure de votre séance" : {
+
+    },
+    "Caméra : %@" : {
+
+    },
+    "Caméra indisponible" : {
+
+    },
+    "Ce fichier est le bilan d'un patient. Il s'ouvre dans l'espace kiné de Rebond." : {
+
+    },
+    "Ce fichier n'est pas un bilan Rebond." : {
+
+    },
+    "Ce que vous avez fait" : {
+
+    },
+    "Cet iPhone ne peut pas lire les photos avec Apple Intelligence." : {
+
+    },
+    "Cet iPhone ne prend pas en charge Apple Intelligence." : {
+
+    },
+    "Charger des patients de démo" : {
+
+    },
+    "Charger les données de démo" : {
+
+    },
+    "Commencer" : {
+
+    },
+    "Comptage manuel" : {
+
+    },
+    "Comptage manuel : cet exercice n'est pas suivi par la caméra." : {
+
+    },
+    "Connecté" : {
+
+    },
+    "Continuer" : {
+
+    },
+    "Continuer la séance" : {
+
+    },
+    "Couper la voix" : {
+
+    },
+    "Date" : {
+
+    },
+    "Descendez encore un peu" : {
+
+    },
+    "Données" : {
+
+    },
+    "Douleur" : {
+
+    },
+    "Douleur %lld/10" : {
+
+    },
+    "Douleur après chaque séance (sur 10)" : {
+
+    },
+    "Douleur après chaque séance, sur 10" : {
+
+    },
+    "Douleur forte" : {
+
+    },
+    "Douleur forte (≥ %lld) le %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Douleur forte (≥ %1$lld) le %2$@"
+          }
+        }
+      }
+    },
+    "Douleur forte signalée" : {
+
+    },
+    "Du %@ au %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Du %1$@ au %2$@"
+          }
+        }
+      }
+    },
+    "Débloquer Pro (démo)" : {
+
+    },
+    "Décalez-vous vers la droite" : {
+
+    },
+    "Décalez-vous vers la gauche" : {
+
+    },
+    "Démarrer ma séance" : {
+
+    },
+    "Encore %lld séances cette semaine" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%#@count@ cette semaine"
+          },
+          "substitutions" : {
+            "count" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "Encore %arg séance"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "Encore %arg séances"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Enregistrer" : {
+
+    },
+    "Enregistrer ce qui a été fait" : {
+
+    },
+    "Enregistrer la séance" : {
+
+    },
+    "Envoyer le lien" : {
+
+    },
+    "Envoyer à mon kiné" : {
+
+    },
+    "Envoyez-le à votre kiné pour qu'il suive vos progrès." : {
+
+    },
+    "Espace kiné" : {
+
+    },
+    "Exercice" : {
+
+    },
+    "Fermer" : {
+
+    },
+    "Feuille d'exercices" : {
+
+    },
+    "Fin de séance" : {
+
+    },
+    "Forte" : {
+
+    },
+    "Fréquence" : {
+
+    },
+    "Gardez la jambe d'appui tendue" : {
+
+    },
+    "Gardez la jambe tendue" : {
+
+    },
+    "Gardez le bras tendu" : {
+
+    },
+    "Gardez le buste plus droit" : {
+
+    },
+    "Gardez les bras tendus" : {
+
+    },
+    "Gardez les genoux au-dessus des pieds" : {
+
+    },
+    "Gardez les pieds en place" : {
+
+    },
+    "Hauteur de la jambe, en % de la hauteur visée" : {
+
+    },
+    "Hauteur des bras, en % de la hauteur visée" : {
+
+    },
+    "Hauteur du bras, en % de la hauteur visée" : {
+
+    },
+    "Hauteur à laquelle vous vous levez, en % de la hauteur visée" : {
+
+    },
+    "Heure" : {
+
+    },
+    "Historique" : {
+
+    },
+    "Historique des séances" : {
+
+    },
+    "Il s'affichera sur l'iPhone de %@ dans quelques secondes." : {
+
+    },
+    "Importer un bilan" : {
+
+    },
+    "Incomplètes : %lld" : {
+
+    },
+    "Insupportable" : {
+
+    },
+    "Inviter un patient" : {
+
+    },
+    "Je ne vois pas vos deux jambes" : {
+
+    },
+    "L'amplitude est mesurée par la caméra de l'iPhone, à titre indicatif : 100 % correspond à l'objectif de mouvement fixé dans l'app. Rebond est un outil de suivi : il ne pose pas de diagnostic et ne remplace pas l'avis d'un professionnel de santé." : {
+
+    },
+    "L'offre gratuite suit jusqu'à %lld patients." : {
+
+    },
+    "La feuille n'a pas pu être lue." : {
+
+    },
+    "La lecture automatique n'est pas disponible." : {
+
+    },
+    "La photo n'a pas pu être ouverte." : {
+
+    },
+    "Le bilan (PDF, et fichier Rebond pour les kinés équipés) reste sur votre iPhone tant que vous ne l'envoyez pas." : {
+
+    },
+    "Le patient scanne ce code avec l'appareil photo de son iPhone : son Rebond est relié au vôtre." : {
+
+    },
+    "Lecture" : {
+
+    },
+    "Lecture de la feuille…" : {
+
+    },
+    "Les valeurs marquées « À vérifier » ne figurent pas sur la feuille : Rebond a mis une valeur par défaut." : {
+
+    },
+    "Levez la jambe un peu plus haut" : {
+
+    },
+    "Levez les deux bras ensemble" : {
+
+    },
+    "Légère" : {
+
+    },
+    "Maintien" : {
+
+    },
+    "Maintien : %lld s sur %lld s prévues" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Maintien : %1$lld s sur %2$lld s prévues"
+          }
+        }
+      }
+    },
+    "Meilleure amplitude : %lld %% de l'objectif" : {
+
+    },
+    "Meilleure répétition de chaque séance, mesurée par la caméra : 100 % correspond à l'objectif du mouvement." : {
+
+    },
+    "Meilleure répétition de chaque séance, mesurée par la caméra du patient, à titre indicatif : 100 % correspond à l'objectif du mouvement." : {
+
+    },
+    "Mes patients" : {
+
+    },
+    "Mode patient" : {
+
+    },
+    "Modifier le programme" : {
+
+    },
+    "Modèle du mouvement" : {
+
+    },
+    "Modérée" : {
+
+    },
+    "Mon bilan Rebond" : {
+
+    },
+    "Montez encore un peu" : {
+
+    },
+    "Moyenne : %@ sur 10" : {
+
+    },
+    "Ne pas enregistrer" : {
+
+    },
+    "Nom de l'exercice" : {
+
+    },
+    "Nouveau programme" : {
+
+    },
+    "OK" : {
+
+    },
+    "Objectif" : {
+
+    },
+    "Objectif : %lld" : {
+
+    },
+    "Objectif atteint : %lld séances" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Objectif atteint : %#@count@"
+          },
+          "substitutions" : {
+            "count" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg séance"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg séances"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Offre gratuite : %lld patients suivis sur %lld. Rebond Pro : patients illimités." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Offre gratuite : %1$lld patients suivis sur %2$lld. Rebond Pro : patients illimités."
+          }
+        }
+      }
+    },
+    "Ouvre Rebond et lance la séance de votre programme." : {
+
+    },
+    "Ouvrez avec Rebond le bilan envoyé par votre patient pour le suivre ici." : {
+
+    },
+    "Ouvrez ce lien sur votre iPhone pour retrouver votre programme dans Rebond." : {
+
+    },
+    "Ouvrir Réglages" : {
+
+    },
+    "Ouvrir l'espace kiné" : {
+
+    },
+    "Parfait, restez immobile" : {
+
+    },
+    "Pas encore de séance" : {
+
+    },
+    "Passer à Rebond Pro" : {
+
+    },
+    "Patient" : {
+
+    },
+    "Patients illimités" : {
+
+    },
+    "Pause" : {
+
+    },
+    "Placez-vous dans la silhouette" : {
+
+    },
+    "Pliez les deux genoux ensemble" : {
+
+    },
+    "Plus" : {
+
+    },
+    "Plus lentement" : {
+
+    },
+    "Plus tard" : {
+
+    },
+    "Politique de confidentialité" : {
+
+    },
+    "Prescrire un programme" : {
+
+    },
+    "Prescrivez et ajustez les programmes sans feuille à recopier." : {
+
+    },
+    "Prescrivez vos programmes en QR code et suivez vos patients avec Rebond Pro." : {
+
+    },
+    "Presque, ajustez-vous dans la silhouette" : {
+
+    },
+    "Profondeur de la descente, en % de la profondeur visée" : {
+
+    },
+    "Programme" : {
+
+    },
+    "Programme de %@" : {
+
+    },
+    "Programme de démo" : {
+
+    },
+    "Programme envoyé" : {
+
+    },
+    "Programme lu par Apple Intelligence, sur votre iPhone. Vérifiez-le : l'écriture manuscrite peut être mal lue." : {
+
+    },
+    "Programme prescrit" : {
+
+    },
+    "Programme prescrit par %@. Vérifiez-le puis enregistrez-le." : {
+
+    },
+    "Programme prescrit par votre kiné. Vérifiez-le puis enregistrez-le." : {
+
+    },
+    "Programmes en QR code" : {
+
+    },
+    "Progrès" : {
+
+    },
+    "Prototype avec patients fictifs : bilans reçus automatiquement et programme modifié à distance. Lancez Server/server.py sur le Mac." : {
+
+    },
+    "QR code" : {
+
+    },
+    "Quelle douleur avez-vous ressentie ?" : {
+
+    },
+    "Quelques minutes d'exercices, guidés par Rebond." : {
+
+    },
+    "Rappels" : {
+
+    },
+    "Rappels de séance" : {
+
+    },
+    "Rasseyez-vous doucement" : {
+
+    },
+    "Rebond Pro" : {
+
+    },
+    "Rebond ne remplace pas l'avis d'un professionnel de santé. Seul votre kiné décide de votre programme." : {
+
+    },
+    "Recevoir un rappel les jours de séance ?" : {
+
+    },
+    "Recommencer" : {
+
+    },
+    "Reculez pour que vos pieds soient visibles" : {
+
+    },
+    "Reculez un peu" : {
+
+    },
+    "Redescendez doucement" : {
+
+    },
+    "Redressez-vous complètement" : {
+
+    },
+    "Regardez d'abord le mouvement" : {
+
+    },
+    "Regardez le mouvement" : {
+
+    },
+    "Remontez" : {
+
+    },
+    "Remplacer" : {
+
+    },
+    "Remplacer le programme et l'historique par les données de démo ?" : {
+
+    },
+    "Reposez la jambe doucement" : {
+
+    },
+    "Reprendre" : {
+
+    },
+    "Restez immobile, vous commencerez après" : {
+
+    },
+    "Retirer une répétition" : {
+
+    },
+    "Revoir la photo de la feuille" : {
+
+    },
+    "Réglages" : {
+
+    },
+    "Régularité" : {
+
+    },
+    "Régularité, répétitions, amplitude et douleur, avec les séances douloureuses signalées." : {
+
+    },
+    "Répétitions" : {
+
+    },
+    "Résumé" : {
+
+    },
+    "Saisir à la main" : {
+
+    },
+    "Saisissez le programme à la main en vous aidant de la photo." : {
+
+    },
+    "Scanner ma feuille" : {
+
+    },
+    "Scanner une nouvelle feuille" : {
+
+    },
+    "Scannez la feuille de votre kiné." : {
+
+    },
+    "Semaine" : {
+
+    },
+    "Si la douleur est forte ou inhabituelle, faites une pause et parlez-en à votre kiné." : {
+
+    },
+    "Squat" : {
+
+    },
+    "Suivez tous vos patients. Rebond reste gratuit pour eux." : {
+
+    },
+    "Suivi" : {
+
+    },
+    "Supprimer l'exercice" : {
+
+    },
+    "Séance" : {
+
+    },
+    "Séance terminée, bravo !" : {
+
+    },
+    "Séances" : {
+
+    },
+    "Séances : %lld sur %lld prévues" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Séances : %1$lld sur %2$lld prévues"
+          }
+        }
+      }
+    },
+    "Séances par semaine" : {
+
+    },
+    "Série %lld sur %lld" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Série %1$lld sur %2$lld"
+          }
+        }
+      }
+    },
+    "Série terminée" : {
+
+    },
+    "Série terminée !" : {
+
+    },
+    "Terminer" : {
+
+    },
+    "Terminer la série" : {
+
+    },
+    "Terminé" : {
+
+    },
+    "Touchez le modèle pour reprendre" : {
+
+    },
+    "Touchez pour l'agrandir devant vous" : {
+
+    },
+    "Touchez pour le ranger dans sa vignette" : {
+
+    },
+    "Tout leur suivi" : {
+
+    },
+    "Tout reste sur votre iPhone : vos images, vos séances et votre programme. Seul le bilan que vous choisissez d'envoyer quitte l'appareil." : {
+
+    },
+    "Type" : {
+
+    },
+    "Un rappel les jours de séance (%lld par semaine), et le dimanche pour envoyer votre bilan à votre kiné." : {
+
+    },
+    "Version connectée (démo)" : {
+
+    },
+    "Vos progrès apparaîtront ici après votre première séance." : {
+
+    },
+    "Votre bilan de la semaine est prêt" : {
+
+    },
+    "Votre kiné a modifié votre programme. Vérifiez-le puis enregistrez-le." : {
+
+    },
+    "Votre nom" : {
+
+    },
+    "Votre nom, pour votre kiné" : {
+
+    },
+    "Votre patient scanne ce code avec l'appareil photo de son iPhone." : {
+
+    },
+    "Votre patient scanne le QR code avec son iPhone : le programme s'ouvre dans Rebond." : {
+
+    },
+    "Votre programme" : {
+
+    },
+    "Votre programme Rebond" : {
+
+    },
+    "Vous" : {
+
+    },
+    "Vous êtes kiné ?" : {
+
+    },
+    "Vérifier le programme" : {
+
+    },
+    "Vérifiez chaque exercice avant d'enregistrer : seul votre kiné décide du programme." : {
+
+    },
+    "restantes" : {
+
+    },
+    "sur %lld répétitions" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%#@count@"
+          },
+          "substitutions" : {
+            "count" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "sur %arg répétition"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "sur %arg répétitions"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "À propos" : {
+
+    },
+    "À vérifier" : {
+
+    },
+    "Élévation de la jambe tendue" : {
+
+    },
+    "Élévation des bras en diagonale" : {
+
+    },
+    "Élévation latérale d'un bras" : {
+
+    },
+    "Élévation latérale des bras" : {
+
+    },
+    "Évolution : %lld → %lld" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Évolution : %1$lld → %2$lld"
+          }
+        }
+      }
+    }
   },
   "version" : "1.0"
 }

@@ -39,7 +39,7 @@ struct MovementGuide: View, Animatable {
             TimelineView(.animation(paused: reduceMotion || !isDemonstrating)) { timeline in
                 Canvas { context, _ in
                     let progress = isDemonstrating && !reduceMotion ? Self.progress(since: demonstrationStart, at: timeline.date) : 0
-                    let figure = Self.outline(exercise.guideRest, exercise.guideTarget, progress: progress, in: box)
+                    let figure = Self.outline(exercise.guideRest, exercise.guideTarget, armStyle: exercise.armStyle, progress: progress, in: box)
                     let color: Color = if isDemonstrating { .white } else {
                         switch placement {
                         case .aligned: .green
@@ -98,7 +98,7 @@ struct MovementGuide: View, Animatable {
     /// A signage-style pictogram drawn as one single contour: round head, torso with rounded corners,
     /// arms and legs of even thickness.
     /// Going down, the hands come together in front of the body, as in a real squat.
-    private static func outline(_ rest: GuidePose, _ target: GuidePose, progress: Double, in box: CGRect) -> Path {
+    static func outline(_ rest: GuidePose, _ target: GuidePose, armStyle: CatalogExercise.ArmStyle, progress: Double, in box: CGRect) -> Path {
         func point(_ joint: Joint, at progress: Double) -> CGPoint? {
             guard let a = rest[joint], let b = target[joint] else { return nil }
             return CGPoint(
@@ -145,7 +145,12 @@ struct MovementGuide: View, Animatable {
         func mix(_ a: CGVector, _ b: CGVector) -> CGVector {
             unit(CGVector(dx: a.dx + (b.dx - a.dx) * progress, dy: a.dy + (b.dy - a.dy) * progress))
         }
-        for side in sides {
+        for side in sides where armStyle == .straight {
+            // Straight arm from the top corner of the torso to the guide's wrist.
+            guard let hand = point(side.wrist, at: progress) else { continue }
+            addSegment(CGPoint(x: side.x(body), y: body.minY + arm / 2), hand)
+        }
+        for side in sides where armStyle == .handsToChest {
             guard let standingHand = point(side.wrist, at: 0) else { continue }
             let standingStart = CGPoint(x: side.x(standing), y: standing.minY + arm / 2)
             let straight = CGVector(dx: standingHand.x - standingStart.x, dy: standingHand.y - standingStart.y)
@@ -183,6 +188,21 @@ struct MovementGuide: View, Animatable {
             legs.addLine(to: ankle)
         }
         outline = outline.union(legs.strokedPath(StrokeStyle(lineWidth: limb, lineCap: .round, lineJoin: .round)))
+
+        // Exercises done from a chair: a seat seen from the front, wider than the figure, with its two legs.
+        // It stays where the resting pose puts it: the figure sits on it, then stands in front of it.
+        if let seat = rest[.guideChairSeat] {
+            let seatY = box.minY + seat.y * box.height
+            let floorY = box.minY + (rest[.leftAnkle]?.y ?? 0.95) * box.height
+            let half = box.width * 0.36
+            let left = box.minX + seat.x * box.width - half, right = box.minX + seat.x * box.width + half
+            var chair = Path()
+            chair.move(to: CGPoint(x: left, y: floorY))
+            chair.addLine(to: CGPoint(x: left, y: seatY))
+            chair.addLine(to: CGPoint(x: right, y: seatY))
+            chair.addLine(to: CGPoint(x: right, y: floorY))
+            outline = outline.union(chair.strokedPath(StrokeStyle(lineWidth: arm * 0.8, lineCap: .round, lineJoin: .round)))
+        }
 
         // Head joined to the torso by a short neck: the whole figure is a single contour.
         let radius = box.height * 0.065

@@ -2,9 +2,9 @@ import SwiftUI
 
 /// Renders the weekly report as a one-page PDF, on the device.
 enum ReportPDF {
-    static func render(_ report: WeeklyReport) -> URL? {
-        let url = URL.temporaryDirectory.appending(path: String(localized: "Rapport Rebond.pdf"))
-        let renderer = ImageRenderer(content: ReportPage(report: report))
+    static func render(_ report: WeeklyReport, progress: ProgressData, patientName: String = "") -> URL? {
+        let url = URL.temporaryDirectory.appending(path: String(localized: "Bilan Rebond.pdf"))
+        let renderer = ImageRenderer(content: ReportPage(report: report, progress: progress, patientName: patientName))
         var page = CGRect(x: 0, y: 0, width: ReportPage.width, height: ReportPage.height)
         guard let context = CGContext(url as CFURL, mediaBox: &page, nil) else { return nil }
         renderer.render { _, draw in
@@ -23,22 +23,42 @@ struct ReportPage: View {
     static let height = 842.0
 
     let report: WeeklyReport
+    let progress: ProgressData
+    var patientName = ""
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: 18) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Rapport hebdomadaire Rebond")
+                Text("Bilan hebdomadaire Rebond")
                     .font(.title.bold())
-                Text("Du \(report.start, format: .dateTime.day().month()) au \(report.end, format: .dateTime.day().month().year())")
+                if !patientName.isEmpty {
+                    Text(patientName)
+                        .font(.title3)
+                }
+                Text("Du \(report.start, format: .dateTime.day().month(.wide)) au \(report.end, format: .dateTime.day().month(.wide).year())")
                     .foregroundStyle(.secondary)
             }
             ReportSummary(report: report)
-            Spacer()
-            Text("Rapport généré par Rebond sur l'iPhone du patient. Rebond ne remplace pas l'avis d'un professionnel de santé.")
-                .font(.caption)
+            HStack(alignment: .top, spacing: 16) {
+                if !progress.amplitude.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Amplitude (% de l'objectif)").font(.caption.bold())
+                        AmplitudeChart(data: progress).frame(height: 150)
+                    }
+                }
+                if !progress.pain.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Douleur après chaque séance (sur 10)").font(.caption.bold())
+                        PainChart(data: progress).frame(height: 150)
+                    }
+                }
+            }
+            Spacer(minLength: 0)
+            Text("L'amplitude est mesurée par la caméra de l'iPhone, à titre indicatif : 100 % correspond à l'objectif de mouvement fixé dans l'app. Rebond est un outil de suivi : il ne pose pas de diagnostic et ne remplace pas l'avis d'un professionnel de santé.")
+                .font(.caption2)
                 .foregroundStyle(.secondary)
         }
-        .padding(40)
+        .padding(36)
         .frame(width: Self.width, height: Self.height, alignment: .topLeading)
         .background(.white)
         .environment(\.colorScheme, .light)
@@ -50,22 +70,26 @@ struct ReportSummary: View {
     let report: WeeklyReport
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 14) {
             Text("Séances : \(report.sessionsDone) sur \(report.sessionsPlanned) prévues")
                 .font(.headline)
 
             ForEach(report.exercises) { line in
                 VStack(alignment: .leading, spacing: 2) {
                     Text(line.name).font(.headline)
-                    Text("\(line.completedReps) répétitions sur \(line.plannedReps) prévues")
-                    if line.incompleteReps > 0 {
-                        Text("\(line.incompleteReps) répétitions incomplètes")
+                    if line.isHeld {
+                        Text("Maintien : \(line.heldSeconds) s sur \(line.plannedSeconds) s prévues")
+                    } else {
+                        Text("\(line.completedReps) répétitions sur \(line.plannedReps) prévues")
+                        if line.incompleteReps > 0 {
+                            Text("\(line.incompleteReps) répétitions incomplètes (amplitude insuffisante)")
+                        }
                     }
                     if let first = line.firstAmplitude {
                         if let last = line.lastAmplitude {
-                            Text("Amplitude : \(Int(first)) % → \(Int(last)) % de la profondeur visée")
+                            Text("Amplitude : \(Int(first.rounded())) % → \(Int(last.rounded())) % de l'objectif")
                         } else {
-                            Text("Amplitude : \(Int(first)) % de la profondeur visée")
+                            Text("Amplitude : \(Int(first.rounded())) % de l'objectif")
                         }
                     }
                 }
@@ -79,10 +103,13 @@ struct ReportSummary: View {
                         Text("Évolution : \(first) → \(last)")
                     }
                     ForEach(report.painfulSessionDates, id: \.self) { date in
-                        Text("⚠︎ Douleur forte le \(date, format: .dateTime.weekday(.wide).day().month())")
+                        Label("Douleur forte (≥ \(WeeklyReport.highPain)) le \(date, format: .dateTime.weekday(.wide).day().month())", systemImage: "exclamationmark.triangle.fill")
                             .foregroundStyle(.orange)
                     }
                 }
+            } else {
+                Text("Aucune séance ces 7 derniers jours.")
+                    .foregroundStyle(.secondary)
             }
         }
     }
