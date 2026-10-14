@@ -42,27 +42,62 @@ enum DemoData {
         }
     }
 
-    /// Three patients with different weeks, for the physiotherapist space.
+    /// Three patients with different weeks, for the physiotherapist space: one progressing well, one with high pain
+    /// and few sessions, one who hasn't sent a report for ten days. Fixed identifiers, so loading again updates them.
     static func loadPatients(into context: ModelContext) {
-        let patients: [(name: String, pains: [Int], amplitudes: [Double], days: [Int])] = [
-            ("Martine D.", [5, 4, 4, 3, 3, 2], [72, 78, 84, 90, 96, 101], [19, 16, 12, 9, 5, 2]),
-            ("Jean-Pierre L.", [6, 6, 7, 8], [80, 79, 76, 74], [20, 13, 8, 1]),
-            ("Sofia R.", [3, 2, 2, 1, 1, 1, 0], [88, 92, 95, 99, 103, 105, 108], [20, 17, 14, 11, 8, 5, 2]),
+        struct DemoPatient {
+            let id: String
+            let name: String
+            let reportDaysAgo: Int
+            let sessionsPerWeek: Int
+            let days: [Int]
+            let pains: [Int]
+            let amplitudes: [Double]
+            let exercise: CatalogExercise
+        }
+        let patients = [
+            DemoPatient(id: "D3A0F6C2-2B7E-4C51-9C1E-6F0A1B2C3D01", name: "Martine Dubois", reportDaysAgo: 0, sessionsPerWeek: 3,
+                        days: [19, 16, 12, 9, 6, 4, 2], pains: [5, 4, 4, 3, 3, 2, 2], amplitudes: [72, 78, 84, 88, 93, 97, 101],
+                        exercise: .squat),
+            DemoPatient(id: "D3A0F6C2-2B7E-4C51-9C1E-6F0A1B2C3D02", name: "Jean-Pierre Laurent", reportDaysAgo: 1, sessionsPerWeek: 3,
+                        days: [20, 15, 13, 8, 3], pains: [5, 6, 6, 7, 8], amplitudes: [80, 81, 79, 76, 73],
+                        exercise: .lateralRaise),
+            DemoPatient(id: "D3A0F6C2-2B7E-4C51-9C1E-6F0A1B2C3D03", name: "Sofia Rossi", reportDaysAgo: 10, sessionsPerWeek: 2,
+                        days: [24, 20, 17, 13, 10], pains: [3, 2, 2, 1, 1], amplitudes: [88, 92, 95, 99, 104],
+                        exercise: .squat),
         ]
         for patient in patients {
             let sessions = zip(patient.days, zip(patient.pains, patient.amplitudes)).map { daysAgo, values in
-                WeeklyReport.SessionData(
+                let (pain, amplitude) = values
+                let painful = pain >= WeeklyReport.highPain
+                return WeeklyReport.SessionData(
                     date: Calendar.current.date(byAdding: .day, value: -daysAgo, to: .now) ?? .now,
-                    pain: values.0,
+                    pain: pain,
                     results: [
-                        .init(name: "Squat", order: 0, plannedReps: 20, completedReps: values.0 >= 7 ? 12 : 20,
-                              incompleteReps: values.0 >= 7 ? 6 : 1, plannedSeconds: 0, heldSeconds: 0, amplitude: values.1),
-                        .init(name: "Gainage", order: 1, plannedReps: 0, completedReps: 0, incompleteReps: 0,
-                              plannedSeconds: 60, heldSeconds: values.0 >= 7 ? 30 : 60, amplitude: nil),
+                        .init(name: String(localized: patient.exercise.name), order: 0, plannedReps: 20, completedReps: painful ? 12 : 19,
+                              incompleteReps: painful ? 6 : 1, plannedSeconds: 0, heldSeconds: 0, amplitude: amplitude),
+                        .init(name: "Pont fessier", order: 1, plannedReps: 24, completedReps: painful ? 16 : 24,
+                              incompleteReps: 0, plannedSeconds: 0, heldSeconds: 0, amplitude: nil),
+                        .init(name: "Gainage", order: 2, plannedReps: 0, completedReps: 0, incompleteReps: 0,
+                              plannedSeconds: 60, heldSeconds: painful ? 30 : 60, amplitude: nil),
                     ]
                 )
             }
-            let transfer = ReportTransfer(patientID: UUID(), patientName: patient.name, sessionsPerWeek: 3, sessions: sessions)
+            var program = EditableProgram()
+            program.sessionsPerWeek = patient.sessionsPerWeek
+            program.exercises = [
+                .init(name: String(localized: patient.exercise.name), catalogID: patient.exercise.id, sets: 2, reps: 10),
+                .init(name: "Pont fessier", catalogID: nil, sets: 2, reps: 12),
+                .init(name: "Gainage", catalogID: nil, sets: 2, mode: .hold, reps: 10, holdSeconds: 30),
+            ]
+            let transfer = ReportTransfer(
+                patientID: UUID(uuidString: patient.id) ?? UUID(),
+                patientName: patient.name,
+                generatedAt: Calendar.current.date(byAdding: .day, value: -patient.reportDaysAgo, to: .now) ?? .now,
+                sessionsPerWeek: patient.sessionsPerWeek,
+                sessions: sessions.filter { $0.date <= Calendar.current.date(byAdding: .day, value: -patient.reportDaysAgo, to: .now) ?? .now },
+                program: ProgramTransfer(program, physiotherapist: nil)
+            )
             if let data = try? transfer.encoded() {
                 _ = try? TrackedPatient.receive(data, in: context)
             }

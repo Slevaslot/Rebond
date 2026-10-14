@@ -1,10 +1,11 @@
 import SwiftData
 import SwiftUI
 
-/// Settings on a single screen, without scrolling: the patient, the reminders, the physiotherapist space,
+/// Settings on a single screen (scrolling only with large text): the patient, the reminders, the physiotherapist space,
 /// and "À propos" (medical notice, privacy) one level down.
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(AppRouter.self) private var router
     @AppStorage(PatientIdentity.nameKey) private var patientName = ""
     @AppStorage(AppRole.key) private var role = AppRole.patient.rawValue
     @Query(sort: \Program.createdAt, order: .reverse) private var programs: [Program]
@@ -51,18 +52,36 @@ struct SettingsView: View {
                 }
 
                 Section {
-                    Button("Espace kiné", systemImage: "stethoscope") {
-                        dismiss()
-                        role = AppRole.physiotherapist.rawValue
-                    }
                     NavigationLink {
                         AboutView()
                     } label: {
                         Label("À propos", systemImage: "info.circle")
                     }
                 }
+
+                // Last, so it stays out of the patient's way, but easy to find for a physiotherapist.
+                Section {
+                    Toggle(isOn: Binding(
+                        get: { role == AppRole.physiotherapist.rawValue },
+                        set: { on in
+                            role = on ? AppRole.physiotherapist.rawValue : AppRole.patient.rawValue
+                            if on {
+                                dismiss()
+                                router.openPhysioSpace()
+                            }
+                        }
+                    )) {
+                        Label("Je suis kiné", systemImage: "stethoscope")
+                    }
+                    .accessibilityHint("Ajoute l'onglet Kiné")
+                } header: {
+                    Text("Espace kiné")
+                } footer: {
+                    Text("Ajoute un onglet Kiné pour prescrire des programmes par QR code et suivre vos patients à partir de leurs bilans. Rebond reste gratuit pour vos patients.")
+                }
             }
-            .scrollDisabled(true)
+            // A single screen when it fits; it scrolls with large text sizes.
+            .scrollBounceBehavior(.basedOnSize)
             .navigationTitle("Réglages")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

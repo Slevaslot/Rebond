@@ -47,6 +47,32 @@ final class TrackedPatient {
         return .added(patient)
     }
 
+    enum ImportResult: Equatable {
+        /// The patient was added or updated.
+        case imported(UUID)
+        /// A new patient beyond the free offer's limit: nothing was saved.
+        case limitReached
+        /// The file isn't a Rebond report.
+        case invalid
+    }
+
+    /// Reads a `.rebond` report shared by a patient (Files, Mail, Messages…). A new patient beyond the free limit isn't added.
+    @discardableResult
+    static func importReport(at url: URL, into context: ModelContext, hasPro: Bool) -> ImportResult {
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+        guard let data = try? Data(contentsOf: url) else { return .invalid }
+        return importReport(data, into: context, hasPro: hasPro)
+    }
+
+    static func importReport(_ data: Data, into context: ModelContext, hasPro: Bool) -> ImportResult {
+        guard let reception = try? receive(data, in: context, canAddNew: canAddNew(in: context, hasPro: hasPro)) else { return .invalid }
+        switch reception {
+        case .added(let patient), .updated(let patient): return .imported(patient.patientID)
+        case .limitReached: return .limitReached
+        }
+    }
+
     /// Whether one more patient can be followed: always with Rebond Pro, up to the limit without.
     static func canAddNew(in context: ModelContext, hasPro: Bool) -> Bool {
         hasPro || ((try? context.fetchCount(FetchDescriptor<TrackedPatient>())) ?? 0) < ProStore.freePatientLimit

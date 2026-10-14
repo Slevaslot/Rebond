@@ -1,7 +1,8 @@
 import Observation
 import SwiftUI
 
-/// Where the app is: the selected tab, the session in progress, and adding a program.
+/// Where the app is: the selected tab, the session in progress, adding a program, and the patient opened in the
+/// physiotherapist space.
 /// Shared with the App Intents, which can start a session from Shortcuts or Spotlight.
 @Observable
 final class AppRouter {
@@ -10,6 +11,8 @@ final class AppRouter {
     enum AppTab: Hashable {
         case today
         case program
+        /// The physiotherapist space, only shown when it is turned on.
+        case physio
     }
 
     /// Ways to add a program: the physiotherapist's message, scanning the sheet, picking a photo of it, or typing it.
@@ -20,13 +23,22 @@ final class AppRouter {
         case manual
     }
 
-    var tab = AppTab.today
+    /// The physiotherapist space is the first tab shown at launch while it is turned on.
+    var tab: AppTab = AppRole.isPhysiotherapistEnabled ? .physio : .today
     var isWorkoutPresented = false
     var importSource: ImportSource?
+    /// A followed patient to show in the physiotherapist space, after their report was opened.
+    var openedPatient: UUID?
 
     func startWorkout() {
         tab = .today
         isWorkoutPresented = true
+    }
+
+    /// Opens the physiotherapist space, on a patient's page when given.
+    func openPhysioSpace(patient: UUID? = nil) {
+        tab = .physio
+        openedPatient = patient
     }
 
     func addProgram(from source: ImportSource) {

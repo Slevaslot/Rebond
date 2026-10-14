@@ -3,8 +3,8 @@ import Observation
 import StoreKit
 
 /// Rebond Pro: the physiotherapist's subscription. The free offer has everything that works on the iPhone,
-/// for up to `freePatientLimit` patients; Pro follows as many patients as needed (and, later, the connected
-/// version with a server). Patients never pay: their app is entirely free.
+/// for up to `freePatientLimit` patients; Pro follows as many patients as needed. No server either way.
+/// Patients never pay: their app is entirely free.
 @Observable
 final class ProStore {
     /// Products created in App Store Connect, in the "Rebond Pro" subscription group.

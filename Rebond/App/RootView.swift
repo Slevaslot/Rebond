@@ -2,8 +2,9 @@ import PhotosUI
 import SwiftData
 import SwiftUI
 
-/// The patient's two tabs (HIG: tabs are for navigation, never for actions), or the physiotherapist space.
-/// Also opens what other apps hand over: a program prescribed by QR code, or a patient's report.
+/// The tabs (HIG: tabs are for navigation, never for actions): Accueil and Programme for everyone, plus Kiné when the
+/// physiotherapist space is turned on. Also opens what other apps hand over: a program prescribed by QR code,
+/// or a patient's report.
 struct RootView: View {
     @Environment(AppRouter.self) private var router
     @Environment(\.modelContext) private var context
@@ -25,72 +26,37 @@ struct RootView: View {
     @State private var draft: Draft?
     @State private var pickedPhoto: PhotosPickerItem?
     @State private var savedProgram = 0
-    @State private var openedReport: URL?
     /// Set while the program being reviewed comes from the physiotherapist.
     @State private var prescriber: String?
     @State private var showingPaywall = false
+    @State private var invalidReport = false
+
+    @Namespace private var workoutTransition
+
+    private var isPhysiotherapist: Bool { role == AppRole.physiotherapist.rawValue }
 
     var body: some View {
         @Bindable var router = router
 
-        Group {
-            if role == AppRole.physiotherapist.rawValue {
-                ProHomeView()
-            } else {
-                patientTabs
-            }
-        }
-        .sheet(item: $draft) { draft in
-            NavigationStack {
-                switch draft.content {
-                case .message:
-                    MessageReadingView(onSave: save)
-                case .photo(let image):
-                    SheetReadingView(photo: image, onSave: save)
-                case .program(let program, let notice):
-                    ProgramEditorView(program: program, notice: notice, onSave: save)
-                }
-            }
-            .interactiveDismissDisabled()
-        }
-        .onOpenURL(perform: open)
-        .alert("Bilan d'un patient", isPresented: Binding(get: { openedReport != nil }, set: { if !$0 { openedReport = nil } })) {
-            Button("Ouvrir l'espace kiné") {
-                if let openedReport { importReport(openedReport) }
-                role = AppRole.physiotherapist.rawValue
-            }
-            Button("Annuler", role: .cancel) {}
-        } message: {
-            Text("Ce fichier est le bilan d'un patient. Il s'ouvre dans l'espace kiné de Rebond.")
-        }
-        .sheet(isPresented: $showingPaywall) { ProPaywall() }
-        .sensoryFeedback(.success, trigger: savedProgram)
-        #if DEBUG
-        .modifier(ConnectedPatient())
-        #endif
-    }
-
-    private func importReport(_ url: URL) {
-        if case .limitReached = ProHomeView.importReport(at: url, into: context, hasPro: store.hasPro) {
-            showingPaywall = true
-        }
-    }
-
-    @Namespace private var workoutTransition
-
-    private var patientTabs: some View {
-        @Bindable var router = router
-
-        return TabView(selection: $router.tab) {
-            Tab("Aujourd'hui", systemImage: "sun.max", value: .today) {
+        TabView(selection: $router.tab) {
+            Tab("Accueil", systemImage: "house", value: .today) {
                 TodayView()
                     .environment(\.workoutTransition, workoutTransition)
             }
-            Tab("Programme", systemImage: "calendar", value: .program) {
+            Tab("Programme", systemImage: "list.bullet.clipboard", value: .program) {
                 ProgramTab()
+            }
+            if isPhysiotherapist {
+                Tab("Kiné", systemImage: "stethoscope", value: .physio) {
+                    ProHomeView()
+                }
             }
         }
         .tabBarMinimizeBehavior(.never)
+        // Turning the space off from Réglages leaves its tab.
+        .onChange(of: role) {
+            if !isPhysiotherapist, router.tab == .physio { router.tab = .today }
+        }
         .fullScreenCover(isPresented: $router.isWorkoutPresented) {
             if let program = programs.first {
                 WorkoutView(program: program)
@@ -134,19 +100,32 @@ struct RootView: View {
                 self.pickedPhoto = nil
             }
         }
+        .sheet(item: $draft) { draft in
+            NavigationStack {
+                switch draft.content {
+                case .message:
+                    MessageReadingView(onSave: save)
+                case .photo(let image):
+                    SheetReadingView(photo: image, onSave: save)
+                case .program(let program, let notice):
+                    ProgramEditorView(program: program, notice: notice, onSave: save)
+                }
+            }
+            .interactiveDismissDisabled()
+        }
+        .onOpenURL(perform: open)
+        .sheet(isPresented: $showingPaywall) { ProPaywall() }
+        .alert("Ce fichier n'est pas un bilan Rebond.", isPresented: $invalidReport) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Demandez à votre patient de vous renvoyer le fichier « Bilan Rebond » joint à son PDF.")
+        }
+        .sensoryFeedback(.success, trigger: savedProgram)
     }
 
     /// A program link scanned from the physiotherapist's QR code, or a report file opened with Rebond.
     private func open(_ url: URL) {
-        #if DEBUG
-        if url.host() == "connecter" {
-            role = AppRole.patient.rawValue
-            Task { _ = await DemoServer.shared.link(from: url) }
-            return
-        }
-        #endif
         if let transfer = ProgramTransfer(url: url) {
-            role = AppRole.patient.rawValue
             prescriber = transfer.k ?? ""
             let notice: LocalizedStringKey = if let name = transfer.k {
                 "Programme prescrit par \(name). Vérifiez-le puis enregistrez-le."
@@ -155,11 +134,26 @@ struct RootView: View {
             }
             draft = Draft(content: .program(transfer.editableProgram, notice: notice))
         } else if url.isFileURL {
-            if role == AppRole.physiotherapist.rawValue {
-                importReport(url)
-            } else {
-                openedReport = url
-            }
+            openReport(url)
+        }
+    }
+
+    /// A patient's report only makes sense in the physiotherapist space: opening one turns it on and shows the patient.
+    private func openReport(_ url: URL) {
+        let result = TrackedPatient.importReport(at: url, into: context, hasPro: store.hasPro)
+        if result == .invalid {
+            invalidReport = true
+            return
+        }
+        role = AppRole.physiotherapist.rawValue
+        switch result {
+        case .imported(let id):
+            router.openPhysioSpace(patient: id)
+        case .limitReached:
+            router.openPhysioSpace()
+            showingPaywall = true
+        case .invalid:
+            break
         }
     }
 
@@ -175,48 +169,6 @@ struct RootView: View {
         router.tab = .today
     }
 }
-
-#if DEBUG
-/// Patient side of the connected version (demo server): sends the report once linked, and offers the program
-/// changed by the physiotherapist as soon as it arrives.
-private struct ConnectedPatient: ViewModifier {
-    @Environment(\.modelContext) private var context
-    @State private var server = DemoServer.shared
-
-    func body(content: Content) -> some View {
-        content
-            .task(id: server.isLinked) {
-                guard server.isLinked else { return }
-                await server.pushReport(context: context)
-                while !Task.isCancelled {
-                    await server.checkProgram()
-                    try? await Task.sleep(for: .seconds(4))
-                }
-            }
-            .sheet(isPresented: Binding(
-                get: { server.pendingProgram != nil },
-                set: { if !$0 { server.settlePendingProgram() } }
-            )) {
-                if let pending = server.pendingProgram {
-                    NavigationStack {
-                        ProgramEditorView(
-                            program: pending.program.editableProgram,
-                            notice: pending.program.k.map { "\($0) a modifié votre programme. Vérifiez-le puis enregistrez-le." }
-                                ?? "Votre kiné a modifié votre programme. Vérifiez-le puis enregistrez-le."
-                        ) { program in
-                            let current = try? context.fetch(FetchDescriptor<Program>(sortBy: [SortDescriptor(\.createdAt, order: .reverse)])).first
-                            ProgramChange.record(from: current, to: program, by: pending.program.k)
-                            Program.replaceAll(with: program, in: context)
-                            server.settlePendingProgram()
-                            Task { await server.pushReport(context: context) }
-                        }
-                    }
-                    .interactiveDismissDisabled()
-                }
-            }
-    }
-}
-#endif
 
 /// The zoom from the Commencer button to the session.
 enum WorkoutTransition {

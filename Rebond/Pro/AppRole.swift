@@ -1,11 +1,17 @@
 import Foundation
 
-/// Who uses this iPhone: a patient (free app) or a physiotherapist (physiotherapist space, Rebond Pro).
+/// Who uses this iPhone. Everyone has the patient app; a physiotherapist also turns on the physiotherapist
+/// space, which adds the Kiné tab (and opens on it at launch) without hiding the patient app.
 enum AppRole: String {
     case patient
     case physiotherapist
 
     static let key = "appRole"
+
+    /// Whether the physiotherapist space is turned on. Kept from one launch to the next.
+    static var isPhysiotherapistEnabled: Bool {
+        UserDefaults.standard.string(forKey: key) == physiotherapist.rawValue
+    }
 }
 
 /// Settings stored on the patient's iPhone and sent with the reports.
