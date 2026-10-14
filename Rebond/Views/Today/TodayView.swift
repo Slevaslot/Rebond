@@ -24,7 +24,7 @@ struct TodayView: View {
                     noProgram
                 }
             }
-            .navigationTitle("Séance")
+            .navigationTitle("Résumé")
             // Fitness-style top bar: the large title and the profile on the same line, in the page.
             .toolbarVisibility(.hidden, for: .navigationBar)
             .sheet(isPresented: $showingSettings) {
@@ -35,7 +35,7 @@ struct TodayView: View {
 
     private var header: some View {
         HStack(alignment: .center) {
-            Text("Séance")
+            Text("Résumé")
                 .font(.largeTitle.bold())
                 .accessibilityAddTraits(.isHeader)
             Spacer()
@@ -78,6 +78,8 @@ struct TodayView: View {
                 SessionCard(program: program) { router.startWorkout() }
 
                 WeekCard(week: week)
+
+                FollowUpSection(sessions: sessions, sessionsPerWeek: program.sessionsPerWeek)
             }
             .padding(.horizontal)
             .padding(.bottom)

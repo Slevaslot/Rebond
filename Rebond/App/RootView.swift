@@ -2,7 +2,7 @@ import PhotosUI
 import SwiftData
 import SwiftUI
 
-/// The patient's three tabs (HIG: tabs are for navigation, never for actions), or the physiotherapist space.
+/// The patient's two tabs (HIG: tabs are for navigation, never for actions), or the physiotherapist space.
 /// Also opens what other apps hand over: a program prescribed by QR code, or a patient's report.
 struct RootView: View {
     @Environment(AppRouter.self) private var router
@@ -75,14 +75,11 @@ struct RootView: View {
         @Bindable var router = router
 
         return TabView(selection: $router.tab) {
-            Tab("Séance", systemImage: "figure.cooldown", value: .today) {
+            Tab("Résumé", systemImage: "heart.text.square", value: .today) {
                 TodayView()
             }
             Tab("Programme", systemImage: "calendar", value: .program) {
                 ProgramTab()
-            }
-            Tab("Progrès", systemImage: "chart.line.uptrend.xyaxis", value: .progress) {
-                ProgressTab()
             }
         }
         .tabBarMinimizeBehavior(.never)
