@@ -20,8 +20,18 @@ nonisolated struct WeeklyReport {
         let lastAmplitude: Double?
     }
 
+    /// One session of the week: its date and the pain entered at the end.
+    struct SessionLine: Identifiable {
+        var id: Date { date }
+        let date: Date
+        let pain: Int
+        var isPainful: Bool { pain >= WeeklyReport.highPain }
+    }
+
     let start: Date
     let end: Date
+    /// The sessions of the week, oldest first.
+    let sessionLines: [SessionLine]
     let sessionsDone: Int
     let sessionsPlanned: Int
     let exercises: [ExerciseLine]
@@ -29,6 +39,9 @@ nonisolated struct WeeklyReport {
     let firstPain: Int?
     let lastPain: Int?
     let painfulSessionDates: [Date]
+
+    /// The sessions with a pain at or above the threshold, flagged for the physiotherapist.
+    var painfulSessions: [SessionLine] { sessionLines.filter(\.isPainful) }
 
     struct SessionData {
         let date: Date
@@ -55,6 +68,7 @@ nonisolated struct WeeklyReport {
 
         self.start = start
         self.end = end
+        sessionLines = sessions.map { SessionLine(date: $0.date, pain: $0.pain) }
         sessionsDone = sessions.count
         sessionsPlanned = sessionsPerWeek
 
