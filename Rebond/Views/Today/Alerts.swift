@@ -32,8 +32,8 @@ struct AlertsGroup: View {
                         symbol: "list.bullet.clipboard.fill",
                         color: .blue,
                         title: Text("Nouveau programme"),
-                        date: Date(timeIntervalSinceReferenceDate: changeDate),
-                        message: changeBy.isEmpty ? Text(changeSummary) : Text("\(changeBy) · \(changeSummary)"),
+                        detail: changeBy.isEmpty ? Text(Date(timeIntervalSinceReferenceDate: changeDate), format: .dateTime.day().month()) : Text(changeBy),
+                        message: Text(changeSummary),
                         action: onShowProgram,
                         onDismiss: { withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) { changeDate = 0 } }
                     )
@@ -46,7 +46,7 @@ struct AlertsGroup: View {
                         symbol: "bandage.fill",
                         color: .orange,
                         title: Text("Douleur de \(painful.pain) sur 10"),
-                        date: painful.date,
+                        detail: Text(painful.date, format: .dateTime.day().month()),
                         message: Text("Faites une pause et prévenez votre kiné."),
                         action: onReport,
                         onDismiss: {
@@ -69,7 +69,7 @@ private struct AlertRow: View {
     let symbol: String
     let color: Color
     let title: Text
-    let date: Date
+    let detail: Text
     let message: Text
     let action: () -> Void
     let onDismiss: () -> Void
@@ -85,7 +85,7 @@ private struct AlertRow: View {
                     VStack(alignment: .leading, spacing: 2) {
                         HStack(alignment: .firstTextBaseline, spacing: 6) {
                             title.font(.headline)
-                            Text(date, format: .dateTime.day().month())
+                            detail
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
                         }
@@ -126,29 +126,39 @@ enum ProgramChange {
         defaults.set(describe(from: old.map(EditableProgram.init), to: new), forKey: summaryKey)
     }
 
-    /// The most useful difference, in one short sentence.
+    /// The change in plain words, short enough for one line: "Squat : plus de répétitions."
     static func describe(from old: EditableProgram?, to new: EditableProgram) -> String {
-        func amount(_ e: EditableProgram.Exercise) -> String {
-            e.mode == .hold ? "\(e.sets) × \(e.holdSeconds) s" : "\(e.sets) × \(e.reps)"
-        }
-        guard let old else { return String(localized: "\(new.exercises.count) exercices, \(new.sessionsPerWeek) séances par semaine.") }
+        guard let old else { return String(localized: "Un programme de \(new.exercises.count) exercices.") }
         var changes: [String] = []
         for exercise in new.exercises {
-            if let before = old.exercises.first(where: { $0.name == exercise.name }) {
-                if amount(before) != amount(exercise) {
-                    changes.append(String(localized: "\(exercise.name) : \(amount(exercise)) au lieu de \(amount(before))"))
-                }
-            } else {
-                changes.append(String(localized: "Nouvel exercice : \(exercise.name)"))
+            guard let before = old.exercises.first(where: { $0.name == exercise.name }) else {
+                changes.append(String(localized: "Nouvel exercice : \(exercise.name)."))
+                continue
+            }
+            if exercise.sets != before.sets {
+                changes.append(exercise.sets > before.sets
+                    ? String(localized: "\(exercise.name) : plus de séries.")
+                    : String(localized: "\(exercise.name) : moins de séries."))
+            } else if exercise.mode == .hold, exercise.holdSeconds != before.holdSeconds {
+                changes.append(exercise.holdSeconds > before.holdSeconds
+                    ? String(localized: "\(exercise.name) : maintien plus long.")
+                    : String(localized: "\(exercise.name) : maintien plus court."))
+            } else if exercise.mode != .hold, exercise.reps != before.reps {
+                changes.append(exercise.reps > before.reps
+                    ? String(localized: "\(exercise.name) : plus de répétitions.")
+                    : String(localized: "\(exercise.name) : moins de répétitions."))
             }
         }
         for exercise in old.exercises where !new.exercises.contains(where: { $0.name == exercise.name }) {
-            changes.append(String(localized: "\(exercise.name) retiré"))
+            changes.append(String(localized: "\(exercise.name) retiré."))
         }
         if old.sessionsPerWeek != new.sessionsPerWeek {
-            changes.append(String(localized: "\(new.sessionsPerWeek) séances par semaine au lieu de \(old.sessionsPerWeek)"))
+            changes.append(String(localized: "\(new.sessionsPerWeek) séances par semaine."))
         }
-        guard let first = changes.first else { return String(localized: "Votre programme a été vérifié par votre kiné.") }
-        return changes.count == 1 ? first + "." : first + String(localized: ", et \(changes.count - 1) autres changements.")
+        switch changes.count {
+        case 0: return String(localized: "Votre kiné a vérifié votre programme.")
+        case 1: return changes[0]
+        default: return String(localized: "\(changes.count) changements.")
+        }
     }
 }

@@ -238,9 +238,11 @@ private struct SessionCard: View {
                         .font(.headline)
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.glassProminent)
                 .buttonBorderShape(.capsule)
-                .controlSize(.large)
+                .controlSize(.extraLarge)
+                // A soft glow lifts the main action off the card.
+                .shadow(color: Color.accentColor.opacity(0.45), radius: 14, y: 6)
             }
         }
         // Tapping anywhere on the card (except Commencer) shows or hides the exercises.
