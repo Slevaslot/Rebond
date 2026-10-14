@@ -77,7 +77,7 @@ struct RootView: View {
         @Bindable var router = router
 
         return TabView(selection: $router.tab) {
-            Tab("Résumé", systemImage: "heart.text.square", value: .today) {
+            Tab("Aujourd'hui", systemImage: "sun.max", value: .today) {
                 TodayView()
             }
             Tab("Programme", systemImage: "calendar", value: .program) {
@@ -153,7 +153,7 @@ struct RootView: View {
     }
 
     private func save(_ program: EditableProgram) {
-        // A program prescribed by the physiotherapist shows what changed on the Résumé page.
+        // A program prescribed by the physiotherapist shows what changed on the Aujourd'hui page.
         if let prescriber {
             ProgramChange.record(from: programs.first, to: program, by: prescriber.isEmpty ? nil : prescriber)
             self.prescriber = nil

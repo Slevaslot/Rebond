@@ -25,7 +25,7 @@ struct TodayView: View {
                     noProgram
                 }
             }
-            .navigationTitle("Résumé")
+            .navigationTitle("Aujourd'hui")
             // Fitness-style top bar: the large title and the profile on the same line, in the page.
             .toolbarVisibility(.hidden, for: .navigationBar)
             .sheet(isPresented: $showingSettings) {
@@ -44,7 +44,7 @@ struct TodayView: View {
 
     private var header: some View {
         HStack(alignment: .center) {
-            Text("Résumé")
+            Text("Aujourd'hui")
                 .font(.largeTitle.bold())
                 .accessibilityAddTraits(.isHeader)
             Spacer()

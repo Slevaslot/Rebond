@@ -2,7 +2,7 @@ import Charts
 import SwiftData
 import SwiftUI
 
-/// The follow-up part of the Résumé page, after Health: small cards side by side (colored title, value,
+/// The follow-up part of the Aujourd'hui page, after Health: small cards side by side (colored title, value,
 /// one per row with a mini chart and a chevron. Each card opens its detail in a sheet.
 struct FollowUpSection: View {
     let sessions: [Session]

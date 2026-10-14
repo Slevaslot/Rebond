@@ -1,7 +1,7 @@
 import SwiftData
 import SwiftUI
 
-/// The alerts of the Résumé page, grouped in one compact card: one row each, newest first.
+/// The alerts of the Aujourd'hui page, grouped in one compact card: one row each, newest first.
 struct AlertsGroup: View {
     let sessions: [Session]
     let onReport: () -> Void
@@ -113,7 +113,7 @@ private struct AlertRow: View {
     }
 }
 
-/// Remembers the last change made by the physiotherapist, to show it on the Résumé page.
+/// Remembers the last change made by the physiotherapist, to show it on the Aujourd'hui page.
 enum ProgramChange {
     static let dateKey = "programChangeDate"
     static let byKey = "programChangeBy"
