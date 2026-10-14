@@ -25,21 +25,30 @@ struct TodayView: View {
                 }
             }
             .navigationTitle("Séance")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showingSettings = true
-                    } label: {
-                        ProfileBadge(name: patientName)
-                    }
-                    .accessibilityLabel("Réglages")
-                }
-                .sharedBackgroundVisibility(.hidden)
-            }
+            // Fitness-style top bar: the large title and the profile on the same line, in the page.
+            .toolbarVisibility(.hidden, for: .navigationBar)
             .sheet(isPresented: $showingSettings) {
                 SettingsView()
             }
         }
+    }
+
+    private var header: some View {
+        HStack(alignment: .center) {
+            Text("Séance")
+                .font(.largeTitle.bold())
+                .accessibilityAddTraits(.isHeader)
+            Spacer()
+            Button {
+                showingSettings = true
+            } label: {
+                ProfileBadge(name: patientName)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Réglages")
+        }
+        .padding(.top, 8)
+        .padding(.bottom, 4)
     }
 
     private var noProgram: some View {
@@ -63,6 +72,7 @@ struct TodayView: View {
 
         return ScrollView {
             VStack(alignment: .leading, spacing: 14) {
+                header
                 PainAlertCard(sessions: sessions)
 
                 SessionCard(program: program) { router.startWorkout() }
@@ -367,11 +377,11 @@ private struct ProfileBadge: View {
                     .font(.headline)
             } else {
                 Text(initials)
-                    .font(.headline.weight(.semibold))
+                    .font(.title3.weight(.semibold))
             }
         }
         .foregroundStyle(.white)
-        .frame(width: 40, height: 40)
+        .frame(width: 50, height: 50)
         .background(Color.accentColor.gradient, in: .circle)
     }
 }
