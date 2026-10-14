@@ -21,6 +21,12 @@ nonisolated struct PoseMeasure: Sendable {
     let rightKnee: CGPoint?
     let leftAnkle: CGPoint?
     let rightAnkle: CGPoint?
+    var leftShoulder: CGPoint? = nil
+    var rightShoulder: CGPoint? = nil
+    var leftElbow: CGPoint? = nil
+    var rightElbow: CGPoint? = nil
+    var leftWrist: CGPoint? = nil
+    var rightWrist: CGPoint? = nil
 
     /// Neck to hips distance: the body's scale in the image.
     var torsoLength: Double {
@@ -103,7 +109,13 @@ nonisolated struct PoseAnalyzer {
                 leftKnee: position(.leftKnee),
                 rightKnee: position(.rightKnee),
                 leftAnkle: position(.leftAnkle),
-                rightAnkle: position(.rightAnkle)
+                rightAnkle: position(.rightAnkle),
+                leftShoulder: position(.leftShoulder),
+                rightShoulder: position(.rightShoulder),
+                leftElbow: position(.leftElbow),
+                rightElbow: position(.rightElbow),
+                leftWrist: position(.leftWrist),
+                rightWrist: position(.rightWrist)
             )
         }
         return PoseFrame(skeleton: skeleton, measure: measure)

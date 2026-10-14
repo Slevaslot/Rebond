@@ -9,6 +9,18 @@ nonisolated enum Correction: Sendable {
     case bendBothKnees
     case showBothLegs
     case kneesOverFeet
+    case raiseHigher
+    case raiseBothArms
+    case keepArmsStraight
+    /// One-arm raises: only the raised arm must be straight.
+    case keepArmStraight
+    case standUpFully
+    /// Sit-to-stand: the torso leans to one side, loading one leg.
+    case useBothLegs
+    case raiseLegHigher
+    case keepLegStraight
+    /// Leg raises: the leg the patient stands on bends.
+    case keepStandingLegStraight
 
     var message: LocalizedStringResource {
         switch self {
@@ -19,13 +31,22 @@ nonisolated enum Correction: Sendable {
         case .bendBothKnees: "Pliez les deux genoux ensemble"
         case .showBothLegs: "Je ne vois pas vos deux jambes"
         case .kneesOverFeet: "Gardez les genoux au-dessus des pieds"
+        case .raiseHigher: "Montez encore un peu"
+        case .raiseBothArms: "Levez les deux bras ensemble"
+        case .keepArmsStraight: "Gardez les bras tendus"
+        case .keepArmStraight: "Gardez le bras tendu"
+        case .standUpFully: "Redressez-vous complètement"
+        case .useBothLegs: "Appuyez-vous sur les deux jambes"
+        case .raiseLegHigher: "Levez la jambe un peu plus haut"
+        case .keepLegStraight: "Gardez la jambe tendue"
+        case .keepStandingLegStraight: "Gardez la jambe d'appui tendue"
         }
     }
 }
 
 nonisolated struct RepResult: Sendable {
-    /// How far the hips went down, in torso lengths (range of motion).
-    let depth: Double
+    /// Range of motion reached, as a fraction of the exercise's target (1 = target reached).
+    let amplitude: Double
     let tooFast: Bool
 }
 
@@ -35,7 +56,7 @@ nonisolated enum RepEvent: Sendable {
     /// The target depth is reached: time to come back up.
     case bottomReached
     case repCompleted(RepResult)
-    case repIncomplete(depth: Double)
+    case repIncomplete(amplitude: Double)
     case correction(Correction)
 }
 
@@ -47,13 +68,19 @@ nonisolated struct CounterUpdate: Sendable {
     var posture: Correction? = nil
 }
 
-/// Counts repetitions from a stream of 2D measures.
+/// Counts the repetitions of one exercise from a stream of 2D measures.
 /// Pure logic: can be tested by feeding recorded measures.
+nonisolated protocol MovementCounter: Sendable {
+    /// Call for every analyzed frame, with nil when the body isn't measured.
+    mutating func process(_ measure: PoseMeasure?, at time: Double) -> CounterUpdate
+}
+
+/// Counts squats.
 ///
 /// A repetition is the hips going down by `targetDepth` torso lengths and coming back up,
 /// feet staying in place. Everything is relative to the patient's resting position,
 /// measured again whenever they stand still.
-nonisolated struct RepCounter {
+nonisolated struct RepCounter: MovementCounter {
     private enum Phase {
         case calibrating
         case rest
@@ -76,7 +103,8 @@ nonisolated struct RepCounter {
         let stance: Double?
     }
 
-    let exercise: CatalogExercise
+    /// How far the hips must go down for a complete repetition, in torso lengths.
+    let targetDepth: Double
 
     /// Median over a few measures removes isolated detection errors.
     private let smoothingWindow = 3
@@ -144,8 +172,8 @@ nonisolated struct RepCounter {
     private var lastMeasureTime = 0.0
     private var progress = 0.0
 
-    init(exercise: CatalogExercise) {
-        self.exercise = exercise
+    init(targetDepth: Double) {
+        self.targetDepth = targetDepth
     }
 
     private var isInRepetition: Bool {
@@ -179,7 +207,7 @@ nonisolated struct RepCounter {
         guard phase != .calibrating else { return CounterUpdate(progress: 0, event: nil) }
 
         let depth = (rest.hipsHeight - Self.median(recentHips)) / rest.torsoLength
-        progress = max(0, depth / exercise.targetDepth)
+        progress = max(0, depth / targetDepth)
         let event = advance(depth: depth, measure: measure, time: time)
         return CounterUpdate(progress: progress, event: event, posture: isInRepetition ? faultStreak?.fault : nil)
     }
@@ -233,7 +261,7 @@ nonisolated struct RepCounter {
 
     private mutating func advance(depth: Double, measure: PoseMeasure, time: Double) -> RepEvent? {
         if isInRepetition {
-            if depth >= exercise.targetDepth * 0.8, measure.leftKnee != nil, measure.rightKnee != nil {
+            if depth >= targetDepth * 0.8, measure.leftKnee != nil, measure.rightKnee != nil {
                 sawBothKneesAtBottom = true
             }
             maxDepth = max(maxDepth, depth)
@@ -262,7 +290,7 @@ nonisolated struct RepCounter {
                 sawBothKneesAtBottom = false
             }
         case .descending:
-            if depth >= exercise.targetDepth {
+            if depth >= targetDepth {
                 phase = .bottomReached
                 return .bottomReached
             } else if depth < maxDepth - reversalMargin {
@@ -280,16 +308,16 @@ nonisolated struct RepCounter {
                     return .correction(.showBothLegs)
                 }
                 return .repCompleted(RepResult(
-                    depth: maxDepth,
+                    amplitude: maxDepth / targetDepth,
                     tooFast: time - repStart < minRepDuration
                 ))
             }
         case .risingTooEarly:
-            if depth >= exercise.targetDepth {
+            if depth >= targetDepth {
                 phase = .bottomReached
             } else if depth <= returnDepth {
                 phase = .rest
-                return .repIncomplete(depth: maxDepth)
+                return .repIncomplete(amplitude: maxDepth / targetDepth)
             }
         }
         return nil

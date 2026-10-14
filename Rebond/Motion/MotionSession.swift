@@ -1,16 +1,7 @@
 import AVFoundation
-import MediaPlayer
 import Observation
 import Synchronization
 import Vision
-
-/// What one set produced, saved in the session.
-nonisolated struct SetResult: Sendable {
-    var completedReps = 0
-    var incompleteReps = 0
-    /// Deepest repetition, in percent of the target depth. Nil when nothing was completed.
-    var amplitude: Double?
-}
 
 /// Latest camera image to display, kept apart from `MotionSession`
 /// so only the camera view redraws at the camera's frame rate.
@@ -62,11 +53,11 @@ final class MotionSession {
     private(set) var depthProgress = 0.0
     private(set) var repCount = 0
     private(set) var incompleteCount = 0
-    /// Deepest completed repetition, in torso lengths.
-    private(set) var bestDepth = 0.0
+    /// Best completed repetition, as a fraction of the exercise's target.
+    private(set) var bestAmplitude = 0.0
     private(set) var feedback: Feedback?
     private(set) var guideDisplay = GuideDisplay.large
-    /// Paused from the screen or the AirPods: nothing is counted until the patient resumes.
+    /// Paused from the screen or by a hand gesture: nothing is counted until the patient resumes.
     private(set) var isPaused = false
     /// The camera lost the patient during the set: the guide outline shows them where to stand again,
     /// and counting resumes once they are back in it.
@@ -96,8 +87,6 @@ final class MotionSession {
     /// Waits a moment before showing the outline again, so a short loss of the body doesn't flash it.
     @ObservationIgnored private var lostDelay: Task<Void, Never>?
     @ObservationIgnored private var feedbackDismissal: Task<Void, Never>?
-    @ObservationIgnored private var remoteTargets: [(MPRemoteCommand, Any)] = []
-    @ObservationIgnored private var volumeObservation: NSKeyValueObservation?
     /// The resting position is measured and the patient stands in the guide: the demonstration can start.
     @ObservationIgnored private var isCalibrated = false
     @ObservationIgnored private var isInPlace = false
@@ -170,13 +159,13 @@ final class MotionSession {
 
         nonisolated(unsafe) let session = captureSession
         videoQueue.async { session.startRunning() }
-        enableRemoteControls()
+        activateAudio()
     }
 
     func stop() {
         nonisolated(unsafe) let session = captureSession
         videoQueue.async { session.stopRunning() }
-        disableRemoteControls()
+        deactivateAudio()
     }
 
     func togglePause() {
@@ -188,7 +177,6 @@ final class MotionSession {
             guideDisplay = .corner
         }
         coach.say(isPaused ? "Pause" : "On reprend")
-        MPNowPlayingInfoCenter.default().nowPlayingInfo?[MPNowPlayingInfoPropertyPlaybackRate] = isPaused ? 0.0 : 1.0
     }
 
     /// While the patient watches the model or pauses, the whole picture is blurred, in one blur with the background.
@@ -205,42 +193,12 @@ final class MotionSession {
         }
     }
 
-    /// The AirPods' press (play/pause) pauses and resumes the set, like music.
-    private func enableRemoteControls() {
+    /// Spoken instructions need an active audio session; other audio is lowered while the coach talks.
+    private func activateAudio() {
         try? AVAudioSession.sharedInstance().setActive(true)
-        let center = MPRemoteCommandCenter.shared()
-        // Rebond plays no continuous sound, so iOS may send "play" even to pause: every press toggles.
-        // Remote commands arrive on the main thread.
-        let toggle: (MPRemoteCommandEvent) -> MPRemoteCommandHandlerStatus = { [weak self] _ in
-            MainActor.assumeIsolated { self?.togglePause() }
-            return .success
-        }
-        remoteTargets = [center.togglePlayPauseCommand, center.pauseCommand, center.playCommand].map {
-            ($0, $0.addTarget(handler: toggle))
-        }
-        MPNowPlayingInfoCenter.default().nowPlayingInfo = [
-            MPMediaItemPropertyTitle: String(localized: exercise.name),
-            MPMediaItemPropertyArtist: "Rebond",
-            MPNowPlayingInfoPropertyPlaybackRate: 1.0,
-        ]
-
-        // Swiping up or down on the AirPods' stem changes the volume: the only way for an app to catch it.
-        // Up opens the model large in front of the patient, down puts it back in its card.
-        volumeObservation = AVAudioSession.sharedInstance().observe(\.outputVolume, options: [.old, .new]) { [weak self] _, change in
-            guard let old = change.oldValue, let new = change.newValue, old != new else { return }
-            Task { @MainActor [self] in
-                if new > old { self?.expandModel() } else { self?.shrinkModel() }
-            }
-        }
     }
 
-    private func disableRemoteControls() {
-        for (command, target) in remoteTargets {
-            command.removeTarget(target)
-        }
-        remoteTargets = []
-        volumeObservation = nil
-        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+    private func deactivateAudio() {
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }
 
@@ -248,7 +206,7 @@ final class MotionSession {
         SetResult(
             completedReps: repCount,
             incompleteReps: incompleteCount,
-            amplitude: repCount > 0 ? bestDepth / exercise.targetDepth * 100 : nil
+            amplitude: repCount > 0 ? bestAmplitude * 100 : nil
         )
     }
 
@@ -355,7 +313,7 @@ final class MotionSession {
         depthProgress = 0
         repCount = 0
         incompleteCount = 0
-        bestDepth = 0
+        bestAmplitude = 0
         feedbackDismissal?.cancel()
         feedback = nil
         heldFault = nil
@@ -397,7 +355,7 @@ final class MotionSession {
         case .repCompleted(let result):
             failedInARow = 0
             repCount += 1
-            bestDepth = max(bestDepth, result.depth)
+            bestAmplitude = max(bestAmplitude, result.amplitude)
             if repCount >= targetReps {
                 phase = .finished
                 depthProgress = 0
@@ -417,7 +375,7 @@ final class MotionSession {
         case .repIncomplete:
             incompleteCount += 1
         case .bottomReached:
-            coach.say("Remontez")
+            coach.say(exercise.returnCue)
         case .correction(let correction):
             show(Feedback(message: correction.message, isPositive: false))
             hold(correction)
@@ -470,14 +428,14 @@ nonisolated final class FrameProcessor: NSObject, AVCaptureVideoDataOutputSample
     private let blur = BackgroundBlur()
     /// Where the patient was last seen, normalized, origin top-left.
     private var patient: CGPoint?
-    private var counter: RepCounter
+    private var counter: any MovementCounter
     private var lastAnalysisTime = CMTime.zero
     /// 15 analyses per second are enough to follow the movement.
     private let minAnalysisInterval = CMTime(value: 1, timescale: 15)
 
     init(exercise: CatalogExercise) {
         self.exercise = exercise
-        counter = RepCounter(exercise: exercise)
+        counter = exercise.makeCounter()
     }
 
     /// Called from the main thread: the counter itself is replaced on the video queue, at the next analysis.
@@ -497,7 +455,7 @@ nonisolated final class FrameProcessor: NSObject, AVCaptureVideoDataOutputSample
         if time - lastAnalysisTime >= minAnalysisInterval {
             lastAnalysisTime = time
             if resetRequested.withLock({ requested in defer { requested = false }; return requested }) {
-                counter = RepCounter(exercise: exercise)
+                counter = exercise.makeCounter()
             }
             let frame = analyzer.analyze(pixelBuffer)
             let update = counter.process(frame.measure, at: time.seconds)
