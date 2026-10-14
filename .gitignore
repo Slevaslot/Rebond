@@ -16,3 +16,4 @@ build/
 # Signature
 *.p12
 *.mobileprovision
+Server/demo-data.json

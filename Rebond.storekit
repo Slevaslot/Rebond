@@ -1,0 +1,100 @@
+{
+  "identifier" : "6A1C2B3D",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+
+  ],
+  "settings" : {
+    "_failTransactionsEnabled" : false,
+    "_locale" : "fr_FR",
+    "_storefront" : "FRA",
+    "_storeKitErrors" : [
+
+    ]
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "21500001",
+      "localizations" : [
+        {
+          "description" : "Bilan pour votre kiné et progrès détaillés",
+          "displayName" : "Rebond Plus",
+          "locale" : "fr_FR"
+        }
+      ],
+      "name" : "Rebond Plus",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "4.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "6739000001",
+          "introductoryOffer" : {
+            "internalID" : "6739000011",
+            "paymentMode" : "free",
+            "subscriptionPeriod" : "P2W"
+          },
+          "localizations" : [
+            {
+              "description" : "Bilan hebdomadaire pour votre kiné et suivi détaillé de vos progrès.",
+              "displayName" : "Rebond Plus mensuel",
+              "locale" : "fr_FR"
+            }
+          ],
+          "productID" : "rebond.plus.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Rebond Plus mensuel",
+          "subscriptionGroupID" : "21500001",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "11.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "6739000002",
+          "introductoryOffer" : {
+            "internalID" : "6739000012",
+            "paymentMode" : "free",
+            "subscriptionPeriod" : "P2W"
+          },
+          "localizations" : [
+            {
+              "description" : "Trois mois de suivi, la durée d'une rééducation type.",
+              "displayName" : "Rebond Plus 3 mois",
+              "locale" : "fr_FR"
+            }
+          ],
+          "productID" : "rebond.plus.quarterly",
+          "recurringSubscriptionPeriod" : "P3M",
+          "referenceName" : "Rebond Plus trimestriel",
+          "subscriptionGroupID" : "21500001",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 4,
+    "minor" : 0
+  }
+}
