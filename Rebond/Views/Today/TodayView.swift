@@ -242,9 +242,10 @@ private struct SessionCard: View {
                 .buttonStyle(.glassProminent)
                 .buttonBorderShape(.capsule)
                 .controlSize(.extraLarge)
+                // The zoom starts from the capsule itself, without the glow around it.
+                .modifier(WorkoutSource(namespace: workoutTransition))
                 // A soft glow lifts the main action off the card.
                 .shadow(color: Color.accentColor.opacity(0.45), radius: 14, y: 6)
-                .modifier(WorkoutSource(namespace: workoutTransition))
             }
         }
         // Tapping anywhere on the card (except Commencer) shows or hides the exercises.
@@ -265,7 +266,9 @@ private struct WorkoutSource: ViewModifier {
 
     func body(content: Content) -> some View {
         if let namespace {
-            content.matchedTransitionSource(id: WorkoutTransition.sourceID, in: namespace)
+            content.matchedTransitionSource(id: WorkoutTransition.sourceID, in: namespace) { source in
+                source.clipShape(.rect(cornerRadius: 30)).shadow(radius: 0)
+            }
         } else {
             content
         }
