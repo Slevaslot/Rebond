@@ -363,4 +363,23 @@ nonisolated extension CatalogExercise {
     var allowsHandGestures: Bool {
         if case .shoulderRotation = analysis { false } else { true }
     }
+
+    /// Whether the joints this exercise measures are seen in the frame. The rest of the body may be hidden
+    /// or out of view (feet cut off for an arm exercise, legs behind a chair): the patient isn't lost.
+    func canFollow(_ measure: PoseMeasure?) -> Bool {
+        guard let measure else { return false }
+        switch analysis {
+        case .squat, .sitToStand, .forwardLunge, .sideLunge:
+            // The hips and the neck give the movement.
+            return true
+        case .armRaise, .oneArmRaise:
+            return ArmRaiseCounter.arms(in: measure) != nil
+        case .legRaise, .kneeRaise:
+            return measure.leftKnee != nil && measure.rightKnee != nil
+        case .shoulderRotation:
+            let left = measure.leftShoulder != nil && measure.leftElbow != nil && measure.leftWrist != nil
+            let right = measure.rightShoulder != nil && measure.rightElbow != nil && measure.rightWrist != nil
+            return left || right
+        }
+    }
 }

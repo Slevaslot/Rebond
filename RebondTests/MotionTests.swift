@@ -253,3 +253,38 @@ struct SquatCounterTests {
         #expect(feeder.incomplete == 0)
     }
 }
+
+@Suite("Corps suivi")
+struct FollowedBodyTests {
+    /// The arms measure with the legs out of view.
+    private var armsOnly: PoseMeasure {
+        let m = Body.arms(left: 20, right: 20)
+        return PoseMeasure(
+            hips: m.hips, neck: m.neck, leftHip: m.leftHip, rightHip: m.rightHip,
+            leftKnee: nil, rightKnee: nil, leftAnkle: nil, rightAnkle: nil,
+            leftShoulder: m.leftShoulder, rightShoulder: m.rightShoulder,
+            leftElbow: m.leftElbow, rightElbow: m.rightElbow, leftWrist: m.leftWrist, rightWrist: m.rightWrist
+        )
+    }
+
+    @Test func nothingMeasuredIsNotFollowed() {
+        #expect(!CatalogExercise.squat.canFollow(nil))
+        #expect(!CatalogExercise.lateralRaise.canFollow(nil))
+    }
+
+    @Test func armExerciseIsFollowedWithFeetOutOfView() {
+        #expect(CatalogExercise.lateralRaise.canFollow(armsOnly))
+        #expect(CatalogExercise.squat.canFollow(armsOnly))
+    }
+
+    @Test func legExerciseNeedsTheKnees() {
+        #expect(!CatalogExercise.legRaise.canFollow(armsOnly))
+        #expect(CatalogExercise.legRaise.canFollow(Body.arms(left: 20, right: 20)))
+    }
+
+    @Test func armExerciseNeedsTheWrists() {
+        let m = Body.squat(depth: 0)
+        #expect(!CatalogExercise.lateralRaise.canFollow(m))
+        #expect(CatalogExercise.squat.canFollow(m))
+    }
+}

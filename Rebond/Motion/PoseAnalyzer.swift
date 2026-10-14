@@ -99,8 +99,17 @@ nonisolated struct PoseAnalyzer {
             visible[joint].map { CGPoint(x: $0.location.x * aspect, y: $0.location.y) }
         }
 
+        /// Vision's root and neck are the middles of the hips and of the shoulders. Their confidence drops
+        /// sooner than the joints around them (arm across the body, loose clothes): rebuild them when needed,
+        /// rather than losing the body.
+        func middle(_ a: VNHumanBodyPoseObservation.JointName, _ b: VNHumanBodyPoseObservation.JointName) -> CGPoint? {
+            guard let p = position(a), let q = position(b) else { return nil }
+            return CGPoint(x: (p.x + q.x) / 2, y: (p.y + q.y) / 2)
+        }
+
         var measure: PoseMeasure?
-        if let hips = position(.root), let neck = position(.neck) {
+        if let hips = position(.root) ?? middle(.leftHip, .rightHip),
+           let neck = position(.neck) ?? middle(.leftShoulder, .rightShoulder) {
             measure = PoseMeasure(
                 hips: hips,
                 neck: neck,

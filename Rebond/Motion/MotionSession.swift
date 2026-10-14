@@ -84,8 +84,19 @@ final class MotionSession {
     @ObservationIgnored private let videoQueue = DispatchQueue(label: "rebond.video")
     @ObservationIgnored private var rotationCoordinator: AVCaptureDevice.RotationCoordinator?
     @ObservationIgnored private var rotationObservation: NSKeyValueObservation?
-    /// Consecutive frames without a body, so a single missed detection doesn't flash the placement hint.
+    /// Consecutive frames without the joints the exercise needs, so a short missed detection doesn't
+    /// flash the placement hint.
     @ObservationIgnored private var missedFrames = 0
+    /// Consecutive frames with them, to come back from "lost" only once the body is seen steadily.
+    @ObservationIgnored private var followedFrames = 0
+    /// Frames since Vision last returned a skeleton: the last one stays on screen for a moment.
+    @ObservationIgnored private var framesWithoutSkeleton = 0
+    /// About 0.8 s at 15 analyses per second without the exercise's joints: the body is no longer seen.
+    private let framesBeforeHidden = 12
+    /// About 0.5 s of the body seen steadily again: counting resumes, even if it isn't all in the outline.
+    private let framesBeforeFound = 8
+    /// About 0.4 s: the last skeleton stays drawn across short gaps of Vision.
+    private let skeletonHoldFrames = 6
     /// Waits a moment before showing the outline again, so a short loss of the body doesn't flash it.
     @ObservationIgnored private var lostDelay: Task<Void, Never>?
     @ObservationIgnored private var feedbackDismissal: Task<Void, Never>?
@@ -112,8 +123,8 @@ final class MotionSession {
         processor.onImage = { [weak self] image in
             Task { @MainActor [self] in self?.liveFrame.image = image }
         }
-        processor.onAnalysis = { [weak self] skeleton, update in
-            Task { @MainActor [self] in self?.apply(skeleton, update) }
+        processor.onAnalysis = { [weak self] skeleton, update, isFollowed in
+            Task { @MainActor [self] in self?.apply(skeleton, update, isFollowed: isFollowed) }
         }
         processor.onGesture = { [weak self] gesture in
             Task { @MainActor [self] in self?.handle(gesture) }
@@ -287,11 +298,11 @@ final class MotionSession {
         }
     }
 
-    /// The body has been missing for about half a second: one more second, then the outline comes back.
+    /// The body has been missing for nearly a second: one more second, then the outline comes back.
     private func showOutlineIfStillLost() {
         lostDelay?.cancel()
         lostDelay = Task {
-            try? await Task.sleep(for: .seconds(1))
+            try? await Task.sleep(for: .seconds(1.2))
             guard !Task.isCancelled, phase == .active, !isPaused else { return }
             isLost = true
             depthProgress = 0
@@ -325,19 +336,31 @@ final class MotionSession {
         coach.say("Posez votre téléphone debout, reculez, puis placez-vous dans la silhouette")
     }
 
-    private func apply(_ skeleton: PoseSkeleton?, _ update: CounterUpdate) {
-        self.skeleton = skeleton
-        if skeleton == nil {
-            missedFrames += 1
-            if missedFrames >= 8, bodyVisible {
-                bodyVisible = false
-                if phase == .active { showOutlineIfStillLost() }
+    private func apply(_ skeleton: PoseSkeleton?, _ update: CounterUpdate, isFollowed: Bool) {
+        if let skeleton {
+            framesWithoutSkeleton = 0
+            self.skeleton = skeleton
+        } else {
+            framesWithoutSkeleton += 1
+            if framesWithoutSkeleton > skeletonHoldFrames { self.skeleton = nil }
+        }
+
+        if isFollowed {
+            missedFrames = 0
+            followedFrames += 1
+            lostDelay?.cancel()
+            if !bodyVisible { bodyVisible = true }
+            // Back and seen steadily, maybe not whole (feet out of view): no need to fit the outline again.
+            if isLost, followedFrames >= framesBeforeFound {
+                isLost = false
+                coach.say("On reprend")
             }
         } else {
-            missedFrames = 0
-            lostDelay?.cancel()
-            if !bodyVisible {
-                bodyVisible = true
+            followedFrames = 0
+            missedFrames += 1
+            if missedFrames >= framesBeforeHidden, bodyVisible {
+                bodyVisible = false
+                if phase == .active { showOutlineIfStillLost() }
             }
         }
 
@@ -422,7 +445,8 @@ final class MotionSession {
 /// and analyzes the pose 15 times per second. Its state is only touched on that queue.
 nonisolated final class FrameProcessor: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, @unchecked Sendable {
     var onImage: (@Sendable (CGImage?) -> Void)?
-    var onAnalysis: (@Sendable (PoseSkeleton?, CounterUpdate) -> Void)?
+    /// The skeleton, the counter's update, and whether the joints the exercise needs were seen.
+    var onAnalysis: (@Sendable (PoseSkeleton?, CounterUpdate, Bool) -> Void)?
     var onGesture: (@Sendable (HandGesture) -> Void)?
 
     private let exercise: CatalogExercise
@@ -462,7 +486,7 @@ nonisolated final class FrameProcessor: NSObject, AVCaptureVideoDataOutputSample
             }
             let frame = analyzer.analyze(pixelBuffer)
             let update = counter.process(frame.measure, at: time.seconds)
-            onAnalysis?(frame.skeleton, update)
+            onAnalysis?(frame.skeleton, update, exercise.canFollow(frame.measure))
             if exercise.allowsHandGestures, let gesture = gestures.process(pixelBuffer, body: frame.skeleton) {
                 onGesture?(gesture)
             }
