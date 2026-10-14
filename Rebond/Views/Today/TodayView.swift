@@ -240,7 +240,7 @@ private struct SessionCard: View {
                 }
 
                 Button(action: onStart) {
-                    Label("Commencer", systemImage: "play.fill")
+                    Text("Commencer")
                         .font(.headline)
                         .frame(maxWidth: .infinity)
                 }

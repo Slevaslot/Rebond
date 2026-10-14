@@ -35,7 +35,8 @@ final class VoiceCommands {
     }
 
     /// Asks for speech recognition, then the microphone. True when both are granted.
-    static func requestAuthorization() async -> Bool {
+    /// Nonisolated: iOS answers on a background queue, which a main-actor closure would trap on.
+    nonisolated static func requestAuthorization() async -> Bool {
         let speech = await withCheckedContinuation { continuation in
             SFSpeechRecognizer.requestAuthorization { continuation.resume(returning: $0) }
         }
