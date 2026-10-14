@@ -1,92 +1,115 @@
 # Rebond – architecture technique
 
-Document de travail pour l'équipe. Le contexte produit est dans `CLAUDE.md`, l'interface dans `INTERFACE.md`.
+Document de travail pour l'équipe. Le contexte produit et les décisions sont dans `CLAUDE.md`, l'interface dans `INTERFACE.md`, l'historique de ce qui a été essayé dans `JOURNAL.md`.
 
 ## En bref
 
-- App iPhone, SwiftUI, iOS 27.0 minimum, Swift 6.4 en concurrence stricte.
+- App iPhone, SwiftUI, iOS 27.0 minimum, Swift 6 en concurrence stricte, isolation `MainActor` par défaut.
 - Frameworks Apple uniquement, aucune dépendance tierce.
 - Tout est traité sur l'appareil, aucun serveur.
-- La logique (lecture de la feuille, analyse des mouvements) est séparée de l'interface et testable sans écran.
+- La logique (lecture de la feuille, analyse des mouvements, rapport) est séparée de l'interface et testée sans écran.
 
-## Stack
+## Point de départ
 
-| Besoin | Framework |
-|---|---|
-| Lecture de la feuille d'exercices | Foundation Models (modèle embarqué, entrée d'image, génération guidée `@Generable`) |
-| Caméra | AVFoundation |
-| Posture, angles, répétitions | Vision (body pose 2D, 3D si le temps le permet) |
-| Stockage | SwiftData |
-| Enregistrement des séances | HealthKit (bonus) |
-| Rapport | PDF généré sur l'appareil, partagé via `ShareLink` |
-| Consignes audio | AVSpeechSynthesizer |
-| Intégration système | App Intents + WidgetKit (bonus) |
-| Abonnement | StoreKit 2 (en attente du modèle économique) |
-| Traductions | String Catalog |
+Le moteur de séance (`Motion/`) a été prototypé et validé avant le hackathon : placement, calibrage, comptage du squat, rejet des faux mouvements, flou de la pièce, voix, geste « paume = pause ». Il est **conservé**. Tout le reste (navigation, scan, programme, séance complète, progrès, rapport) est construit selon ce document et `INTERFACE.md`, sans se caler sur le prototype.
 
 ## Organisation du projet
 
 ```
 Rebond/
-├── App/                 point d'entrée, navigation
+├── App/                 point d'entrée, onglets, routage
 ├── Models/              modèles SwiftData
-├── Catalog/             catalogue des exercices connus et leurs règles d'analyse
-├── SheetReader/         photo → programme (Foundation Models), sans SwiftUI
-├── Motion/              caméra, Vision, angles, comptage, sans SwiftUI
-├── Report/              calcul des stats hebdo et génération du PDF
-├── Health/              HealthKit
+├── Catalog/             exercices connus et leurs règles d'analyse
+├── SheetReader/         scan → programme (Foundation Models), sans SwiftUI
+├── Motion/              caméra, Vision, mesures, comptage, gestes, voix, sans SwiftUI
+├── Workout/             enchaînement des exercices d'une séance (caméra, manuel, minuteur), sans SwiftUI
+├── Report/              statistiques, données des graphiques, PDF
+├── Reminders/           notifications locales
+├── Store/               abonnement Rebond Pro (StoreKit 2)
+├── Pro/                 rôle patient / kiné, transferts (lien du programme, fichier de bilan)
 ├── Intents/             App Intents
-├── Views/               écrans SwiftUI
-└── Resources/           String Catalog, données de démo
+├── Views/               écrans SwiftUI, regroupés par onglet
+└── Resources/           String Catalog, données de démo, PrivacyInfo
+RebondTests/             tests (Swift Testing) : compteurs, séance, bilan, programme
+Rebond-Info.plist        schéma d'URL `rebond://` et type de fichier `.rebond`
+Rebond.storekit          produits Rebond Pro pour les tests dans Xcode
 ```
 
-## Point clé : le catalogue d'exercices
+## Le catalogue d'exercices
 
-La caméra ne peut pas analyser un exercice qu'elle ne connaît pas. On maintient donc un petit catalogue d'exercices connus, chacun avec ses règles d'analyse :
+La caméra ne suit que les exercices qu'elle connaît. Chaque entrée du catalogue définit :
 
-- l'articulation à suivre (ex. genou pour le squat : angle hanche – genou – cheville) ;
-- l'angle de départ et l'angle cible ;
-- le type : répétitions ou maintien chronométré (gainage) ;
-- les corrections possibles (« descends encore un peu »).
+- **`id`** stable (`squat`, `lateral-raise`) : c'est le lien entre la feuille, le programme et le moteur ;
+- **le type** : répétitions ou maintien chronométré ;
+- **la mesure** suivie, l'une de :
+  - `verticalDrop(joint:)` : descente d'une articulation divisée par la longueur du buste debout (squat : hanches) ;
+  - `angle(a, vertex, b)` : angle entre trois articulations (élévation latérale : hanche – épaule – poignet) ;
+- **l'objectif** (profondeur ou angle cible) et les seuils d'hystérésis ;
+- **la vue attendue** (face) et les articulations qui doivent être visibles ;
+- **les défauts surveillés** et leur consigne (« Gardez le buste droit ») ;
+- **les poses du pictogramme** (repos et objectif).
 
-Le rôle de Foundation Models est de **faire correspondre chaque exercice de la feuille à une entrée du catalogue**, et d'en extraire séries, répétitions et fréquence.
-
-Un exercice hors catalogue reste utilisable en mode simple : minuteur et comptage manuel, sans analyse caméra.
-
-Pour le hackathon : 3 à 5 exercices bien réglés valent mieux que 20 approximatifs. Proposition : squat, pont fessier, gainage, élévation latérale du bras, extension du genou assis.
+Hackathon : **squat** (fait) puis **élévation latérale des bras**. Tous deux debout et de face : le téléphone ne bouge pas entre les deux. Tout autre exercice passe en comptage manuel (boutons + / −) ou au minuteur (maintien).
 
 ## Lecture de la feuille (SheetReader)
 
-1. Vérifier la disponibilité du modèle (`SystemLanguageModel.default.availability`). S'il n'est pas disponible : saisie manuelle du programme.
-2. Envoyer la photo au modèle avec une consigne et un type `@Generable` qui décrit le programme attendu.
-3. Le modèle renvoie directement une structure Swift : liste d'exercices (identifiant du catalogue ou « inconnu », nom lu, séries, répétitions ou durée), fréquence par semaine.
-4. L'écran de vérification affiche le résultat ; le patient corrige avant d'enregistrer.
+1. Capture : `VNDocumentCameraViewController` (VisionKit), ou `PhotosPicker` pour une photo existante.
+2. Disponibilité : `SystemLanguageModel.default.availability` **et** capacité d'entrée d'image. Sinon : message adapté à la cause, puis saisie manuelle.
+3. Appel du modèle avec des instructions et un type `@Generable` :
 
-Risque : écriture manuscrite mal lue. Parades : écran de vérification obligatoire, et une feuille de démo préparée et testée à l'avance.
+```
+ProgramDraft
+  - sessionsPerWeek: Int?          nil si la feuille ne le dit pas
+  - exercises: [ExerciseDraft]
+
+ExerciseDraft
+  - name: String                   tel qu'écrit sur la feuille
+  - kind: squat | lateralRaise | other
+  - sets: Int?
+  - reps: Int?                     pour un exercice en répétitions
+  - holdSeconds: Int?              pour un maintien (gainage…)
+```
+
+   Les champs optionnels permettent de distinguer ce qui a été **lu** de ce qui sera **complété par défaut** (3 séances, 3 séries, 10 répétitions, 30 s) et signalé « À vérifier » à l'écran.
+4. Conversion `ProgramDraft` → brouillon éditable (logique pure, testée), écran de vérification, enregistrement.
+
+Risque : écriture manuscrite mal lue. Parades : scanner de documents (image redressée), écran de vérification obligatoire, feuille de démo imprimée et testée à l'avance.
 
 ## Analyse des mouvements (Motion)
 
-Chaîne de traitement :
+```
+Caméra frontale (AVFoundation), 720p, miroir
+  → images sur la file vidéo, 15 analyses / s
+  → Vision : points du corps + confiance ; mains seulement si un poignet est levé
+  → mesure de l'exercice (descente ou angle), lissée sur quelques images
+  → machine à états : calibrage → repos → aller → objectif atteint → retour → +1
+  → événements vers l'interface (MainActor)
+```
+
+Événements émis (contrat entre le moteur et l'interface) :
 
 ```
-Caméra (AVFoundation)
-  → images, hors thread principal
-  → Vision : points du corps (articulations + confiance)
-  → calcul de l'angle de l'articulation suivie
-  → lissage (moyenne glissante sur quelques images)
-  → machine à états : repos → descente → bas atteint → remontée → +1 répétition
-  → événements vers l'interface : compteur, correction, fin de série
+placement(hint)        consigne de placement
+calibrated             position de repos mesurée
+repCompleted(count, amplitude)
+repIncomplete(count)
+correction(fault)      défaut en cours, déjà filtré (persiste ≥ 3 images)
+bodyLost / bodyFound
+gesture(.pause)
 ```
 
 Règles :
-- **Seuils avec hystérésis** : une répétition compte quand l'angle passe sous le seuil bas puis repasse au-dessus du seuil haut. Évite les doubles comptages.
-- **Points peu fiables ignorés** : en dessous d'un niveau de confiance, on n'actualise pas.
-- **Correction** : si la remontée commence avant l'angle cible, on affiche la consigne et on ne compte pas la répétition (ou on la compte comme incomplète, à décider).
-- **Amplitude** : on garde l'angle extrême atteint à chaque répétition, c'est ce qui alimente le « +12° » du rapport.
-- **Performance** : pas besoin d'analyser chaque image, 15 par seconde suffisent.
-- **Placement du téléphone** : un écran d'aide avant la séance (téléphone posé à 2–3 m, corps entier visible, de profil pour le squat).
+- **Hystérésis** : une répétition compte quand la mesure franchit le seuil d'objectif puis revient sous le seuil de repos.
+- **Confiance** : sous le seuil de confiance, on n'actualise rien ; après ~1,5 s sans corps, `bodyLost`.
+- **Incomplète** : retour avant l'objectif → `repIncomplete`, non comptée dans la série.
+- **Tempo** : répétition < 1,2 s → « Plus lentement » (au plus une fois toutes les 3 répétitions).
+- **Amplitude** : extrême atteint à chaque répétition, en % de l'objectif ; la meilleure de la série est enregistrée.
+- **Flou** : masque de personne (Vision), seul le patient reste net.
+- **Tests** : le moteur reçoit des suites de points enregistrées depuis les vidéos de l'équipe ; les tests vérifient comptage, incomplètes et rejets.
 
-Tout ce module se teste sans caméra en lui injectant des séries d'angles enregistrées.
+## Séance (Workout)
+
+Logique pure qui enchaîne les exercices du programme : pour chaque exercice, chaque série, choisit le mode (caméra si `catalogId` connu, sinon manuel ou minuteur), agrège les résultats, puis produit une `Session` après la saisie de la douleur. Une séance sans aucune répétition et de moins de 30 s n'est pas enregistrée sans confirmation.
 
 ## Modèle de données (SwiftData)
 
@@ -94,64 +117,77 @@ Tout ce module se teste sans caméra en lui injectant des séries d'angles enreg
 Program
   - createdAt
   - sessionsPerWeek
-  - exercises: [PlannedExercise]
+  - exercises: [PlannedExercise]   (cascade)
 
 PlannedExercise
-  - catalogId (ou nil si hors catalogue)
-  - displayName
-  - sets, reps   (ou holdSeconds pour un maintien)
+  - catalogId: String?             nil = hors catalogue
+  - name
+  - sets
+  - reps: Int?  /  holdSeconds: Int?
   - order
 
 Session
   - date
+  - duration
   - pain (0–10)
-  - results: [ExerciseResult]
+  - results: [ExerciseResult]      (cascade)
 
-ExerciseResult
-  - plannedExercise
+ExerciseResult                     copie autonome, pas de lien vers PlannedExercise :
+  - exerciseName                   l'historique survit au remplacement du programme
+  - catalogId: String?
+  - order
+  - plannedReps / plannedSeconds
   - completedReps
   - incompleteReps
-  - bestAngle (amplitude)
+  - heldSeconds
+  - amplitude: Double?             % de l'objectif, nil si non mesuré
 ```
 
-## Rapport hebdo (Report)
+## Progrès et rapport (Report)
 
-- Calculé à partir des `Session` de la semaine : séances faites / prévues, répétitions, évolution de l'amplitude, évolution de la douleur.
-- Séances avec douleur ≥ 7 signalées.
-- PDF généré sur l'appareil, envoyé uniquement quand le patient appuie sur « Envoyer à mon kiné » (feuille de partage : mail, Messages…).
-- Données de démo pré-remplies pour montrer un rapport complet pendant la présentation.
+- Fenêtre : les 7 derniers jours, dates exactes affichées.
+- Calcul (logique pure, testée) : séances faites / prévues, répétitions complètes et incomplètes par exercice, amplitude première → dernière séance, douleur moyenne et évolution, séances à douleur ≥ 7.
+- Graphiques Swift Charts partagés entre l'onglet Progrès et le PDF.
+- PDF généré sur l'appareil, partagé via `ShareLink` uniquement quand le patient appuie sur « Envoyer à mon kiné ».
+
+## Espace kiné (Rebond Pro)
+
+- **Prescription** : `ProgramTransfer` (JSON compact, base64url) dans un lien `rebond://programme?d=…`, affiché en QR code (Core Image). Le patient le scanne avec l'appareil photo : `onOpenURL` ouvre l'écran de vérification.
+- **Suivi** : le bilan partagé contient le PDF et un fichier `.rebond` (`ReportTransfer`, 6 dernières semaines, identifiant stable du patient). Ouvert avec Rebond, il crée ou met à jour un `TrackedPatient` ; le kiné voit le même résumé et les mêmes graphiques que le patient.
+- **Accès** : `ProStore` lit les droits StoreKit ; l'espace kiné demande l'abonnement, l'app patient jamais.
 
 ## Bonus, dans l'ordre
 
-1. **App Intents** : « Démarrer ma séance » dans Raccourcis, Spotlight et le centre de contrôle ; widget « Prochaine séance ».
-2. **HealthKit** : enregistrer chaque séance comme entraînement.
-3. **Body pose 3D** : angles plus fiables quand le patient n'est pas parfaitement de profil.
-4. **StoreKit** : seulement quand le modèle économique est décidé.
+1. **Rappels** : notifications locales les jours de séance et rappel hebdomadaire du rapport.
+2. **App Intents + widget** : « Démarrer ma séance » (Raccourcis, Spotlight, centre de contrôle), widget « Prochaine séance ».
+3. **HealthKit** : enregistrer chaque séance comme entraînement (type « renforcement fonctionnel »).
 
-## Répartition proposée
+## Répartition
 
 | Dev A – moteur | Dev B – app |
 |---|---|
-| Caméra + Vision | Navigation et écrans |
-| Calcul des angles, comptage, corrections | SwiftData + données de démo |
-| Catalogue d'exercices et réglages | Lecture de la feuille (Foundation Models) + écran de vérification |
-| Écran de séance (avec B) | Rapport hebdo + PDF |
-| | Autorisations, String Catalog, soumission App Store |
+| Catalogue + élévation latérale | Onglets, navigation, accueil |
+| Événements Motion, cible de tests | Scan (VisionKit) + SheetReader + vérification |
+| Écran de séance caméra | Workout (enchaînement, manuel, minuteur), douleur |
+| Réglage sur vidéos réelles | SwiftData, données de démo, Progrès, PDF |
+| Icône (Icon Composer) | Autorisations, String Catalog, soumission |
 
-Point de synchro : l'interface entre les deux, c'est le catalogue (`catalogId`) et les événements émis par Motion (répétition comptée, correction, fin de série). À définir ensemble au début du jour 1.
+Point de synchro : le catalogue (`catalogId`) et les événements Motion ci-dessus, figés le matin du jour 1.
 
 ## Avant le 15 octobre
 
-- [ ] Compte développeur actif, équipe de signature configurée sur les deux Mac.
-- [ ] Identifiant d'app créé, fiche App Store Connect créée (nom, icône provisoire).
-- [ ] Projet Xcode initialisé et partagé (dépôt Git), capacité HealthKit ajoutée.
-- [ ] Vérifier sur un vrai iPhone que Foundation Models est disponible et lit une feuille test.
-- [ ] Feuille d'exercices de démo imprimée.
+- [ ] Relire le règlement du Build Challenge : le code écrit avant l'événement est-il autorisé ?
+- [ ] Compte développeur actif ; **une** équipe propriétaire de l'app, ajoutée sur les deux Mac.
+- [ ] Identifiant d'app créé (vérifier que `com.rebond.app` est libre, sinon en choisir un autre), fiche App Store Connect créée.
+- [ ] URL de politique de confidentialité prête.
+- [ ] `main` à jour avec la branche `technique`.
+- [ ] Sur un vrai iPhone : Foundation Models lit une feuille test avec image.
+- [ ] Feuille d'exercices de démo imprimée (squat, élévation latérale, gainage, un exercice manuscrit).
+- [ ] Voix française Premium téléchargée sur l'iPhone de démo.
 - [ ] Un premier build envoyé sur TestFlight pour valider la chaîne de soumission.
 
-## Questions ouvertes
+## Questions encore ouvertes
 
-- Une répétition incomplète compte-t-elle ?
-- Langues cibles de la traduction.
-- Modèle économique (paiement côté kiné ou abonnement patient).
-- Usage de l'Apple Watch (plus tard, cible séparée).
+- Seuil de douleur et profondeur cible du squat à valider avec un kiné.
+- Modèle économique (paiement côté kiné ou abonnement patient), après le hackathon.
+- Usage de l'Apple Watch, après le hackathon.

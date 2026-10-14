@@ -33,8 +33,8 @@ Swift 6 en concurrence stricte (`SWIFT_VERSION 6.0`), isolation MainActor par d�
 
 ### Pendant la série
 
-- **Agrandir le modèle** (double tap sur la vignette, glisser vers le haut sur la tige des AirPods, ou geste de la main) : le modèle repasse en grand, la caméra est floutée, rien n'est compté. On le remet en vignette (tap, pincement, glisser vers le bas, geste) et « À vous », le comptage reprend.
-- **Pause** (bouton, appui sur les AirPods, ou paume levée) : seule la barre du haut reste, avec un gros bouton pause au centre sur l'image floutée. À la reprise, le modèle est toujours en vignette.
+- **Agrandir le modèle** (double tap sur la vignette, ou geste de la main) : le modèle repasse en grand, la caméra est floutée, rien n'est compté. On le remet en vignette (tap, pincement, geste) et « À vous », le comptage reprend.
+- **Pause** (bouton ou paume levée) : seule la barre du haut reste, avec un gros bouton pause au centre sur l'image floutée. À la reprise, le modèle est toujours en vignette.
 - **Corps perdu** : si la caméra ne voit plus le patient pendant environ 1,5 s, la silhouette de placement revient avec la même consigne. Rien n'est compté tant qu'il n'est pas revenu dedans ; les répétitions déjà faites sont gardées.
 - **Après deux mouvements refusés d'affilée**, le modèle montre le mouvement en grand pendant 4 s.
 
@@ -68,8 +68,7 @@ Swift 6 en concurrence stricte (`SWIFT_VERSION 6.0`), isolation MainActor par d�
 
 ## Commandes à distance
 
-- **AirPods – appui** : pause / reprise. Rebond devient l'app « en cours de lecture » pendant la séance ; chaque commande reçue (lecture, pause, bascule) inverse l'état, car iOS envoie parfois « lecture » pour mettre en pause.
-- **AirPods – glisser sur la tige** : vers le haut agrandit le modèle, vers le bas le réduit. iOS ne permet pas de lire ce geste directement : l'app observe le changement de volume. Limites : le volume change vraiment, rien ne se passe au volume maximum ou minimum, les boutons de volume de l'iPhone ont le même effet.
+- **AirPods (retiré)** : l'appui pour mettre en pause et le glisser sur la tige (détection par le volume) ont été essayés puis retirés. Détourner les contrôles audio est contraire aux HIG (*Playing audio*) et expose à un rejet (App Review 2.5.9).
 - **Gestes de la main** (Vision, `VNDetectHumanHandPoseRequest`) — une seule main levée à hauteur d'épaule, l'autre baissée :
   - paume ouverte tenue environ 0,6 s : pause / reprise ;
   - pouce et index collés puis écartés : agrandir le modèle ;
@@ -83,7 +82,7 @@ Swift 6 en concurrence stricte (`SWIFT_VERSION 6.0`), isolation MainActor par d�
 - `AVSpeechSynthesizer`, la voix française de meilleure qualité installée est choisie automatiquement (Premium > Améliorée > défaut, région de l'utilisateur en priorité).
 - Les voix Premium sont gratuites mais à télécharger sur chaque iPhone : Réglages > Accessibilité > Contenu énoncé > Voix > Français (ex. Audrey). Sans elles, l'app prend la voix de base.
 - Piste si la voix n'est pas assez naturelle : enregistrer la quarantaine de phrases du coach avec une vraie voix et les jouer avec AVFoundation.
-- Session audio `.playback` / `.spokenAudio` : audible même en mode silencieux, interrompt la musique pendant la séance.
+- Session audio `.playback` / `.voicePrompt` avec `duckOthers` : audible même en mode silencieux, la musique est baissée pendant que le coach parle.
 
 ## Reste du parcours
 
@@ -104,8 +103,32 @@ xcodebuild -scheme Rebond -destination 'generic/platform=iOS' -allowProvisioning
 
 ## Points ouverts
 
-- Valider les gestes de la main et le glisser sur la tige des AirPods en conditions réelles ; ajuster l'écart pouce-index demandé si le geste passe mal à distance.
-- Décider si l'on garde le glisser sur la tige (il change le volume).
+- Valider les gestes de la main en conditions réelles. Décision : ne garder que la paume ouverte pour la pause (voir `CLAUDE.md`).
 - Le bouton « Terminer la série » peut chevaucher le bas de la silhouette quand le corps est perdu.
 - Seuil de douleur élevée (7) à valider avec un kiné.
 - Prochaines étapes de `CLAUDE.md` : HealthKit, App Intents et widget, cible Apple Watch (rien n'est construit pour la montre).
+
+## Reconstruction (13 octobre, soir)
+
+L'app a été reconstruite selon `CLAUDE.md`, `TECHNIQUE.md` et `INTERFACE.md`, en gardant le moteur de séance.
+
+- **Moteur** : protocole `MovementCounter` ; le squat (`RepCounter`) et l'**élévation latérale des bras** (`ArmRaiseCounter`, angle bras-tronc, cible 80°, bras tendus, symétrie) partagent la même session caméra. Amplitude en % de l'objectif.
+- **App patient** : onglets Aujourd'hui / Programme / Progrès, accueil en deux écrans, scanner de documents VisionKit, valeurs devinées par l'IA signalées « À vérifier », exercices en maintien avec minuteur, comptage manuel, douleur, résumé de fin de séance, graphiques Swift Charts, bilan PDF, rappels locaux, raccourci « Démarrer ma séance » (App Intents).
+- **AirPods retirés** (contrôles audio détournés, contraire aux HIG). Gestes de la main conservés.
+- **Modèle B2B** : l'app patient est gratuite ; l'espace kiné (Rebond Pro, StoreKit 2) permet de prescrire par QR code et de suivre les patients à partir de leurs bilans `.rebond`. Voir `BUSINESS.md`.
+- **Icône** au format Icon Composer (modes sombre, teinté, transparent).
+- **Tests** : cible `RebondTests` (Swift Testing), 18 tests sur les compteurs (mouvements synthétiques), la séance, le bilan et le programme.
+- **À faire** : traductions (« Generate Translations » dans Xcode), produits App Store Connect, URL de confidentialité, tester l'élévation latérale devant la caméra.
+
+## Nouveaux exercices suivis par la caméra (réglés sur UI-PRMD)
+
+Logique commune dans `RepCycle` (repos → aller → objectif → retour, incomplètes, défaut confirmé sur 3 images, trop rapide). Rejeu des données Kinect avec perspective (téléphone à hauteur de hanche, 2,5 m) et ordre d'Euler corrigé (Z·X·Y) pour les jambes.
+
+| Exercice | Mesure | Objectif | Bons comptés | Mauvais encore comptés |
+|---|---|---|---|---|
+| Assis-debout | montée des hanches au-dessus de l'assise | 0,6 buste | 100 % | 51 % |
+| Élévation de la jambe tendue | montée du genou vers la hanche | 0,3 buste (cuisse ~55°) | 100 % | 69 % |
+| Élévation latérale d'un bras | angle bras-tronc, un bras au choix | 110° | 99 % | 53 % |
+| Élévation des bras en diagonale | angle bras-tronc | 90° | 100 % | 41 % |
+
+À tester devant la caméra : chaise avec accoudoirs (assis-debout), genou plié pendant l'élévation de jambe, geste « paume ouverte » qui pourrait mettre en pause pendant les exercices à un bras. Pictogrammes de profil pour le squat, l'assis-debout et l'élévation de jambe.
