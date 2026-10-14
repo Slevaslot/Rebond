@@ -33,6 +33,8 @@ nonisolated enum ExerciseKind: Sendable {
     case forwardLunge
     /// Lunge to one side, the other leg straight.
     case sideLunge
+    /// Shoulder rotation with the upper arm out at shoulder height and the elbow bent (90/90).
+    case shoulderRotation
     case other
 
     var catalogID: String? {
@@ -46,6 +48,7 @@ nonisolated enum ExerciseKind: Sendable {
         case .hurdleStep: CatalogExercise.hurdleStep.id
         case .forwardLunge: CatalogExercise.forwardLunge.id
         case .sideLunge: CatalogExercise.sideLunge.id
+        case .shoulderRotation: CatalogExercise.shoulderRotation.id
         case .other: nil
         }
     }
@@ -56,7 +59,7 @@ nonisolated struct ExerciseDraft: Sendable {
     @Guide(description: "Nom de l'exercice tel qu'il est écrit ou dessiné sur la feuille, en français.")
     var name: String
 
-    @Guide(description: "squat pour un squat ou une flexion des genoux debout ; lateralRaise pour une élévation latérale des deux bras ensemble (abduction des épaules) ; shoulderAbduction pour l'élévation latérale d'un seul bras sur le côté, au-dessus de l'épaule ; scaption pour une élévation des bras en avant et en diagonale (en Y, dans le plan de l'omoplate, pouces vers le haut) ; sitToStand pour un assis-debout (se lever d'une chaise puis se rasseoir, lever de chaise) ; legRaise pour une élévation de la jambe tendue vers l'avant, debout ; hurdleStep pour une montée de genou debout, genou plié (enjambement d'un obstacle ou d'une haie, genoux hauts, marche sur place en levant les genoux) ; forwardLunge pour une fente avant (un pied devant l'autre, on descend puis on remonte, fente en ligne) ; sideLunge pour une fente latérale (un pas sur le côté en pliant un genou, l'autre jambe tendue, travail des adducteurs) ; other pour tout autre exercice, y compris allongé ou au sol.")
+    @Guide(description: "squat pour un squat ou une flexion des genoux debout ; lateralRaise pour une élévation latérale des deux bras ensemble (abduction des épaules) ; shoulderAbduction pour l'élévation latérale d'un seul bras sur le côté, au-dessus de l'épaule ; scaption pour une élévation des bras en avant et en diagonale (en Y, dans le plan de l'omoplate, pouces vers le haut) ; sitToStand pour un assis-debout (se lever d'une chaise puis se rasseoir, lever de chaise) ; legRaise pour une élévation de la jambe tendue vers l'avant, debout ; hurdleStep pour une montée de genou debout, genou plié (enjambement d'un obstacle ou d'une haie, genoux hauts, marche sur place en levant les genoux) ; forwardLunge pour une fente avant (un pied devant l'autre, on descend puis on remonte, fente en ligne) ; sideLunge pour une fente latérale (un pas sur le côté en pliant un genou, l'autre jambe tendue, travail des adducteurs) ; shoulderRotation pour une rotation interne ou externe de l'épaule debout, bras écarté à hauteur d'épaule et coude plié à 90° (position 90/90), l'avant-bras basculant de la verticale vers l'avant ; other pour tout autre exercice, y compris une rotation d'épaule coude collé au corps, ou un exercice allongé ou au sol.")
     var kind: ExerciseKind
 
     @Guide(description: "Nombre de séries. Vide si la feuille ne le précise pas.", .range(1...10))

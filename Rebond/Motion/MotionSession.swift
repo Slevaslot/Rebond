@@ -460,7 +460,7 @@ nonisolated final class FrameProcessor: NSObject, AVCaptureVideoDataOutputSample
             let frame = analyzer.analyze(pixelBuffer)
             let update = counter.process(frame.measure, at: time.seconds)
             onAnalysis?(frame.skeleton, update)
-            if let gesture = gestures.process(pixelBuffer, body: frame.skeleton) {
+            if exercise.allowsHandGestures, let gesture = gestures.process(pixelBuffer, body: frame.skeleton) {
                 onGesture?(gesture)
             }
             // The background blur keeps only this person sharp.

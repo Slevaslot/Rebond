@@ -67,6 +67,8 @@ extension Correction {
         case .kneesOverFeet: [.leftKnee, .rightKnee, .leftAnkle, .rightAnkle]
         case .raiseHigher, .raiseBothArms: [.leftShoulder, .rightShoulder, .leftElbow, .rightElbow, .leftWrist, .rightWrist]
         case .keepArmsStraight, .keepArmStraight: [.leftElbow, .rightElbow, .leftWrist, .rightWrist]
+        case .turnForearmFurther: [.leftElbow, .rightElbow, .leftWrist, .rightWrist]
+        case .keepElbowUp: [.leftShoulder, .rightShoulder, .leftElbow, .rightElbow]
         case .standUpFully: [.root, .leftHip, .rightHip, .leftKnee, .rightKnee]
         case .lungeFurther, .bendFrontKnee: [.root, .leftHip, .rightHip, .leftKnee, .rightKnee, .leftAnkle, .rightAnkle]
         case .useBothLegs: [.neck, .root, .leftHip, .rightHip, .leftKnee, .rightKnee]

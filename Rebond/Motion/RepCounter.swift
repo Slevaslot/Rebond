@@ -27,6 +27,10 @@ nonisolated enum Correction: Sendable {
     case lungeFurther
     /// Lunges: the hips move without the leading knee bending.
     case bendFrontKnee
+    /// Shoulder rotation: the forearm doesn't turn far enough.
+    case turnForearmFurther
+    /// Shoulder rotation: the elbow drops below shoulder height.
+    case keepElbowUp
 
     var message: LocalizedStringResource {
         switch self {
@@ -48,6 +52,8 @@ nonisolated enum Correction: Sendable {
         case .raiseKneeHigher: "Montez le genou un peu plus haut"
         case .lungeFurther: "Allez un peu plus loin sur le côté"
         case .bendFrontKnee: "Pliez le genou de la jambe qui avance"
+        case .turnForearmFurther: "Basculez l'avant-bras un peu plus loin"
+        case .keepElbowUp: "Gardez le coude à hauteur d'épaule"
         case .keepStandingLegStraight: "Gardez la jambe d'appui tendue"
         }
     }

@@ -21,6 +21,8 @@ nonisolated struct CatalogExercise: Identifiable, Sendable {
         case forwardLunge(targetDrop: Double)
         /// Lunge to one side, either side, in torso lengths of hips shifting sideways.
         case sideLunge(targetShift: Double)
+        /// Shoulder rotation in the 90/90 position, in forearm lengths of the wrist coming down toward the elbow.
+        case shoulderRotation(targetTurn: Double)
     }
 
     /// How the guide pictogram moves its arms.
@@ -58,6 +60,7 @@ nonisolated struct CatalogExercise: Identifiable, Sendable {
         case .kneeRaise(let targetLift): LegRaiseCounter(targetLift: targetLift, style: .bentKnee)
         case .forwardLunge(let targetDrop): LungeCounter(direction: .forward, target: targetDrop)
         case .sideLunge(let targetShift): LungeCounter(direction: .side, target: targetShift)
+        case .shoulderRotation(let targetTurn): ShoulderRotationCounter(targetTurn: targetTurn)
         }
     }
 }
@@ -308,10 +311,36 @@ nonisolated extension CatalogExercise {
         armStyle: .handsToChest
     )
 
+    /// Shoulder rotation in the "90/90" position, either arm: the upper arm out sideways at shoulder height,
+    /// the elbow bent at a right angle, the forearm turns from pointing up to pointing forward, then back up.
+    static let shoulderRotation = CatalogExercise(
+        id: "shoulder-rotation",
+        name: "Rotation de l'épaule",
+        symbol: "figure.arms.open",
+        // 0.6 is the forearm about two thirds of the way from upright to level. UI-PRMD internal-external rotations
+        // (front view, phone at 2–3 m): all correct ones counted, 42% of incorrect ones (elbow dropping,
+        // torso leaning, range too small).
+        analysis: .shoulderRotation(targetTurn: 0.6),
+        highlightedJoints: [.leftShoulder, .leftElbow, .leftWrist, .rightShoulder, .rightElbow, .rightWrist],
+        returnCue: "Remontez l'avant-bras doucement",
+        amplitudeMeaning: "Bascule de l'avant-bras, en % de la bascule visée",
+        // Left upper arm out at shoulder height, forearm up; the right arm hangs.
+        guideRest: standingBody.merging([
+            .leftElbow: CGPoint(x: 0.14, y: 0.2), .leftWrist: CGPoint(x: 0.14, y: 0.02),
+            .rightElbow: CGPoint(x: 0.68, y: 0.35), .rightWrist: CGPoint(x: 0.7, y: 0.5),
+        ]) { $1 },
+        // The forearm points at the camera: seen from the front, the wrist is just in front of the elbow.
+        guideTarget: standingBody.merging([
+            .leftElbow: CGPoint(x: 0.14, y: 0.2), .leftWrist: CGPoint(x: 0.15, y: 0.15),
+            .rightElbow: CGPoint(x: 0.68, y: 0.35), .rightWrist: CGPoint(x: 0.7, y: 0.5),
+        ]) { $1 },
+        armStyle: .straight
+    )
+
     /// Exercises the camera knows how to follow.
     static let all: [CatalogExercise] = [
         .squat, .lateralRaise, .shoulderAbduction, .scaption, .sitToStand, .legRaise, .hurdleStep,
-        .forwardLunge, .sideLunge,
+        .forwardLunge, .sideLunge, .shoulderRotation,
     ]
 
     static func find(_ id: String) -> CatalogExercise? {
@@ -327,5 +356,11 @@ nonisolated extension CatalogExercise {
         case .squat, .forwardLunge: false
         default: true
         }
+    }
+
+    /// Whether the open palm pauses the set. Not for the shoulder rotation: its starting position, one hand raised
+    /// above the shoulder, palm toward the camera, is the gesture itself. The pause button stays.
+    var allowsHandGestures: Bool {
+        if case .shoulderRotation = analysis { false } else { true }
     }
 }

@@ -6,5 +6,5 @@ MOTION="$HERE/../../Rebond/Motion"
 swiftc -O "$HERE/kinect.swift" "$HERE/main.swift" \
     "$MOTION/RepCounter.swift" "$MOTION/RepCycle.swift" "$MOTION/ArmRaiseCounter.swift" \
     "$MOTION/SitToStandCounter.swift" "$MOTION/LegRaiseCounter.swift" "$MOTION/LungeCounter.swift" \
-    "$MOTION/PoseAnalyzer.swift" \
+    "$MOTION/ShoulderRotationCounter.swift" "$MOTION/PoseAnalyzer.swift" \
     -o "$HERE/replay" 2>&1 | grep -E "error|warning" | head -20

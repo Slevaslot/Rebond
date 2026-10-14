@@ -216,3 +216,82 @@ struct MoreCatalogTests {
         #expect(CatalogExercise.sideLunge.fillsGaugeUpward)
     }
 }
+
+extension MoreBody {
+    /// Shoulder rotation in the 90/90 position, right arm: the upper arm out at shoulder height (dropped by
+    /// `elbowDrop` image units), the forearm up and turned forward by `turn` (0 upright, 1 pointing at the camera).
+    /// The left arm hangs.
+    static func rotation(turn: Double, elbowDrop: Double = 0, lean: Double = 0) -> PoseMeasure {
+        let dx = lean * torso
+        let shoulder = CGPoint(x: 0.56 + dx, y: 0.78)
+        let elbow = CGPoint(x: 0.68 + dx, y: 0.78 - elbowDrop)
+        return PoseMeasure(
+            hips: CGPoint(x: 0.5, y: 0.5), neck: CGPoint(x: 0.5 + dx, y: 0.8),
+            leftHip: CGPoint(x: 0.45, y: 0.5), rightHip: CGPoint(x: 0.55, y: 0.5),
+            leftKnee: CGPoint(x: 0.45, y: 0.3), rightKnee: CGPoint(x: 0.55, y: 0.3),
+            leftAnkle: CGPoint(x: 0.45, y: 0.1), rightAnkle: CGPoint(x: 0.55, y: 0.1),
+            leftShoulder: CGPoint(x: 0.44 + dx, y: 0.78), rightShoulder: shoulder,
+            leftElbow: CGPoint(x: 0.42 + dx, y: 0.66), rightElbow: elbow,
+            leftWrist: CGPoint(x: 0.42 + dx, y: 0.56), rightWrist: CGPoint(x: elbow.x, y: elbow.y + 0.1 * (1 - turn))
+        )
+    }
+}
+
+@Suite("Rotation de l'épaule")
+struct ShoulderRotationTests {
+    private func ready() -> Feeder<ShoulderRotationCounter> {
+        var feeder = Feeder(counter: ShoulderRotationCounter(targetTurn: 0.6))
+        feeder.feed(MoreBody.rotation(turn: 0), frames: 10)
+        return feeder
+    }
+
+    private func turn(_ feeder: inout Feeder<ShoulderRotationCounter>, to turn: Double, elbowDrop: Double = 0, lean: Double = 0) {
+        let body = { (turn: Double) in MoreBody.rotation(turn: turn, elbowDrop: elbowDrop * turn, lean: lean * turn) }
+        feeder.move(from: 0, to: turn, seconds: 1, measure: body)
+        feeder.feed(body(turn), frames: 3)
+        feeder.move(from: turn, to: 0, seconds: 1, measure: body)
+        feeder.feed(body(0), frames: 5)
+    }
+
+    @Test func calibratesInTheStartingPosition() {
+        #expect(ready().calibrated)
+    }
+
+    @Test func doesNotCalibrateWithArmsDown() {
+        var feeder = Feeder(counter: ShoulderRotationCounter(targetTurn: 0.6))
+        feeder.feed(Body.arms(left: 15, right: 15), frames: 20)
+        #expect(!feeder.calibrated)
+    }
+
+    @Test func countsRotations() throws {
+        var feeder = ready()
+        turn(&feeder, to: 0.9)
+        turn(&feeder, to: 0.9)
+        #expect(feeder.completed.count == 2)
+        let amplitude = try #require(feeder.completed.first?.amplitude)
+        #expect(amplitude > 1.4 && amplitude < 1.6)
+        #expect(feeder.corrections.isEmpty)
+    }
+
+    @Test func smallTurnIsIncomplete() {
+        var feeder = ready()
+        turn(&feeder, to: 0.4)
+        #expect(feeder.completed.isEmpty)
+        #expect(feeder.incomplete == 1)
+        #expect(feeder.corrections == [.turnForearmFurther])
+    }
+
+    @Test func droppingTheElbowIsRejected() {
+        var feeder = ready()
+        turn(&feeder, to: 0.9, elbowDrop: 0.08)
+        #expect(feeder.completed.isEmpty)
+        #expect(feeder.corrections.contains(.keepElbowUp))
+    }
+
+    @Test func isInTheCatalogWithoutThePalmGesture() {
+        #expect(ExerciseKind.shoulderRotation.catalogID == "shoulder-rotation")
+        #expect(CatalogExercise.shoulderRotation.makeCounter() is ShoulderRotationCounter)
+        #expect(!CatalogExercise.shoulderRotation.allowsHandGestures)
+        #expect(CatalogExercise.squat.allowsHandGestures)
+    }
+}
