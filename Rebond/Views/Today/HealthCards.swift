@@ -3,7 +3,7 @@ import SwiftData
 import SwiftUI
 
 /// The follow-up part of the Résumé page, after Health: small cards side by side (colored title, value,
-/// mini chart, chevron), then "Points clés" sentences. Each card opens its detail in a sheet.
+/// one per row with a mini chart and a chevron. Each card opens its detail in a sheet.
 struct FollowUpSection: View {
     let sessions: [Session]
     let sessionsPerWeek: Int
@@ -25,63 +25,55 @@ struct FollowUpSection: View {
                 .padding(.horizontal, 4)
                 .padding(.top, 10)
 
-            Grid(horizontalSpacing: 14, verticalSpacing: 14) {
-                GridRow {
-                    TileCard(title: "Amplitude", color: .blue) {
-                        detail = .amplitude
-                    } content: {
-                        if let last = progress.amplitude.last {
-                            TileValue(value: "\(Int(last.value.rounded()))", unit: "%")
-                            MiniLine(values: progress.amplitude.filter { $0.series == last.series }.map(\.value), color: .blue)
-                        } else {
-                            TileEmpty()
-                        }
-                    }
-                    TileCard(title: "Douleur", color: .orange) {
-                        detail = .pain
-                    } content: {
-                        if let last = progress.pain.last {
-                            TileValue(value: "\(Int(last.value))", unit: "/ 10")
-                            MiniBars(values: progress.pain.suffix(8).map(\.value), maximum: 10, color: .orange)
-                        } else {
-                            TileEmpty()
-                        }
-                    }
+            let report = WeeklyReport(sessions: data, sessionsPerWeek: sessionsPerWeek)
+            TileCard(title: "Amplitude", color: .blue, trailing: progress.amplitude.last.map { Text($0.series) }) {
+                detail = .amplitude
+            } value: {
+                if let last = progress.amplitude.last {
+                    TileValue(value: "\(Int(last.value.rounded()))", unit: "%")
+                } else {
+                    TileEmpty()
                 }
-                GridRow {
-                    TileCard(title: "Bilan kiné", color: .indigo) {
-                        detail = .report
-                    } content: {
-                        Image(systemName: "doc.richtext")
-                            .font(.system(size: 34))
-                            .foregroundStyle(.indigo)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        Text("7 derniers jours")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                    TileCard(title: "Historique", color: .teal) {
-                        detail = .history
-                    } content: {
-                        TileValue(value: "\(sessions.count)", unit: sessions.count > 1 ? "séances" : "séance")
-                        if let last = sessions.first {
-                            Text(last.date, format: .relative(presentation: .named))
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
+            } chart: {
+                if let last = progress.amplitude.last {
+                    MiniLine(values: progress.amplitude.filter { $0.series == last.series }.map(\.value), color: .blue)
                 }
             }
-
-            let highlights = Highlights(progress: progress, sessions: data)
-            if !highlights.items.isEmpty {
-                Text("Points clés")
-                    .font(.title2.bold())
-                    .padding(.horizontal, 4)
-                    .padding(.top, 10)
-                ForEach(highlights.items) { item in
-                    HighlightCard(item: item)
+            TileCard(title: "Douleur", color: .orange, trailing: Text("Dernière séance")) {
+                detail = .pain
+            } value: {
+                if let last = progress.pain.last {
+                    TileValue(value: "\(Int(last.value))", unit: "/ 10")
+                } else {
+                    TileEmpty()
                 }
+            } chart: {
+                MiniBars(values: progress.pain.suffix(8).map(\.value), maximum: 10, color: .orange)
+            }
+            TileCard(title: "Bilan kiné", color: .indigo, trailing: Text("7 derniers jours")) {
+                detail = .report
+            } value: {
+                TileValue(value: "\(report.sessionsDone)", unit: "sur \(report.sessionsPlanned) séances")
+            } chart: {
+                // Share of the planned work done, per exercise.
+                MiniBars(
+                    values: report.exercises.map { line in
+                        line.isHeld
+                            ? Double(line.heldSeconds) / Double(max(line.plannedSeconds, 1))
+                            : Double(line.completedReps) / Double(max(line.plannedReps, 1))
+                    },
+                    maximum: 1, color: .indigo, highlightAll: true
+                )
+            }
+            TileCard(title: "Historique", color: .teal, trailing: sessions.first.map { Text($0.date, format: .relative(presentation: .named)) }) {
+                detail = .history
+            } value: {
+                TileValue(value: "\(sessions.count)", unit: sessions.count > 1 ? "séances" : "séance")
+            } chart: {
+                // Sessions per week, last 6 weeks.
+                MiniBars(values: progress.weeks.map { Double($0.sessions) },
+                         maximum: Double(max(sessionsPerWeek, progress.weeks.map(\.sessions).max() ?? 1)),
+                         color: .teal, highlightAll: true)
             }
         }
         .sheet(item: $detail) { detail in
@@ -106,30 +98,42 @@ struct FollowUpSection: View {
 
 // MARK: - Tiles
 
-/// A small Health tile: colored title with a chevron, then its content. The whole tile opens the detail.
-private struct TileCard<Content: View>: View {
+/// A full-width Health card: colored title, a detail and a chevron, then the value with a small chart beside it.
+/// The whole card opens the detail.
+private struct TileCard<Value: View, ChartContent: View>: View {
     let title: LocalizedStringKey
     let color: Color
+    let trailing: Text?
     let action: () -> Void
-    @ViewBuilder let content: Content
+    @ViewBuilder let value: Value
+    @ViewBuilder let chart: ChartContent
 
     var body: some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Text(title)
                         .font(.headline)
                         .foregroundStyle(color)
                     Spacer()
+                    if let trailing {
+                        trailing
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
                     Image(systemName: "chevron.right")
                         .font(.footnote.weight(.bold))
                         .foregroundStyle(.tertiary)
                 }
-                Spacer(minLength: 0)
-                content
+                HStack(alignment: .bottom, spacing: 16) {
+                    value
+                    Spacer(minLength: 0)
+                    chart
+                        .frame(width: 130, height: 48)
+                }
             }
             .padding()
-            .frame(maxWidth: .infinity, minHeight: 150, alignment: .topLeading)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 26))
             .contentShape(.rect(cornerRadius: 26))
         }
@@ -175,7 +179,6 @@ private struct MiniLine: View {
         }
         .chartXAxis(.hidden)
         .chartYAxis(.hidden)
-        .frame(height: 30)
         .accessibilityHidden(true)
     }
 }
@@ -184,91 +187,19 @@ private struct MiniBars: View {
     let values: [Double]
     let maximum: Double
     let color: Color
+    /// Every bar in color; otherwise only the last one, as Health does for "today".
+    var highlightAll = false
 
     var body: some View {
         Chart(Array(values.enumerated()), id: \.offset) { item in
             BarMark(x: .value("n", item.offset), y: .value("v", max(item.element, 0.3)))
-                .foregroundStyle(item.offset == values.count - 1 ? color : Color(.tertiaryLabel))
+                .foregroundStyle(highlightAll || item.offset == values.count - 1 ? color : Color(.tertiaryLabel))
                 .clipShape(.rect(cornerRadius: 2))
         }
         .chartXAxis(.hidden)
         .chartYAxis(.hidden)
         .chartYScale(domain: 0...maximum)
-        .frame(height: 30)
         .accessibilityHidden(true)
-    }
-}
-
-// MARK: - Highlights
-
-/// Trend sentences, as Health's "Points clés".
-struct Highlights {
-    struct Item: Identifiable {
-        let id = UUID()
-        let title: LocalizedStringKey
-        let symbol: String
-        let color: Color
-        let text: Text
-    }
-
-    var items: [Item] = []
-
-    init(progress: ProgressData, sessions: [WeeklyReport.SessionData]) {
-        // Amplitude: first and last measure of the main camera exercise.
-        if let series = progress.amplitude.first?.series {
-            let points = progress.amplitude.filter { $0.series == series }
-            if let first = points.first, let last = points.last, points.count > 1 {
-                let change = Int((last.value - first.value).rounded())
-                if change != 0 {
-                    items.append(Item(
-                        title: "Amplitude", symbol: "arrow.up.right", color: .blue,
-                        text: change > 0
-                            ? Text("Votre amplitude au \(series.lowercased()) est passée de \(Int(first.value.rounded())) % à \(Int(last.value.rounded())) % de l'objectif.")
-                            : Text("Votre amplitude au \(series.lowercased()) a baissé de \(abs(change)) points. Parlez-en à votre kiné si cela continue.")
-                    ))
-                }
-            }
-        }
-        // Pain: average of the last 7 days against the 7 days before.
-        let now = Date.now
-        func average(from: Int, to: Int) -> Double? {
-            let start = now.addingTimeInterval(-Double(from) * 86_400), end = now.addingTimeInterval(-Double(to) * 86_400)
-            let pains = sessions.filter { $0.date > start && $0.date <= end }.map { Double($0.pain) }
-            return pains.isEmpty ? nil : pains.reduce(0, +) / Double(pains.count)
-        }
-        if let recent = average(from: 7, to: 0), let before = average(from: 14, to: 7), abs(recent - before) >= 0.5 {
-            let format = FloatingPointFormatStyle<Double>.number.precision(.fractionLength(1))
-            items.append(Item(
-                title: "Douleur", symbol: recent < before ? "arrow.down.right" : "arrow.up.right", color: .orange,
-                text: Text("Votre douleur moyenne est passée de \(before.formatted(format)) à \(recent.formatted(format)) sur 10 cette semaine.")
-            ))
-        }
-        // Regularity: sessions in the last 7 days.
-        let week = sessions.filter { $0.date > now.addingTimeInterval(-7 * 86_400) }.count
-        if week > 0 {
-            items.append(Item(
-                title: "Régularité", symbol: "calendar", color: .green,
-                text: Text("Vous avez fait \(week) séances ces 7 derniers jours.")
-            ))
-        }
-    }
-}
-
-private struct HighlightCard: View {
-    let item: Highlights.Item
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label(item.title, systemImage: item.symbol)
-                .font(.headline)
-                .foregroundStyle(item.color)
-            item.text
-                .font(.title3.weight(.semibold))
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 26))
     }
 }
 
