@@ -27,6 +27,8 @@ nonisolated enum ExerciseKind: Sendable {
     case sitToStand
     /// Standing, one leg raised in front with the knee straight.
     case legRaise
+    /// Standing, one knee raised bent, as when stepping over a hurdle.
+    case hurdleStep
     case other
 
     var catalogID: String? {
@@ -37,6 +39,7 @@ nonisolated enum ExerciseKind: Sendable {
         case .scaption: CatalogExercise.scaption.id
         case .sitToStand: CatalogExercise.sitToStand.id
         case .legRaise: CatalogExercise.legRaise.id
+        case .hurdleStep: CatalogExercise.hurdleStep.id
         case .other: nil
         }
     }
@@ -47,7 +50,7 @@ nonisolated struct ExerciseDraft: Sendable {
     @Guide(description: "Nom de l'exercice tel qu'il est écrit ou dessiné sur la feuille, en français.")
     var name: String
 
-    @Guide(description: "squat pour un squat ou une flexion des genoux debout ; lateralRaise pour une élévation latérale des deux bras ensemble (abduction des épaules) ; shoulderAbduction pour l'élévation latérale d'un seul bras sur le côté, au-dessus de l'épaule ; scaption pour une élévation des bras en avant et en diagonale (en Y, dans le plan de l'omoplate, pouces vers le haut) ; sitToStand pour un assis-debout (se lever d'une chaise puis se rasseoir, lever de chaise) ; legRaise pour une élévation de la jambe tendue vers l'avant, debout ; other pour tout autre exercice, y compris allongé ou au sol.")
+    @Guide(description: "squat pour un squat ou une flexion des genoux debout ; lateralRaise pour une élévation latérale des deux bras ensemble (abduction des épaules) ; shoulderAbduction pour l'élévation latérale d'un seul bras sur le côté, au-dessus de l'épaule ; scaption pour une élévation des bras en avant et en diagonale (en Y, dans le plan de l'omoplate, pouces vers le haut) ; sitToStand pour un assis-debout (se lever d'une chaise puis se rasseoir, lever de chaise) ; legRaise pour une élévation de la jambe tendue vers l'avant, debout ; hurdleStep pour une montée de genou debout, genou plié (enjambement d'un obstacle ou d'une haie, genoux hauts, marche sur place en levant les genoux) ; other pour tout autre exercice, y compris allongé ou au sol.")
     var kind: ExerciseKind
 
     @Guide(description: "Nombre de séries. Vide si la feuille ne le précise pas.", .range(1...10))

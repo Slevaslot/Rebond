@@ -2,7 +2,7 @@ import Foundation
 import simd
 
 // Replays UI-PRMD Kinect repetitions through the app's real counters, seen from the front.
-// usage: replay <root of correct or incorrect> <c|i> <movement 1|5|6|7|10> <target> [verbose]
+// usage: replay <root of correct or incorrect> <c|i> <movement 1|2|5|6|7|10> <target> [verbose]
 // Environment: PERSP=<cm> phone distance (default 250, 0 = orthographic), DIAG=1 measure distributions,
 // DEBUG=sXXeYY frame-by-frame trace of one repetition, ORDER=<zxy…> Euler order (see kinect.swift).
 let a = CommandLine.arguments
@@ -36,6 +36,7 @@ func makeCounter() -> any MovementCounter {
     switch movement {
     case 1: RepCounter(targetDepth: target)
     case 5: SitToStandCounter(targetRise: target)
+    case 2: LegRaiseCounter(targetLift: target, style: .bentKnee)
     case 6: LegRaiseCounter(targetLift: target)
     default: ArmRaiseCounter(targetAngle: target, arms: .either)
     }

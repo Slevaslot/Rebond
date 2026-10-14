@@ -21,6 +21,8 @@ nonisolated enum Correction: Sendable {
     case keepLegStraight
     /// Leg raises: the leg the patient stands on bends.
     case keepStandingLegStraight
+    /// Hurdle step: the knee doesn't come up high enough.
+    case raiseKneeHigher
 
     var message: LocalizedStringResource {
         switch self {
@@ -39,6 +41,7 @@ nonisolated enum Correction: Sendable {
         case .useBothLegs: "Appuyez-vous sur les deux jambes"
         case .raiseLegHigher: "Levez la jambe un peu plus haut"
         case .keepLegStraight: "Gardez la jambe tendue"
+        case .raiseKneeHigher: "Montez le genou un peu plus haut"
         case .keepStandingLegStraight: "Gardez la jambe d'appui tendue"
         }
     }

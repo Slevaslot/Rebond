@@ -69,7 +69,7 @@ extension Correction {
         case .keepArmsStraight, .keepArmStraight: [.leftElbow, .rightElbow, .leftWrist, .rightWrist]
         case .standUpFully: [.root, .leftHip, .rightHip, .leftKnee, .rightKnee]
         case .useBothLegs: [.neck, .root, .leftHip, .rightHip, .leftKnee, .rightKnee]
-        case .raiseLegHigher, .keepLegStraight, .keepStandingLegStraight: [.leftHip, .rightHip, .leftKnee, .rightKnee, .leftAnkle, .rightAnkle]
+        case .raiseLegHigher, .keepLegStraight, .keepStandingLegStraight, .raiseKneeHigher: [.leftHip, .rightHip, .leftKnee, .rightKnee, .leftAnkle, .rightAnkle]
         case .slowDown: []
         }
     }

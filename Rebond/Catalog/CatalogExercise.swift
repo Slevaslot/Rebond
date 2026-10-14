@@ -15,6 +15,8 @@ nonisolated struct CatalogExercise: Identifiable, Sendable {
         case sitToStand(targetRise: Double)
         /// One leg raised in front, in torso lengths of the knee coming up toward the hip.
         case legRaise(targetLift: Double)
+        /// One knee raised, bent, either side: the same lift as the leg raise.
+        case kneeRaise(targetLift: Double)
     }
 
     /// How the guide pictogram moves its arms.
@@ -49,6 +51,7 @@ nonisolated struct CatalogExercise: Identifiable, Sendable {
         case .oneArmRaise(let targetAngle): ArmRaiseCounter(targetAngle: targetAngle, arms: .either)
         case .sitToStand(let targetRise): SitToStandCounter(targetRise: targetRise)
         case .legRaise(let targetLift): LegRaiseCounter(targetLift: targetLift)
+        case .kneeRaise(let targetLift): LegRaiseCounter(targetLift: targetLift, style: .bentKnee)
         }
     }
 }
@@ -218,8 +221,32 @@ nonisolated extension CatalogExercise {
         armStyle: .straight
     )
 
+    /// Hurdle step: one knee raised, bent, as when stepping over an obstacle, then the foot set back down;
+    /// one leg then the other. Works the hip and the balance on the standing leg.
+    static let hurdleStep = CatalogExercise(
+        id: "hurdle-step",
+        name: "Montée de genou",
+        symbol: "figure.step.training",
+        // 0.45 is the thigh at about 60° seen from hip height, short of level: a partial range for older patients.
+        // UI-PRMD hurdle steps (front view, phone at 2–3 m): 94% of correct ones counted, 41% of incorrect ones
+        // (knee not high enough, standing leg bending, torso leaning).
+        analysis: .kneeRaise(targetLift: 0.45),
+        highlightedJoints: [.leftHip, .leftKnee, .leftAnkle, .rightHip, .rightKnee, .rightAnkle],
+        returnCue: "Reposez le pied doucement",
+        amplitudeMeaning: "Hauteur du genou, en % de la hauteur visée",
+        guideRest: standingBody.merging([
+            .leftWrist: CGPoint(x: 0.28, y: 0.5), .rightWrist: CGPoint(x: 0.72, y: 0.5),
+        ]) { $1 },
+        // The thigh comes toward the camera and the shin hangs: the knee nearly at hip height, the foot under it.
+        guideTarget: standingBody.merging([
+            .leftWrist: CGPoint(x: 0.24, y: 0.47), .rightWrist: CGPoint(x: 0.72, y: 0.5),
+            .leftKnee: CGPoint(x: 0.38, y: 0.56), .leftAnkle: CGPoint(x: 0.4, y: 0.74),
+        ]) { $1 },
+        armStyle: .straight
+    )
+
     /// Exercises the camera knows how to follow.
-    static let all: [CatalogExercise] = [.squat, .lateralRaise, .shoulderAbduction, .scaption, .sitToStand, .legRaise]
+    static let all: [CatalogExercise] = [.squat, .lateralRaise, .shoulderAbduction, .scaption, .sitToStand, .legRaise, .hurdleStep]
 
     static func find(_ id: String) -> CatalogExercise? {
         all.first { $0.id == id }

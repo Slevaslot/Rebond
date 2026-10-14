@@ -12,7 +12,17 @@ import Foundation
 /// A bent knee can't be seen in the knee angle from the front (hip, knee and ankle stay on one vertical line),
 /// but in the heights: once the thigh is well up, a straight leg brings the ankle up at least as much as the knee,
 /// while a shin left hanging keeps the ankle low.
+///
+/// The hurdle step (knee raise) is the same movement with the knee bent: the knee is followed the same way,
+/// the bent knee is expected, and leaning the torso forward is checked instead.
 nonisolated struct LegRaiseCounter: MovementCounter {
+    enum Style: Sendable {
+        /// Straight leg raise: the knee must stay straight.
+        case straightLeg
+        /// Hurdle step: the knee comes up bent, as when stepping over an obstacle.
+        case bentKnee
+    }
+
     private struct Leg {
         /// Hip height above the knee, standing.
         let thigh: Double
@@ -34,6 +44,7 @@ nonisolated struct LegRaiseCounter: MovementCounter {
 
     /// How far the knee must come up toward the hip for a complete repetition, in torso lengths.
     let targetLift: Double
+    let style: Style
 
     /// Measures (about 0.5 s) needed while standing still to learn the standing position.
     private let stillSamples = 8
@@ -54,6 +65,11 @@ nonisolated struct LegRaiseCounter: MovementCounter {
     /// Torso leaning to one side over the standing leg, compared with standing, in torso lengths.
     /// UI-PRMD: correct raises up to 0.22 (shifting the weight is normal), incorrect ones up to 0.5.
     private let maxSideLean = 0.25
+    /// Bent knee: UI-PRMD correct hurdle steps lean up to 0.19, incorrect ones up to 0.6.
+    private let maxSideLeanBentKnee = 0.2
+    /// Bent knee: leaning forward makes the torso look shorter, seen from the front. UI-PRMD hurdle steps:
+    /// correct ones keep at least 93% of the standing length, incorrect ones drop to 61%.
+    private let minTorsoRatio = 0.88
     /// Below this fraction of the standing torso length, Vision has lost the body: the frame is ignored.
     private let collapsedTorsoRatio = 0.5
     private let lostTimeout = 1.5
@@ -68,8 +84,9 @@ nonisolated struct LegRaiseCounter: MovementCounter {
     private var lastMeasureTime = 0.0
     private var progress = 0.0
 
-    init(targetLift: Double) {
+    init(targetLift: Double, style: Style = .straightLeg) {
         self.targetLift = targetLift
+        self.style = style
         cycle = RepCycle(
             start: targetLift * 0.35,
             target: targetLift,
@@ -77,7 +94,7 @@ nonisolated struct LegRaiseCounter: MovementCounter {
             reversalMargin: targetLift * 0.3,
             noise: targetLift * 0.6,
             minDuration: 1.5,
-            shortfall: .raiseLegHigher
+            shortfall: style == .straightLeg ? .raiseLegHigher : .raiseKneeHigher
         )
     }
 
@@ -166,8 +183,11 @@ nonisolated struct LegRaiseCounter: MovementCounter {
         if (stance.hipsHeight - measure.hips.y) / stance.torsoLength > maxHipsDrop {
             return .keepStandingLegStraight
         }
-        if abs(measure.sideLean - stance.lean) > maxSideLean {
+        if abs(measure.sideLean - stance.lean) > (style == .bentKnee ? maxSideLeanBentKnee : maxSideLean) {
             return .keepBackStraight
+        }
+        if style == .bentKnee {
+            return measure.torsoLength / stance.torsoLength < minTorsoRatio ? .keepBackStraight : nil
         }
         // The knee is judged on the way up only: many lower the leg bending the knee a little
         // (UI-PRMD correct raises included), which doesn't take anything from the raise.
