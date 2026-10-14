@@ -86,10 +86,17 @@ struct ShareSheet: UIViewControllerRepresentable {
 
 /// Every saved session, most recent first.
 struct HistoryView: View {
+    var sessionsPerWeek = 3
     @Query(sort: \Session.date, order: .reverse) private var sessions: [Session]
 
     var body: some View {
-        List(sessions) { session in
+        List {
+            Section("Séances par semaine") {
+                RegularityChart(data: ProgressData(sessions: sessions.map(\.reportData), sessionsPerWeek: sessionsPerWeek))
+                    .frame(height: 180)
+                    .padding(.vertical, 6)
+            }
+            ForEach(sessions) { session in
             Section {
                 LabeledContent {
                     Text("\(session.pain) / 10")
@@ -103,7 +110,8 @@ struct HistoryView: View {
             } header: {
                 Text(session.date, format: .dateTime.weekday(.wide).day().month(.wide))
             }
+            }
         }
-        .navigationTitle("Historique")
+        .navigationTitle("Régularité")
     }
 }

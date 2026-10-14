@@ -25,6 +25,8 @@ struct RootView: View {
     @State private var pickedPhoto: PhotosPickerItem?
     @State private var savedProgram = 0
     @State private var openedReport: URL?
+    /// Set while the program being reviewed comes from the physiotherapist.
+    @State private var prescriber: String?
     @State private var showingPaywall = false
 
     var body: some View {
@@ -134,6 +136,7 @@ struct RootView: View {
         #endif
         if let transfer = ProgramTransfer(url: url) {
             role = AppRole.patient.rawValue
+            prescriber = transfer.k ?? ""
             let notice: LocalizedStringKey = if let name = transfer.k {
                 "Programme prescrit par \(name). Vérifiez-le puis enregistrez-le."
             } else {
@@ -150,6 +153,11 @@ struct RootView: View {
     }
 
     private func save(_ program: EditableProgram) {
+        // A program prescribed by the physiotherapist shows what changed on the Résumé page.
+        if let prescriber {
+            ProgramChange.record(from: programs.first, to: program, by: prescriber.isEmpty ? nil : prescriber)
+            self.prescriber = nil
+        }
         Program.replaceAll(with: program, in: context)
         draft = nil
         savedProgram += 1
@@ -185,6 +193,8 @@ private struct ConnectedPatient: ViewModifier {
                             notice: pending.program.k.map { "\($0) a modifié votre programme. Vérifiez-le puis enregistrez-le." }
                                 ?? "Votre kiné a modifié votre programme. Vérifiez-le puis enregistrez-le."
                         ) { program in
+                            let current = try? context.fetch(FetchDescriptor<Program>(sortBy: [SortDescriptor(\.createdAt, order: .reverse)])).first
+                            ProgramChange.record(from: current, to: program, by: pending.program.k)
                             Program.replaceAll(with: program, in: context)
                             server.settlePendingProgram()
                             Task { await server.pushReport(context: context) }

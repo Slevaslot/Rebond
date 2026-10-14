@@ -86,6 +86,14 @@ private struct AboutView: View {
             }
             #if DEBUG
             Section("Démo") {
+                Button("Simuler un changement du kiné") {
+                    if let program = try? context.fetch(FetchDescriptor<Program>(sortBy: [SortDescriptor(\.createdAt, order: .reverse)])).first {
+                        var changed = EditableProgram(program)
+                        if !changed.exercises.isEmpty { changed.exercises[0].reps += 2 }
+                        ProgramChange.record(from: program, to: changed, by: "M. Martin")
+                        Program.replaceAll(with: changed, in: context)
+                    }
+                }
                 Button("Charger les données de démo") { confirmingDemo = true }
                     .confirmationDialog("Remplacer le programme et l'historique par les données de démo ?", isPresented: $confirmingDemo, titleVisibility: .visible) {
                         Button("Remplacer", role: .destructive) { DemoData.load(into: context) }

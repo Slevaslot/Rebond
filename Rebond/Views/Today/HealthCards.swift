@@ -7,6 +7,7 @@ import SwiftUI
 struct FollowUpSection: View {
     let sessions: [Session]
     let sessionsPerWeek: Int
+    let week: WeekProgress
 
     enum Detail: String, Identifiable {
         case amplitude, pain, report, history
@@ -25,7 +26,12 @@ struct FollowUpSection: View {
                 .padding(.horizontal, 4)
                 .padding(.top, 10)
 
-            let report = WeeklyReport(sessions: data, sessionsPerWeek: sessionsPerWeek)
+            // Régularité and the history are one card: this week at a glance, the sessions in the detail.
+            Button { detail = .history } label: {
+                WeekCard(week: week, showsChevron: true)
+            }
+            .buttonStyle(.plain)
+
             TileCard(title: "Amplitude", color: .blue, trailing: progress.amplitude.last.map { Text($0.series) }) {
                 detail = .amplitude
             } value: {
@@ -50,31 +56,26 @@ struct FollowUpSection: View {
             } chart: {
                 MiniBars(values: progress.pain.suffix(8).map(\.value), maximum: 10, color: .orange)
             }
-            TileCard(title: "Bilan kiné", color: .indigo, trailing: Text("7 derniers jours")) {
-                detail = .report
-            } value: {
-                TileValue(value: "\(report.sessionsDone)", unit: "sur \(report.sessionsPlanned) séances")
-            } chart: {
-                // Share of the planned work done, per exercise.
-                MiniBars(
-                    values: report.exercises.map { line in
-                        line.isHeld
-                            ? Double(line.heldSeconds) / Double(max(line.plannedSeconds, 1))
-                            : Double(line.completedReps) / Double(max(line.plannedReps, 1))
-                    },
-                    maximum: 1, color: .indigo, highlightAll: true
-                )
+
+            // A plain row, like Health's "Afficher toutes les données Santé".
+            Button { detail = .report } label: {
+                HStack(spacing: 14) {
+                    Image(systemName: "paperplane.fill")
+                        .font(.title2)
+                        .foregroundStyle(.indigo)
+                        .frame(width: 32)
+                    Text("Envoyer le bilan à mon kiné")
+                        .font(.body)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.footnote.weight(.bold))
+                        .foregroundStyle(.tertiary)
+                }
+                .padding()
+                .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 26))
+                .contentShape(.rect(cornerRadius: 26))
             }
-            TileCard(title: "Historique", color: .teal, trailing: sessions.first.map { Text($0.date, format: .relative(presentation: .named)) }) {
-                detail = .history
-            } value: {
-                TileValue(value: "\(sessions.count)", unit: sessions.count > 1 ? "séances" : "séance")
-            } chart: {
-                // Sessions per week, last 6 weeks.
-                MiniBars(values: progress.weeks.map { Double($0.sessions) },
-                         maximum: Double(max(sessionsPerWeek, progress.weeks.map(\.sessions).max() ?? 1)),
-                         color: .teal, highlightAll: true)
-            }
+            .buttonStyle(.plain)
         }
         .sheet(item: $detail) { detail in
             NavigationStack {
@@ -83,7 +84,7 @@ struct FollowUpSection: View {
                     case .amplitude: MetricDetailView(metric: .amplitude, sessions: data, sessionsPerWeek: sessionsPerWeek)
                     case .pain: MetricDetailView(metric: .pain, sessions: data, sessionsPerWeek: sessionsPerWeek)
                     case .report: ReportView()
-                    case .history: HistoryView()
+                    case .history: HistoryView(sessionsPerWeek: sessionsPerWeek)
                     }
                 }
                 .toolbar {
@@ -179,6 +180,7 @@ private struct MiniLine: View {
         }
         .chartXAxis(.hidden)
         .chartYAxis(.hidden)
+        .chartYScale(domain: (values.min() ?? 0) - 5 ... (values.max() ?? 1) + 5)
         .accessibilityHidden(true)
     }
 }

@@ -14,6 +14,7 @@ struct TodayView: View {
     @AppStorage(PainAlertCard.dismissedKey) private var dismissedPainAlert: Double = 0
     @State private var restoredAlert = 0
     @State private var showingSettings = false
+    @State private var showingReport = false
 
     var body: some View {
         NavigationStack {
@@ -29,6 +30,14 @@ struct TodayView: View {
             .toolbarVisibility(.hidden, for: .navigationBar)
             .sheet(isPresented: $showingSettings) {
                 SettingsView()
+            }
+            .sheet(isPresented: $showingReport) {
+                NavigationStack {
+                    ReportView()
+                        .toolbar {
+                            Button("Fermer", systemImage: "xmark", role: .close) { showingReport = false }
+                        }
+                }
             }
         }
     }
@@ -73,13 +82,12 @@ struct TodayView: View {
         return ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 header
-                PainAlertCard(sessions: sessions)
+                ProgramChangeCard { router.tab = .program }
+                PainAlertCard(sessions: sessions) { showingReport = true }
 
                 SessionCard(program: program) { router.startWorkout() }
 
-                WeekCard(week: week)
-
-                FollowUpSection(sessions: sessions, sessionsPerWeek: program.sessionsPerWeek)
+                FollowUpSection(sessions: sessions, sessionsPerWeek: program.sessionsPerWeek, week: week)
             }
             .padding(.horizontal)
             .padding(.bottom)
@@ -108,7 +116,7 @@ struct TodayView: View {
 // MARK: - Cards
 
 /// A Health-style card: a colored category label with an optional trailing detail, then the content.
-private struct SummaryCard<Content: View, Trailing: View>: View {
+struct SummaryCard<Content: View, Trailing: View>: View {
     let title: Text
     let systemImage: String?
     var icon: CatalogExercise?
@@ -154,7 +162,7 @@ private struct SummaryCard<Content: View, Trailing: View>: View {
 }
 
 /// A big rounded value with its unit, as in Health ("3 717 pas").
-private struct BigValue: View {
+struct BigValue: View {
     let value: String
     let unit: LocalizedStringKey
 
@@ -268,12 +276,20 @@ private struct ExerciseBadge: View {
 }
 
 /// This week: sessions done against the goal, with a bar per day (today highlighted), like Health's step card.
-private struct WeekCard: View {
+struct WeekCard: View {
     let week: WeekProgress
+    var showsChevron = false
 
     var body: some View {
         SummaryCard(title: Text("Régularité"), systemImage: "checkmark.circle.fill", color: .mint) {
-            Text("Cette semaine")
+            HStack(spacing: 8) {
+                Text("Cette semaine")
+                if showsChevron {
+                    Image(systemName: "chevron.right")
+                        .font(.footnote.weight(.bold))
+                        .foregroundStyle(.tertiary)
+                }
+            }
         } content: {
             HStack(alignment: .bottom) {
                 VStack(alignment: .leading, spacing: 2) {
@@ -309,60 +325,6 @@ private struct WeekCard: View {
     }
 }
 
-/// After a painful session, a calm card with a yellow band, like Health's notifications. Dismissable.
-private struct PainAlertCard: View {
-    let sessions: [Session]
-    static let dismissedKey = "dismissedPainAlert"
-    @AppStorage(dismissedKey) private var dismissed: Double = 0
-
-    private var painful: Session? {
-        guard let last = sessions.first,
-              last.pain >= WeeklyReport.highPain,
-              last.date.timeIntervalSinceReferenceDate > dismissed,
-              last.date > Date.now.addingTimeInterval(-7 * 86_400)
-        else { return nil }
-        return last
-    }
-
-    var body: some View {
-        if let painful {
-            VStack(alignment: .leading, spacing: 0) {
-                HStack {
-                    Label("Douleur forte", systemImage: "exclamationmark.triangle.fill")
-                        .font(.headline)
-                    Spacer()
-                    Text(painful.date, format: .dateTime.day().month())
-                        .font(.subheadline.weight(.semibold))
-                    Button("Masquer", systemImage: "xmark") {
-                        withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) {
-                            dismissed = painful.date.timeIntervalSinceReferenceDate
-                        }
-                    }
-                    .labelStyle(.iconOnly)
-                    .buttonStyle(.glass)
-                    .buttonBorderShape(.circle)
-                }
-                .foregroundStyle(.black)
-                .padding()
-                .background(.yellow)
-                HStack(alignment: .top, spacing: 14) {
-                    Image(systemName: "heart.text.square")
-                        .font(.title)
-                        .foregroundStyle(.orange)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Douleur de \(painful.pain) sur 10 à la dernière séance.")
-                            .font(.headline)
-                        Text("Si la douleur est forte ou inhabituelle, faites une pause et parlez-en à votre kiné.")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .padding()
-            }
-            .background(Color(.secondarySystemGroupedBackground))
-            .clipShape(.rect(cornerRadius: 26))
-        }
-    }
-}
 
 /// The patient's initials, or a person symbol, as Health's profile button.
 private struct ProfileBadge: View {
