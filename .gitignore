@@ -17,3 +17,4 @@ build/
 *.p12
 *.mobileprovision
 Server/demo-data.json
+Tools/Replay/replay
