@@ -14,6 +14,7 @@ struct RootView: View {
     /// The program being reviewed before it is saved: read from a photo, typed, or prescribed.
     private struct Draft: Identifiable {
         enum Content {
+            case message
             case photo(UIImage)
             case program(EditableProgram, notice: LocalizedStringKey?)
         }
@@ -42,6 +43,8 @@ struct RootView: View {
         .sheet(item: $draft) { draft in
             NavigationStack {
                 switch draft.content {
+                case .message:
+                    MessageReadingView(onSave: save)
                 case .photo(let image):
                     SheetReadingView(photo: image, onSave: save)
                 case .program(let program, let notice):
@@ -117,6 +120,9 @@ struct RootView: View {
             if router.importSource == .manual {
                 router.importSource = nil
                 draft = Draft(content: .program(EditableProgram(), notice: nil))
+            } else if router.importSource == .message {
+                router.importSource = nil
+                draft = Draft(content: .message)
             }
         }
         .onChange(of: pickedPhoto) {

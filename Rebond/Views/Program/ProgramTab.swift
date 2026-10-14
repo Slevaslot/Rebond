@@ -17,14 +17,16 @@ struct ProgramTab: View {
                     content(program)
                 } else {
                     ContentUnavailableView {
-                        Label("Aucun programme", systemImage: "calendar")
+                        Label("Votre programme vient de votre kiné", systemImage: "stethoscope")
                     } description: {
-                        Text("Scannez la feuille de votre kiné pour créer votre programme.")
+                        Text("Collez le message où il vous décrit vos exercices, ou scannez sa feuille.")
                     } actions: {
-                        Button("Scanner ma feuille") { router.addProgram(from: .scan) }
-                            .buttonStyle(.borderedProminent)
-                            .buttonBorderShape(.capsule)
-                        Button("Saisir à la main") { router.addProgram(from: .manual) }
+                        Button("Coller son message", systemImage: "text.bubble") { router.addProgram(from: .message) }
+                            .buttonStyle(.glassProminent)
+                            .controlSize(.large)
+                        Button("Scanner sa feuille", systemImage: "doc.viewfinder") { router.addProgram(from: .scan) }
+                            .buttonStyle(.glass)
+                            .controlSize(.large)
                     }
                 }
             }
@@ -68,10 +70,11 @@ struct ProgramTab: View {
                     } label: {
                         Label("Modifier", systemImage: "pencil").frame(maxWidth: .infinity)
                     }
-                    Button {
-                        router.addProgram(from: .scan)
+                    Menu {
+                        Button("Coller le message du kiné", systemImage: "text.bubble") { router.addProgram(from: .message) }
+                        Button("Scanner sa feuille", systemImage: "doc.viewfinder") { router.addProgram(from: .scan) }
                     } label: {
-                        Label("Scanner", systemImage: "doc.viewfinder").frame(maxWidth: .infinity)
+                        Label("Nouveau", systemImage: "plus").frame(maxWidth: .infinity)
                     }
                 }
                 .lineLimit(1)
