@@ -73,12 +73,15 @@ struct RootView: View {
         }
     }
 
+    @Namespace private var workoutTransition
+
     private var patientTabs: some View {
         @Bindable var router = router
 
         return TabView(selection: $router.tab) {
             Tab("Aujourd'hui", systemImage: "sun.max", value: .today) {
                 TodayView()
+                    .environment(\.workoutTransition, workoutTransition)
             }
             Tab("Programme", systemImage: "calendar", value: .program) {
                 ProgramTab()
@@ -88,6 +91,8 @@ struct RootView: View {
         .fullScreenCover(isPresented: $router.isWorkoutPresented) {
             if let program = programs.first {
                 WorkoutView(program: program)
+                    // The session grows out of the Commencer button.
+                    .navigationTransition(.zoom(sourceID: WorkoutTransition.sourceID, in: workoutTransition))
             }
         }
         .fullScreenCover(isPresented: Binding(
@@ -206,3 +211,12 @@ private struct ConnectedPatient: ViewModifier {
     }
 }
 #endif
+
+/// The zoom from the Commencer button to the session.
+enum WorkoutTransition {
+    static let sourceID = "startWorkout"
+}
+
+extension EnvironmentValues {
+    @Entry var workoutTransition: Namespace.ID?
+}

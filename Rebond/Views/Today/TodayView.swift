@@ -183,6 +183,7 @@ struct BigValue: View {
 private struct SessionCard: View {
     let program: Program
     let onStart: () -> Void
+    @Environment(\.workoutTransition) private var workoutTransition
 
     /// The exercises stay folded to keep the page light; tapping the card unfolds them in place.
     @State private var expanded = false
@@ -243,6 +244,7 @@ private struct SessionCard: View {
                 .controlSize(.extraLarge)
                 // A soft glow lifts the main action off the card.
                 .shadow(color: Color.accentColor.opacity(0.45), radius: 14, y: 6)
+                .modifier(WorkoutSource(namespace: workoutTransition))
             }
         }
         // Tapping anywhere on the card (except Commencer) shows or hides the exercises.
@@ -254,6 +256,19 @@ private struct SessionCard: View {
             withAnimation { expanded.toggle() }
         }
         .sensoryFeedback(.selection, trigger: expanded)
+    }
+}
+
+/// Marks the Commencer button as the start of the zoom into the session.
+private struct WorkoutSource: ViewModifier {
+    let namespace: Namespace.ID?
+
+    func body(content: Content) -> some View {
+        if let namespace {
+            content.matchedTransitionSource(id: WorkoutTransition.sourceID, in: namespace)
+        } else {
+            content
+        }
     }
 }
 
