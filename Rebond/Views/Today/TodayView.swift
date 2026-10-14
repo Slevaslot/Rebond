@@ -230,7 +230,7 @@ private struct SessionCard: View {
                             .accessibilityElement(children: .combine)
                         }
                     }
-                    .transition(.asymmetric(insertion: .push(from: .top).combined(with: .opacity), removal: .opacity))
+                    .transition(.opacity.combined(with: .scale(scale: 0.97, anchor: .top)))
                 }
 
                 Button(action: onStart) {
@@ -276,7 +276,8 @@ private struct ExerciseBadge: View {
 
 
 
-/// The patient's initials, or a person symbol, as Health's profile button.
+/// The patient's initials, or a person symbol, as Health's profile button:
+/// a soft gradient disc inside a Liquid Glass ring.
 private struct ProfileBadge: View {
     let name: String
 
@@ -288,15 +289,21 @@ private struct ProfileBadge: View {
         Group {
             if initials.isEmpty {
                 Image(systemName: "person.fill")
-                    .font(.headline)
+                    .font(.body.weight(.semibold))
             } else {
                 Text(initials)
-                    .font(.title3.weight(.semibold))
+                    .font(.body.weight(.semibold))
             }
         }
         .foregroundStyle(.white)
-        .frame(width: 50, height: 50)
-        .background(Color.accentColor.gradient, in: .circle)
+        .frame(width: 38, height: 38)
+        .background(
+            LinearGradient(colors: [Color(red: 0.66, green: 0.70, blue: 0.96), Color(red: 0.43, green: 0.47, blue: 0.86)],
+                           startPoint: .top, endPoint: .bottom),
+            in: .circle
+        )
+        .padding(4)
+        .glassEffect(.regular.interactive(), in: .circle)
     }
 }
 

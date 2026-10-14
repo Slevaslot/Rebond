@@ -21,10 +21,18 @@ struct FollowUpSection: View {
     var body: some View {
         let progress = ProgressData(sessions: data, sessionsPerWeek: sessionsPerWeek)
         VStack(alignment: .leading, spacing: 14) {
-            Text("Suivi")
-                .font(.title2.bold())
-                .padding(.horizontal, 4)
-                .padding(.top, 10)
+            // The report sums up this section, so it is sent from its header.
+            HStack {
+                Text("Suivi")
+                    .font(.title2.bold())
+                Spacer()
+                Button("Envoyer à mon kiné", systemImage: "paperplane.fill") { detail = .report }
+                    .font(.subheadline.weight(.semibold))
+                    .buttonStyle(.glass)
+                    .buttonBorderShape(.capsule)
+            }
+            .padding(.leading, 4)
+            .padding(.top, 10)
 
             RegularityCard(week: week) { detail = .history }
 
@@ -33,25 +41,6 @@ struct FollowUpSection: View {
 
             PainCard(points: Array(progress.pain.suffix(7))) { detail = .pain }
 
-            // A plain row, like Health's "Afficher toutes les données Santé".
-            Button { detail = .report } label: {
-                HStack(spacing: 14) {
-                    Image(systemName: "paperplane.fill")
-                        .font(.title2)
-                        .foregroundStyle(.indigo)
-                        .frame(width: 32)
-                    Text("Envoyer le bilan à mon kiné")
-                        .font(.body)
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.footnote.weight(.bold))
-                        .foregroundStyle(.tertiary)
-                }
-                .padding()
-                .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 26))
-                .contentShape(.rect(cornerRadius: 26))
-            }
-            .buttonStyle(.plain)
         }
         .sheet(item: $detail) { detail in
             NavigationStack {
@@ -158,7 +147,7 @@ private struct DotLabelStyle: LabelStyle {
     }
 }
 
-/// This week, day by day, against the program's goal.
+/// This week against the program's goal: a ring like Fitness, and the days with what was planned and done.
 private struct RegularityCard: View {
     let week: WeekProgress
     let action: () -> Void
@@ -166,37 +155,104 @@ private struct RegularityCard: View {
     private var sentence: Text {
         if week.done >= week.planned { return Text("Objectif de la semaine atteint, bravo.") }
         if week.done == 0 { return Text("Aucune séance cette semaine pour l'instant.") }
-        return Text("Vous avez fait ^[\(week.done) séance](inflect: true) sur \(week.planned) cette semaine.")
+        let left = week.planned - week.done
+        return Text("Encore ^[\(left) séance](inflect: true) pour atteindre votre objectif de la semaine.")
     }
 
     var body: some View {
-        InsightCard(symbol: "calendar", title: "Régularité", color: .teal, sentence: sentence, action: action) {
-            LegendValue(label: "Cette semaine", value: "\(week.done)", unit: week.done > 1 ? "séances" : "séance", color: .teal)
-            LegendValue(label: "Objectif", value: "\(week.planned)", unit: week.planned > 1 ? "séances" : "séance", color: .gray)
-        } chart: {
-            HStack(spacing: 6) {
-                ForEach(week.days, id: \.date) { day in
-                    let isToday = Calendar.current.isDateInToday(day.date)
-                    VStack(spacing: 6) {
-                        Capsule()
-                            .fill(day.done ? AnyShapeStyle(Color.teal) : AnyShapeStyle(Color(.systemGray5)))
-                            .frame(height: 30)
-                            .overlay {
-                                if day.done {
-                                    Image(systemName: "checkmark")
-                                        .font(.caption.weight(.heavy))
-                                        .foregroundStyle(.white)
-                                }
-                            }
-                        Text(day.date, format: .dateTime.weekday(.narrow))
-                            .font(.caption.weight(isToday ? .bold : .regular))
-                            .foregroundStyle(isToday ? AnyShapeStyle(Color.teal) : AnyShapeStyle(.secondary))
-                    }
-                    .frame(maxWidth: .infinity)
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Label("Régularité", systemImage: "calendar")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.teal)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                }
+                sentence
+                    .font(.title3.weight(.semibold))
+                    .fixedSize(horizontal: false, vertical: true)
+                Divider()
+                HStack(spacing: 18) {
+                    WeekRing(done: week.done, planned: week.planned)
+                    WeekDots(week: week)
                 }
             }
-            .accessibilityHidden(true)
+            .padding(18)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 24))
+            .contentShape(.rect(cornerRadius: 24))
         }
+        .buttonStyle(.plain)
+    }
+}
+
+/// Sessions done over the goal, as an activity ring.
+private struct WeekRing: View {
+    let done: Int
+    let planned: Int
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(Color.teal.opacity(0.22), lineWidth: 10)
+            Circle()
+                .trim(from: 0, to: min(Double(done) / Double(max(planned, 1)), 1))
+                .stroke(Color.teal, style: StrokeStyle(lineWidth: 10, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+            HStack(alignment: .firstTextBaseline, spacing: 1) {
+                Text("\(done)")
+                    .font(.title2.weight(.bold))
+                    .foregroundStyle(.teal)
+                Text("/\(planned)")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .monospacedDigit()
+        }
+        .frame(width: 74, height: 74)
+        .accessibilityElement()
+        .accessibilityLabel(Text("\(done) séances sur \(planned)"))
+    }
+}
+
+/// The seven days: done (filled), planned (outlined, dashed when still to come), the others as a small dot.
+private struct WeekDots: View {
+    let week: WeekProgress
+
+    var body: some View {
+        let calendar = Calendar.current
+        let planned = Set(ReminderScheduler.sessionDays(count: week.planned))
+        HStack(spacing: 0) {
+            ForEach(week.days, id: \.date) { day in
+                let isToday = calendar.isDateInToday(day.date)
+                let isPlanned = planned.contains(calendar.component(.weekday, from: day.date))
+                VStack(spacing: 8) {
+                    Text(day.date, format: .dateTime.weekday(.narrow))
+                        .font(.caption.weight(isToday ? .bold : .medium))
+                        .foregroundStyle(isToday ? AnyShapeStyle(Color.teal) : AnyShapeStyle(.secondary))
+                    ZStack {
+                        if day.done {
+                            Circle().fill(Color.teal)
+                            Image(systemName: "checkmark")
+                                .font(.caption2.weight(.heavy))
+                                .foregroundStyle(.white)
+                        } else if isPlanned {
+                            Circle()
+                                .strokeBorder(isToday ? AnyShapeStyle(Color.teal) : AnyShapeStyle(Color(.systemGray3)),
+                                              style: StrokeStyle(lineWidth: 2, dash: day.date > .now || isToday ? [3, 3] : []))
+                        } else {
+                            Circle().fill(Color(.systemGray4)).frame(width: 5, height: 5)
+                        }
+                    }
+                    .frame(width: 24, height: 24)
+                }
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .accessibilityHidden(true)
     }
 }
 
