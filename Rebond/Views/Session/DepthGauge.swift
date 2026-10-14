@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Vertical gauge following the movement (downward for a squat, upward for raised arms),
-/// with a mark at the target.
+/// with marks at the amplitude tiers and at the target, and the fill in the tier's color.
 struct DepthGauge: View {
     /// 0 at rest, 1 at the target.
     let progress: Double
@@ -11,7 +11,7 @@ struct DepthGauge: View {
     /// The gauge goes a bit past the target so going deeper stays visible.
     private let maximum = 1.2
 
-    private var reachedTarget: Bool { progress >= 1 }
+    private var fillColor: Color { AmplitudeTier(progress: progress)?.color ?? .yellow }
 
     var body: some View {
         GeometryReader { geometry in
@@ -20,8 +20,15 @@ struct DepthGauge: View {
                 Capsule()
                     .fill(.white.opacity(0.25))
                 Capsule()
-                    .fill(reachedTarget ? Color.green : Color.yellow)
+                    .fill(fillColor)
                     .frame(height: height * min(progress, maximum) / maximum)
+                // Small marks at "Bien" and "Très bien", the large one at the target ("Parfait").
+                ForEach([AmplitudeTier.goodThreshold, AmplitudeTier.veryGoodThreshold], id: \.self) { level in
+                    Capsule()
+                        .fill(.white.opacity(0.8))
+                        .frame(width: width * 1.3, height: 2)
+                        .offset(y: (fillsUpward ? -1 : 1) * (height * level / maximum - 1))
+                }
                 Capsule()
                     .fill(.white)
                     .frame(width: width * 1.8, height: 4)

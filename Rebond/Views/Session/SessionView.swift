@@ -14,6 +14,9 @@ struct SessionView: View {
     /// The model's card during the set: fixed, in the middle of the left edge.
     @ScaledMetric private var cardWidth = 110
     @ScaledMetric private var pauseIconSize = 72
+    @State private var voice = VoiceCommands()
+    @AppStorage("voiceCommandsEnabled") private var voiceEnabled = false
+    @State private var showingVoiceInfo = false
 
     init(exercise: CatalogExercise, targetReps: Int, setTitle: LocalizedStringKey, onFinish: @escaping (SetResult) -> Void) {
         self.exercise = exercise
@@ -36,7 +39,7 @@ struct SessionView: View {
                     SkeletonOverlay(
                         skeleton: skeleton,
                         highlightedJoints: exercise.highlightedJoints,
-                        highlightColor: motion.depthProgress >= 1 ? .green : .yellow,
+                        highlightColor: AmplitudeTier(progress: motion.depthProgress)?.color ?? .yellow,
                         faultyJoints: motion.faultToHighlight?.bodyJoints ?? []
                     )
                 }
@@ -55,6 +58,9 @@ struct SessionView: View {
                     topCard(title: "Caméra indisponible", detail: motion.cameraAccessDenied
                         ? "Autorisez l'accès à la caméra dans Réglages pour que Rebond suive vos mouvements."
                         : "Aucune caméra avant n'est disponible. Vous pouvez terminer la série.")
+                } else if motion.phase == .calibrating, placement == .notVisible {
+                    topCard(title: "Posez votre iPhone debout",
+                            detail: "Calez-le à hauteur de hanche, puis reculez à 2 ou 3 mètres pour voir tout votre corps.")
                 } else if motion.phase == .calibrating || motion.isLost {
                     placementHint
                 } else if motion.phase == .demonstrating {
@@ -80,6 +86,17 @@ struct SessionView: View {
                     .padding(pauseIconSize * 0.4)
                     .glassEffect(in: .circle)
                     .buttonStyle(.plain)
+                    .overlay(alignment: .bottom) {
+                        if voice.isListening {
+                            Label("Dites « Reprendre »", systemImage: "mic.fill")
+                                .font(.headline)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 10)
+                                .glassEffect(in: .capsule)
+                                .fixedSize()
+                                .offset(y: pauseIconSize * 1.2)
+                        }
+                    }
                     .transition(.scale.combined(with: .opacity))
             }
         }
@@ -127,6 +144,17 @@ struct SessionView: View {
                 }
             }
             ToolbarItem(placement: .topBarTrailing) {
+                Button(voiceEnabled ? "Couper les commandes vocales" : "Commandes vocales",
+                       systemImage: voiceEnabled && voice.isListening ? "mic.fill" : "mic.slash.fill") {
+                    if voiceEnabled {
+                        voiceEnabled = false
+                        voice.stop()
+                    } else {
+                        showingVoiceInfo = true
+                    }
+                }
+            }
+            ToolbarItem(placement: .topBarTrailing) {
                 Button(motion.isMuted ? "Activer la voix" : "Couper la voix",
                        systemImage: motion.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill") {
                     motion.isMuted.toggle()
@@ -137,7 +165,31 @@ struct SessionView: View {
             motion.blurWholePicture(blurred)
         }
         .task { await motion.start() }
-        .onDisappear { motion.stop() }
+        .task {
+            voice.onCommand = { command in
+                switch command {
+                case .pause: if !motion.isPaused { motion.togglePause() }
+                case .resume: if motion.isPaused { motion.togglePause() }
+                case .showModel: motion.expandModel()
+                }
+            }
+            if voiceEnabled { voice.start() }
+        }
+        .onDisappear {
+            voice.stop()
+            motion.stop()
+        }
+        .sheet(isPresented: $showingVoiceInfo) {
+            VoiceCommandsInfo {
+                showingVoiceInfo = false
+                Task {
+                    guard await VoiceCommands.requestAuthorization() else { return }
+                    voiceEnabled = true
+                    voice.start()
+                }
+            }
+            .presentationDetents([.medium, .large])
+        }
         .onChange(of: motion.repCount + motion.incompleteCount) { reportSetActivity() }
         .sensoryFeedback(.success, trigger: motion.repCount)
         .sensoryFeedback(.warning, trigger: motion.incompleteCount)
@@ -348,7 +400,39 @@ struct SessionView: View {
         .transition(.scale(scale: 0.9).combined(with: .opacity))
     }
 
+    @ViewBuilder
     private func feedbackBanner(_ feedback: MotionSession.Feedback) -> some View {
+        if let tier = feedback.tier {
+            tierBanner(tier, id: feedback.id)
+        } else {
+            correctionBanner(feedback)
+        }
+    }
+
+    /// "Bien", "Très bien" or "Parfait !", with one to three stars in the tier's color.
+    private func tierBanner(_ tier: AmplitudeTier, id: UUID) -> some View {
+        HStack(spacing: 10) {
+            HStack(spacing: 2) {
+                ForEach(1...3, id: \.self) { star in
+                    Image(systemName: star <= tier.stars ? "star.fill" : "star")
+                        .foregroundStyle(star <= tier.stars ? AnyShapeStyle(.white) : AnyShapeStyle(.white.opacity(0.5)))
+                }
+            }
+            .font(.headline)
+            Text(tier.message)
+                .font(.title3.bold())
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+        .glassEffect(.regular.tint(tier.color.opacity(0.7)), in: .capsule)
+        .symbolEffect(.bounce, value: id)
+        .id(id)
+        .transition(.scale(scale: 0.8).combined(with: .opacity))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(tier.message))
+    }
+
+    private func correctionBanner(_ feedback: MotionSession.Feedback) -> some View {
         Label {
             Text(feedback.message)
         } icon: {
@@ -360,5 +444,39 @@ struct SessionView: View {
         .glassEffect(.regular.tint((feedback.isPositive ? Color.green : Color.orange).opacity(0.6)), in: .capsule)
         .id(feedback.id)
         .transition(.move(edge: .bottom).combined(with: .opacity))
+    }
+}
+
+/// Why Rebond asks for the microphone, before iOS asks: what the patient can say, and that nothing leaves the iPhone.
+private struct VoiceCommandsInfo: View {
+    let onEnable: () -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Label("Commandes vocales", systemImage: "mic.fill")
+                .font(.title2.bold())
+            VStack(alignment: .leading, spacing: 12) {
+                Label("Dites « Pause » pour vous arrêter, « Reprendre » pour continuer.", systemImage: "pause.circle")
+                Label("Dites « Montre-moi » pour revoir le mouvement.", systemImage: "figure.wave")
+                Label("Tout se passe sur l'iPhone, pendant la séance seulement. Rien n'est enregistré.", systemImage: "lock.shield")
+            }
+            .font(.body)
+            .fixedSize(horizontal: false, vertical: true)
+            Text("iOS va vous demander l'accès au micro et à la reconnaissance vocale.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 0)
+            VStack(spacing: 10) {
+                Button(action: onEnable) {
+                    Text("Activer").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.glassProminent)
+                Button("Plus tard") { dismiss() }
+                    .frame(maxWidth: .infinity)
+            }
+            .controlSize(.extraLarge)
+        }
+        .padding(24)
     }
 }

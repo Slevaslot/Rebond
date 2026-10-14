@@ -4,15 +4,17 @@ import SwiftUI
 
 /// The session to do, laid out like the Health app's Summary: a tinted header, large cards with a colored
 /// category label, a big rounded value and a small chart, bold section titles. Liquid Glass stays in the
-/// navigation layer (toolbar, tab bar, the floating start button).
+/// navigation layer (toolbar, tab bar). Editing the program lives in the Programme tab.
 struct TodayView: View {
     @Environment(AppRouter.self) private var router
     @Environment(\.modelContext) private var context
     @Query(sort: \Program.createdAt, order: .reverse) private var programs: [Program]
     @Query(sort: \Session.date, order: .reverse) private var sessions: [Session]
     @AppStorage(PatientIdentity.nameKey) private var patientName = ""
+    @AppStorage(AlertsGroup.dismissedKey) private var dismissedPainAlert: Double = 0
+    @State private var restoredAlert = 0
     @State private var showingSettings = false
-    @State private var editing: EditableProgram?
+    @State private var showingReport = false
 
     var body: some View {
         NavigationStack {
@@ -23,30 +25,39 @@ struct TodayView: View {
                     noProgram
                 }
             }
-            .navigationTitle("Séance")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showingSettings = true
-                    } label: {
-                        ProfileBadge(name: patientName)
-                    }
-                    .accessibilityLabel("Réglages")
-                }
-                .sharedBackgroundVisibility(.hidden)
-            }
-            .navigationDestination(isPresented: Binding(get: { editing != nil }, set: { if !$0 { editing = nil } })) {
-                if let editing {
-                    ProgramEditorView(program: editing) { saved in
-                        Program.replaceAll(with: saved, in: context)
-                        self.editing = nil
-                    }
-                }
-            }
+            .navigationTitle("Aujourd'hui")
+            // Fitness-style top bar: the large title and the profile on the same line, in the page.
+            .toolbarVisibility(.hidden, for: .navigationBar)
             .sheet(isPresented: $showingSettings) {
                 SettingsView()
             }
+            .sheet(isPresented: $showingReport) {
+                NavigationStack {
+                    ReportView()
+                        .toolbar {
+                            Button("Fermer", systemImage: "xmark", role: .close) { showingReport = false }
+                        }
+                }
+            }
         }
+    }
+
+    private var header: some View {
+        HStack(alignment: .center) {
+            Text("Aujourd'hui")
+                .font(.largeTitle.bold())
+                .accessibilityAddTraits(.isHeader)
+            Spacer()
+            Button {
+                showingSettings = true
+            } label: {
+                ProfileBadge(name: patientName)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Réglages")
+        }
+        .padding(.top, 8)
+        .padding(.bottom, 4)
     }
 
     private var noProgram: some View {
@@ -70,25 +81,27 @@ struct TodayView: View {
 
         return ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                PainAlertCard(sessions: sessions)
+                header
+                AlertsGroup(sessions: sessions, onReport: { showingReport = true }, onShowProgram: { router.tab = .program })
 
-                SessionCard(
-                    program: program,
-                    onEdit: { editing = EditableProgram(program) },
-                    onScan: { router.addProgram(from: .scan) }
-                )
+                SessionCard(program: program) { router.startWorkout() }
 
-                WeekCard(week: week)
-
-                Text("Rebond ne remplace pas l'avis d'un professionnel de santé.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 4)
-                    .padding(.top, 4)
+                FollowUpSection(sessions: sessions, sessionsPerWeek: program.sessionsPerWeek, week: week)
             }
             .padding(.horizontal)
             .padding(.bottom)
         }
+        // Pulling the page down brings back the alert of a painful session that was dismissed;
+        // the page bounces even when it is shorter than the screen.
+        .scrollBounceBehavior(.always)
+        .onScrollGeometryChange(for: Bool.self) { geometry in
+            geometry.contentOffset.y + geometry.contentInsets.top < -50
+        } action: { _, pulled in
+            guard pulled, dismissedPainAlert != 0 else { return }
+            withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) { dismissedPainAlert = 0 }
+            restoredAlert += 1
+        }
+        .sensoryFeedback(.success, trigger: restoredAlert)
         .background(alignment: .top) {
             // Tinted top, fading into the page, like Health's Summary.
             LinearGradient(colors: [Color.accentColor.opacity(0.45), .clear], startPoint: .top, endPoint: .bottom)
@@ -96,18 +109,13 @@ struct TodayView: View {
                 .ignoresSafeArea()
         }
         .background(Color(.systemGroupedBackground))
-        .safeAreaBar(edge: .bottom) {
-            SlideToStart { router.startWorkout() }
-                .padding(.horizontal)
-                .padding(.bottom, 8)
-        }
     }
 }
 
 // MARK: - Cards
 
 /// A Health-style card: a colored category label with an optional trailing detail, then the content.
-private struct SummaryCard<Content: View, Trailing: View>: View {
+struct SummaryCard<Content: View, Trailing: View>: View {
     let title: Text
     let systemImage: String?
     var icon: CatalogExercise?
@@ -153,7 +161,7 @@ private struct SummaryCard<Content: View, Trailing: View>: View {
 }
 
 /// A big rounded value with its unit, as in Health ("3 717 pas").
-private struct BigValue: View {
+struct BigValue: View {
     let value: String
     let unit: LocalizedStringKey
 
@@ -174,15 +182,19 @@ private struct BigValue: View {
 /// Today's session: how long it takes and how many exercises.
 private struct SessionCard: View {
     let program: Program
-    let onEdit: () -> Void
-    let onScan: () -> Void
+    let onStart: () -> Void
+    @Environment(\.workoutTransition) private var workoutTransition
 
-    /// The program stays folded to keep the page light; "Plus de détails" unfolds it in place, like Health.
+    /// The exercises stay folded to keep the page light; tapping the card unfolds them in place.
     @State private var expanded = false
 
     var body: some View {
         SummaryCard(title: Text("Séance du jour"), systemImage: nil, color: .accentColor, sectionHeader: true) {
-            Text("\(program.exercises.count) exercices")
+            // The chevron tells the card unfolds, like an expandable row in iOS.
+            Image(systemName: "chevron.down")
+                .font(.body.weight(.semibold))
+                .rotationEffect(.degrees(expanded ? 180 : 0))
+                .accessibilityHidden(true)
         } content: {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .bottom) {
@@ -219,30 +231,48 @@ private struct SessionCard: View {
                             .accessibilityElement(children: .combine)
                         }
                     }
-                    .transition(.asymmetric(insertion: .push(from: .top).combined(with: .opacity), removal: .opacity))
-
-                    HStack {
-                        Button("Modifier", systemImage: "pencil", action: onEdit)
-                        Button("Nouvelle feuille", systemImage: "doc.viewfinder", action: onScan)
-                    }
-                    .buttonStyle(.glass)
-                    .buttonBorderShape(.capsule)
-                    .transition(.opacity)
+                    .transition(.opacity.combined(with: .scale(scale: 0.97, anchor: .top)))
                 }
 
-                // Same button as Health's "Plus de détails": a tinted capsule with bold accent text.
-                Button(expanded ? "Moins de détails" : "Plus de détails") {
-                    withAnimation(.spring(response: 0.5, dampingFraction: 0.78)) { expanded.toggle() }
+                Button(action: onStart) {
+                    Label("Commencer", systemImage: "play.fill")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
                 }
-                .font(.title3.weight(.semibold))
-                .buttonStyle(.glass)
+                .buttonStyle(.glassProminent)
                 .buttonBorderShape(.capsule)
-                .controlSize(.regular)
-                .tint(.accentColor)
-                .contentTransition(.interpolate)
+                .controlSize(.extraLarge)
+                // A soft glow lifts the main action off the card.
+                .shadow(color: Color.accentColor.opacity(0.45), radius: 14, y: 6)
             }
         }
+        // The session zooms out of the whole card: a plain rounded shape, so nothing of the glass button
+        // or its glow is cut out during the transition.
+        .modifier(WorkoutSource(namespace: workoutTransition))
+        // Tapping anywhere on the card (except Commencer) shows or hides the exercises.
+        .contentShape(.rect(cornerRadius: 26))
+        .onTapGesture {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.78)) { expanded.toggle() }
+        }
+        .accessibilityAction(named: expanded ? Text("Masquer les exercices") : Text("Voir les exercices")) {
+            withAnimation { expanded.toggle() }
+        }
         .sensoryFeedback(.selection, trigger: expanded)
+    }
+}
+
+/// Marks the Commencer button as the start of the zoom into the session.
+private struct WorkoutSource: ViewModifier {
+    let namespace: Namespace.ID?
+
+    func body(content: Content) -> some View {
+        if let namespace {
+            content.matchedTransitionSource(id: WorkoutTransition.sourceID, in: namespace) { source in
+                source.clipShape(.rect(cornerRadius: 26))
+            }
+        } else {
+            content
+        }
     }
 }
 
@@ -265,101 +295,10 @@ private struct ExerciseBadge: View {
     }
 }
 
-/// This week: sessions done against the goal, with a bar per day (today highlighted), like Health's step card.
-private struct WeekCard: View {
-    let week: WeekProgress
 
-    var body: some View {
-        SummaryCard(title: Text("Régularité"), systemImage: "checkmark.circle.fill", color: .mint) {
-            Text("Cette semaine")
-        } content: {
-            HStack(alignment: .bottom) {
-                VStack(alignment: .leading, spacing: 2) {
-                    BigValue(value: "\(week.done)", unit: "sur \(week.planned) séances")
-                    if week.done >= week.planned {
-                        Text("Objectif atteint, bravo !")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                Spacer(minLength: 12)
-                Chart(week.days, id: \.date) { day in
-                    BarMark(
-                        x: .value("Jour", day.date, unit: .day),
-                        y: .value("Séances", day.done ? 1 : 0.06)
-                    )
-                    .foregroundStyle(day.done ? Color.mint : Color(.tertiaryLabel))
-                    .clipShape(.rect(cornerRadius: 2))
-                }
-                .chartXAxis {
-                    AxisMarks(values: .stride(by: .day)) { value in
-                        AxisValueLabel(format: .dateTime.weekday(.narrow))
-                    }
-                }
-                .chartYAxis(.hidden)
-                .chartYScale(domain: 0...1)
-                .frame(width: 130, height: 64)
-            }
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("Régularité cette semaine"))
-        .accessibilityValue(Text(week.summary))
-    }
-}
 
-/// After a painful session, a calm card with a yellow band, like Health's notifications. Dismissable.
-private struct PainAlertCard: View {
-    let sessions: [Session]
-    @AppStorage("dismissedPainAlert") private var dismissed: Double = 0
-
-    private var painful: Session? {
-        guard let last = sessions.first,
-              last.pain >= WeeklyReport.highPain,
-              last.date.timeIntervalSinceReferenceDate > dismissed,
-              last.date > Date.now.addingTimeInterval(-7 * 86_400)
-        else { return nil }
-        return last
-    }
-
-    var body: some View {
-        if let painful {
-            VStack(alignment: .leading, spacing: 0) {
-                HStack {
-                    Label("Douleur forte", systemImage: "exclamationmark.triangle.fill")
-                        .font(.headline)
-                    Spacer()
-                    Text(painful.date, format: .dateTime.day().month())
-                        .font(.subheadline.weight(.semibold))
-                    Button("Masquer", systemImage: "xmark") {
-                        dismissed = painful.date.timeIntervalSinceReferenceDate
-                    }
-                    .labelStyle(.iconOnly)
-                    .buttonStyle(.glass)
-                    .buttonBorderShape(.circle)
-                }
-                .foregroundStyle(.black)
-                .padding()
-                .background(.yellow)
-                HStack(alignment: .top, spacing: 14) {
-                    Image(systemName: "heart.text.square")
-                        .font(.title)
-                        .foregroundStyle(.orange)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Douleur de \(painful.pain) sur 10 à la dernière séance.")
-                            .font(.headline)
-                        Text("Si la douleur est forte ou inhabituelle, faites une pause et parlez-en à votre kiné.")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .padding()
-            }
-            .background(Color(.secondarySystemGroupedBackground))
-            .clipShape(.rect(cornerRadius: 26))
-        }
-    }
-}
-
-/// The patient's initials, or a person symbol, as Health's profile button.
+/// The patient's initials, or a person symbol, as Health's profile button:
+/// a soft gradient disc inside a Liquid Glass ring.
 private struct ProfileBadge: View {
     let name: String
 
@@ -371,15 +310,21 @@ private struct ProfileBadge: View {
         Group {
             if initials.isEmpty {
                 Image(systemName: "person.fill")
-                    .font(.headline)
+                    .font(.body.weight(.semibold))
             } else {
                 Text(initials)
-                    .font(.headline.weight(.semibold))
+                    .font(.body.weight(.semibold))
             }
         }
         .foregroundStyle(.white)
-        .frame(width: 40, height: 40)
-        .background(Color.accentColor.gradient, in: .circle)
+        .frame(width: 38, height: 38)
+        .background(
+            LinearGradient(colors: [Color(red: 0.66, green: 0.70, blue: 0.96), Color(red: 0.43, green: 0.47, blue: 0.86)],
+                           startPoint: .top, endPoint: .bottom),
+            in: .circle
+        )
+        .padding(4)
+        .glassEffect(.regular.interactive(), in: .circle)
     }
 }
 
@@ -435,107 +380,4 @@ extension Program {
         }
         return max(1, Int((Double(seconds) / 60).rounded()))
     }
-}
-
-/// "Glisser pour commencer": a Liquid Glass track with a glass thumb dragged from left to right.
-/// Released before the end, the thumb springs back; at the end, the session starts.
-/// VoiceOver sees a plain button, since dragging isn't practical with it.
-private struct SlideToStart: View {
-    let onStart: () -> Void
-
-    @State private var offset: Double = 0
-    @State private var started = 0
-    @State private var triggered = false
-    private let thumb: Double = 60
-    private let inset: Double = 5
-
-    var body: some View {
-        GeometryReader { geometry in
-            let travel = max(1, geometry.size.width - thumb - inset * 2)
-            let progress = min(1, offset / travel)
-            ZStack(alignment: .leading) {
-                Text("Glisser pour commencer")
-                    .font(.headline)
-                    .foregroundStyle(.secondary)
-                    .shimmer()
-                    .frame(maxWidth: .infinity)
-                    .padding(.leading, thumb * 0.6)
-                    .opacity(1 - progress * 1.4)
-
-                Image(systemName: progress > 0.95 ? "checkmark" : "play.fill")
-                    .font(.title2.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .contentTransition(.symbolEffect(.replace))
-                    .frame(width: thumb, height: thumb)
-                    // Plain glass, like the thumb of an incoming call's slider.
-                    .glassEffect(.regular.interactive(), in: .circle)
-                    .offset(x: inset + offset)
-                    .gesture(
-                        DragGesture(minimumDistance: 0)
-                            .onChanged { value in
-                                guard !triggered else { return }
-                                offset = min(max(0, value.translation.width), travel)
-                                // Reaching the end is enough: no need to wait for the finger to lift.
-                                if offset >= travel * 0.95 { start(travel: travel) }
-                            }
-                            .onEnded { _ in
-                                guard !triggered else { return }
-                                if offset >= travel * 0.85 {
-                                    start(travel: travel)
-                                } else {
-                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) { offset = 0 }
-                                }
-                            }
-                    )
-            }
-            .frame(height: thumb + inset * 2)
-            .glassEffect(.regular.interactive(), in: .capsule)
-        }
-        .frame(height: thumb + inset * 2)
-        .sensoryFeedback(.success, trigger: started)
-        .accessibilityRepresentation {
-            Button("Commencer la séance", action: onStart)
-        }
-    }
-
-    private func start(travel: Double) {
-        triggered = true
-        withAnimation(.spring(duration: 0.25)) { offset = travel }
-        started += 1
-        onStart()
-        Task {
-            try? await Task.sleep(for: .seconds(0.8))
-            offset = 0
-            triggered = false
-        }
-    }
-}
-
-/// A light sweeping across the text, like the "slide to answer" hint of an incoming call.
-private struct Shimmer: ViewModifier {
-    @State private var phase: Double = -1
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    func body(content: Content) -> some View {
-        content
-            .overlay {
-                if !reduceMotion {
-                    // The light moves inside a fixed frame, and only the letters show it.
-                    GeometryReader { geometry in
-                        LinearGradient(colors: [.clear, .white.opacity(0.8), .clear], startPoint: .leading, endPoint: .trailing)
-                            .frame(width: 70)
-                            .offset(x: (phase + 1) / 2 * (geometry.size.width + 70) - 70)
-                    }
-                    .mask(content)
-                    .allowsHitTesting(false)
-                }
-            }
-            .onAppear {
-                withAnimation(.linear(duration: 2.2).repeatForever(autoreverses: false)) { phase = 1 }
-            }
-    }
-}
-
-private extension View {
-    func shimmer() -> some View { modifier(Shimmer()) }
 }

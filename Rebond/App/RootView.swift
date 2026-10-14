@@ -25,6 +25,8 @@ struct RootView: View {
     @State private var pickedPhoto: PhotosPickerItem?
     @State private var savedProgram = 0
     @State private var openedReport: URL?
+    /// Set while the program being reviewed comes from the physiotherapist.
+    @State private var prescriber: String?
     @State private var showingPaywall = false
 
     var body: some View {
@@ -71,21 +73,26 @@ struct RootView: View {
         }
     }
 
+    @Namespace private var workoutTransition
+
     private var patientTabs: some View {
         @Bindable var router = router
 
         return TabView(selection: $router.tab) {
-            Tab("Séance", systemImage: "figure.cooldown", value: .today) {
+            Tab("Aujourd'hui", systemImage: "sun.max", value: .today) {
                 TodayView()
+                    .environment(\.workoutTransition, workoutTransition)
             }
-            Tab("Progrès", systemImage: "chart.line.uptrend.xyaxis", value: .progress) {
-                ProgressTab()
+            Tab("Programme", systemImage: "calendar", value: .program) {
+                ProgramTab()
             }
         }
-        .tabBarMinimizeBehavior(.onScrollDown)
+        .tabBarMinimizeBehavior(.never)
         .fullScreenCover(isPresented: $router.isWorkoutPresented) {
             if let program = programs.first {
                 WorkoutView(program: program)
+                    // The session grows out of the Commencer button.
+                    .navigationTransition(.zoom(sourceID: WorkoutTransition.sourceID, in: workoutTransition))
             }
         }
         .fullScreenCover(isPresented: Binding(
@@ -134,6 +141,7 @@ struct RootView: View {
         #endif
         if let transfer = ProgramTransfer(url: url) {
             role = AppRole.patient.rawValue
+            prescriber = transfer.k ?? ""
             let notice: LocalizedStringKey = if let name = transfer.k {
                 "Programme prescrit par \(name). Vérifiez-le puis enregistrez-le."
             } else {
@@ -150,6 +158,11 @@ struct RootView: View {
     }
 
     private func save(_ program: EditableProgram) {
+        // A program prescribed by the physiotherapist shows what changed on the Aujourd'hui page.
+        if let prescriber {
+            ProgramChange.record(from: programs.first, to: program, by: prescriber.isEmpty ? nil : prescriber)
+            self.prescriber = nil
+        }
         Program.replaceAll(with: program, in: context)
         draft = nil
         savedProgram += 1
@@ -185,6 +198,8 @@ private struct ConnectedPatient: ViewModifier {
                             notice: pending.program.k.map { "\($0) a modifié votre programme. Vérifiez-le puis enregistrez-le." }
                                 ?? "Votre kiné a modifié votre programme. Vérifiez-le puis enregistrez-le."
                         ) { program in
+                            let current = try? context.fetch(FetchDescriptor<Program>(sortBy: [SortDescriptor(\.createdAt, order: .reverse)])).first
+                            ProgramChange.record(from: current, to: program, by: pending.program.k)
                             Program.replaceAll(with: program, in: context)
                             server.settlePendingProgram()
                             Task { await server.pushReport(context: context) }
@@ -196,3 +211,12 @@ private struct ConnectedPatient: ViewModifier {
     }
 }
 #endif
+
+/// The zoom from the Commencer button to the session.
+enum WorkoutTransition {
+    static let sourceID = "startWorkout"
+}
+
+extension EnvironmentValues {
+    @Entry var workoutTransition: Namespace.ID?
+}

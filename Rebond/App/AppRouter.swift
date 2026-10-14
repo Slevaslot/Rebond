@@ -9,7 +9,7 @@ final class AppRouter {
 
     enum AppTab: Hashable {
         case today
-        case progress
+        case program
     }
 
     /// Ways to add a program: scanning the sheet, picking a photo of it, or typing it.
