@@ -14,8 +14,14 @@ Lire d'abord `CLAUDE.md` (règles du projet), `TECHNIQUE.md` (architecture) et `
 | Élévation des bras en diagonale | `scaption` | `ArmRaiseCounter(arms: .either)` | angle bras-tronc | 90° |
 | Assis-debout | `sit-to-stand` | `SitToStandCounter` | montée des hanches au-dessus de l'assise | 0,6 |
 | Élévation de la jambe tendue | `leg-raise` | `LegRaiseCounter` | montée du genou vers la hanche | 0,3 |
+| Montée de genou (enjambement) | `hurdle-step` | `LegRaiseCounter(style: .bentKnee)` | montée du genou vers la hanche, genou plié | 0,45 |
+| Fente avant | `forward-lunge` | `LungeCounter(direction: .forward)` | descente des hanches, en longueurs de buste | 0,45 |
+| Fente latérale | `side-lunge` | `LungeCounter(direction: .side)` | décalage des hanches sur le côté, en longueurs de buste | 0,4 |
+| Rotation de l'épaule (90/90) | `shoulder-rotation` | `ShoulderRotationCounter` | descente du poignet vers le coude, en longueurs d'avant-bras | 0,6 |
 
-Résultats sur UI-PRMD (bons comptés / mauvais encore comptés) : squat 85–91 % / 26–39 %, assis-debout 100 % / 51 %, jambe 100 % / 69 %, un bras 99 % / 53 %, diagonale 100 % / 41 %.
+Résultats sur UI-PRMD (bons comptés / mauvais encore comptés) : squat 85–91 % / 26–39 %, assis-debout 100 % / 51 %, jambe 100 % / 69 %, un bras 99 % / 53 %, diagonale 100 % / 41 %, montée de genou 94 % / 41 %, fente avant 97 % / 54 %, fente latérale 98 % / 43 %, rotation 100 % / 42 %.
+
+L'extension d'épaule (n° 8) n'est **pas** suivie par la caméra : de face, le bras qui recule ne se distingue pas d'un bras levé devant ou sur le côté (détails dans `JOURNAL.md`). Elle reste en comptage manuel.
 
 ## Les fichiers à toucher
 
@@ -46,9 +52,9 @@ Ne pas toucher aux autres vues : elles appartiennent à la branche `graphique`.
 | N° | Mouvement | N° | Mouvement |
 |---|---|---|---|
 | 1 | squat profond (fait) | 6 | élévation de la jambe tendue (fait) |
-| 2 | enjambement de haie | 7 | abduction d'épaule (fait) |
-| 3 | fente avant | 8 | extension d'épaule |
-| 4 | fente latérale | 9 | rotation interne/externe d'épaule |
+| 2 | enjambement de haie (fait) | 7 | abduction d'épaule (fait) |
+| 3 | fente avant (fait) | 8 | extension d'épaule (écartée : illisible de face) |
+| 4 | fente latérale (fait) | 9 | rotation interne/externe d'épaule (fait, en 90/90) |
 | 5 | assis-debout (fait) | 10 | scaption (fait) |
 
 ```bash

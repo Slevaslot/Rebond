@@ -132,3 +132,68 @@ Logique commune dans `RepCycle` (repos → aller → objectif → retour, incomp
 | Élévation des bras en diagonale | angle bras-tronc | 90° | 100 % | 41 % |
 
 À tester devant la caméra : chaise avec accoudoirs (assis-debout), genou plié pendant l'élévation de jambe, geste « paume ouverte » qui pourrait mettre en pause pendant les exercices à un bras. Pictogrammes de profil pour le squat, l'assis-debout et l'élévation de jambe.
+
+## Le reste d'UI-PRMD : enjambement, fentes, épaule (14 octobre)
+
+Les cinq mouvements restants du jeu de données ont été observés de face, en perspective (téléphone à hauteur de hanche, `PERSP=200/250/300`), avant d'écrire le moindre compteur. Résultats sur 100 bons et 100 mauvais mouvements chacun, à 2,5 m (les chiffres varient de 1 à 3 points entre 2 et 3 m).
+
+| N° | Exercice (`id`) | Compteur | Mesure | Objectif | Bons comptés | Mauvais encore comptés |
+|---|---|---|---|---|---|---|
+| 2 | Montée de genou (`hurdle-step`) | `LegRaiseCounter(style: .bentKnee)` | montée du genou vers la hanche | 0,45 buste | 94 % | 41 % |
+| 3 | Fente avant (`forward-lunge`) | `LungeCounter(direction: .forward)` | descente des hanches | 0,45 buste | 97 % | 54 % |
+| 4 | Fente latérale (`side-lunge`) | `LungeCounter(direction: .side)` | décalage des hanches sur le côté | 0,4 buste | 98 % | 43 % |
+| 9 | Rotation de l'épaule (`shoulder-rotation`) | `ShoulderRotationCounter` | descente du poignet vers le coude | 0,6 avant-bras | 100 % | 42 % |
+| 8 | Extension d'épaule | — | **écartée** (voir plus bas) | — | 87 % au mieux | 37 % |
+
+Les six exercices existants donnent exactement les mêmes chiffres avant et après ces ajouts.
+
+### Montée de genou (enjambement, m2)
+
+- **Mesure** : la même que l'élévation de jambe tendue (le genou monte vers la hanche, en longueurs de buste). Les bons enjambements montent le genou de 0,36 à 1,37 buste de face : ça se lit très bien.
+- **Différence avec l'élévation de jambe** : le genou plié est attendu, le contrôle « jambe tendue » ne s'applique pas. À la place, le buste penché en avant (buste vu plus court que 88 % de sa longueur debout ; bons ≥ 93 %, mauvais jusqu'à 61 %) et penché sur le côté (0,2 ; bons ≤ 0,19, mauvais jusqu'à 0,6).
+- **Seuils** : départ 0,16, retour 0,11, jambe d'appui qui plie (hanches qui descendent de plus de 0,15), comme l'élévation de jambe. Une jambe puis l'autre : le côté est choisi à chaque répétition.
+- **Corrections** : « Montez le genou un peu plus haut », « Gardez le buste plus droit », « Gardez la jambe d'appui tendue ».
+- **Objectif** : 0,45 (cuisse à environ 60°). 0,4 compte 98 % des bons mais 51 % des mauvais ; 0,5 tombe à 91 %.
+
+### Fente avant (m3)
+
+- **Mesure** : descente des hanches, comme le squat. De face, les deux genoux se superposent presque : le genou arrière qui descend ne se lit pas assez (écart des genoux de 0,13 seulement chez 10 % des bons).
+- **Défauts** : buste penché sur le côté (0,25 ; bons ≤ 0,26, mauvais jusqu'à 0,8), buste penché en avant (moins de 75 % de sa longueur ; bons ≥ 78 %), descente sans plier un genou (aucun genou sous 145° au retour ; bons ≤ 125°).
+- **Objectif** : 0,45 buste (les bons descendent de 0,43 à 0,98). 0,6 ne compte plus que 80 % des bons.
+- **Limites** : un squat est aussi compté comme une fente avant. Serrer les seuils (0,22 / 0,78) ferait tomber les mauvais à 45 %, mais trop près des bons pour le bruit de Vision. Les mauvais restants sont surtout des défauts d'alignement du genou, invisibles en 2D de face sans chevilles fiables.
+
+### Fente latérale (m4)
+
+- **Mesure** : décalage des hanches sur le côté, quel que soit le côté. Les bons se décalent de 0,38 à 0,77 buste.
+- **Défauts** : genou non plié (le genou le plus plié de la répétition doit passer sous 155° ; bons ≤ 148°, mauvais jusqu'à 176°), jugé au début du retour (il plie au plus profond, pas avant) ; buste penché sur le côté (0,5 ; bons ≤ 0,47, mauvais jusqu'à 1). Le buste penché en avant fait partie du mouvement (bons jusqu'à 56 % de sa longueur) : seul un écrasement sous 45 % est refusé.
+- **Corrections** : « Allez un peu plus loin sur le côté », « Pliez le genou de la jambe qui avance », « Gardez le buste plus droit ».
+- **Objectif** : 0,4 buste.
+
+### Rotation de l'épaule (m9)
+
+- **Ce que fait UI-PRMD** : la rotation en position « 90/90 », bras écarté à hauteur d'épaule, coude plié à 90°, avant-bras vertical qui bascule vers l'avant jusqu'à l'horizontale puis revient. **Ce n'est pas** la rotation coude collé au corps : celle-là n'a pas de données, elle reste en comptage manuel (la lecture de la feuille la classe en « autre »).
+- **Mesure** : de face, l'avant-bras vertical est vu en entier ; en basculant vers la caméra, il raccourcit et le poignet descend à la hauteur du coude. On mesure la descente du poignet vers le coude, en longueurs d'avant-bras (0 vertical, 1 horizontal). La longueur de référence est la plus grande vue au repos : certains commencent l'avant-bras un peu basculé en arrière.
+- **Défauts** : coude qui descend (bras à plus de 25° sous sa position de départ ; mauvais dès 54°, bons ≥ 85°), buste penché sur le côté (0,08 ; bons ≤ 0,03, mauvais jusqu'à 0,22) ou en avant.
+- **Corrections** : « Basculez l'avant-bras un peu plus loin », « Gardez le coude à hauteur d'épaule », « Gardez le buste plus droit ».
+- **Objectif** : 0,6 (avant-bras aux deux tiers du chemin vers l'horizontale). 0,7 compte 97 % des bons.
+- **Limites** : de face, une bascule vers l'arrière ressemble à une bascule vers l'avant. Un sujet qui finit l'avant-bras très basculé en arrière est compté deux fois (1 cas sur 100).
+- **Pause par la paume désactivée** pour cet exercice (`CatalogExercise.allowsHandGestures`) : la position de départ, une main levée au-dessus de l'épaule paume vers la caméra, est le geste lui-même. Le bouton pause reste.
+
+### Extension d'épaule (m8) : écartée
+
+- Le bras tendu part vers l'arrière, dans la profondeur. De face, il n'en reste qu'une petite montée du poignet (0,11 à 0,66 buste chez les bons, médiane 0,35).
+- Essai avec cette mesure : 87 % des bons comptés à l'objectif 0,2, mais 80 à 84 % dès qu'on s'en écarte (0,15 ou 0,25), et 37 % des mauvais encore comptés. Trop fragile, sur des données Kinect plus lisses que Vision.
+- Surtout, **un bras levé vers l'avant ou sur le côté donne le même signal** : l'app compterait le mauvais geste, ce qui va contre son but.
+- Il faudrait une **vue de profil** (le bras recule dans le plan de l'image : l'angle bras-tronc se lit directement), donc un autre placement du téléphone pour cet exercice. En attendant, comptage manuel.
+
+### Pour la session `graphique`
+
+- **Pictogrammes de profil** souhaités pour la montée de genou (la cuisse vient vers la caméra) et la fente avant (les genoux se superposent de face). La fente latérale se lit bien de face.
+- **Rotation de l'épaule** : les poses `guideRest` / `guideTarget` donnent le coude (`leftElbow`), mais `ArmStyle.straight` trace l'épaule directement vers le poignet. Il faudrait un style de bras qui passe par le coude pour montrer le bras en « L ».
+
+### À tester devant la caméra
+
+- Montée de genou : genou très haut (cuisse à l'horizontale) bien suivi par Vision, alternance des jambes.
+- Fentes : grand pas en avant ou sur le côté, le patient reste-t-il dans le cadre et la silhouette de placement ? Distance minimale à revoir.
+- Rotation : Vision suit-il le poignet quand l'avant-bras pointe vers la caméra (raccourci, devant le coude) ?
+- Rejeu : le squat donne 70 % des bons comptés et 20 % des mauvais avec la perspective actuelle de `Tools/Replay`, loin des 85–91 % notés plus haut avec l'ancien rejeu. Ce n'est pas lié à ces ajouts, mais à vérifier.
