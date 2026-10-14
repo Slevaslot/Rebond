@@ -9,6 +9,7 @@ final class AppRouter {
 
     enum AppTab: Hashable {
         case today
+        case program
         case progress
     }
 

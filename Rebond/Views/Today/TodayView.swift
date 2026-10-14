@@ -4,15 +4,16 @@ import SwiftUI
 
 /// The session to do, laid out like the Health app's Summary: a tinted header, large cards with a colored
 /// category label, a big rounded value and a small chart, bold section titles. Liquid Glass stays in the
-/// navigation layer (toolbar, tab bar, the floating start button).
+/// navigation layer (toolbar, tab bar). Editing the program lives in the Programme tab.
 struct TodayView: View {
     @Environment(AppRouter.self) private var router
     @Environment(\.modelContext) private var context
     @Query(sort: \Program.createdAt, order: .reverse) private var programs: [Program]
     @Query(sort: \Session.date, order: .reverse) private var sessions: [Session]
     @AppStorage(PatientIdentity.nameKey) private var patientName = ""
+    @AppStorage(PainAlertCard.dismissedKey) private var dismissedPainAlert: Double = 0
+    @State private var restoredAlert = 0
     @State private var showingSettings = false
-    @State private var editing: EditableProgram?
 
     var body: some View {
         NavigationStack {
@@ -34,14 +35,6 @@ struct TodayView: View {
                     .accessibilityLabel("Réglages")
                 }
                 .sharedBackgroundVisibility(.hidden)
-            }
-            .navigationDestination(isPresented: Binding(get: { editing != nil }, set: { if !$0 { editing = nil } })) {
-                if let editing {
-                    ProgramEditorView(program: editing) { saved in
-                        Program.replaceAll(with: saved, in: context)
-                        self.editing = nil
-                    }
-                }
             }
             .sheet(isPresented: $showingSettings) {
                 SettingsView()
@@ -72,23 +65,24 @@ struct TodayView: View {
             VStack(alignment: .leading, spacing: 14) {
                 PainAlertCard(sessions: sessions)
 
-                SessionCard(
-                    program: program,
-                    onEdit: { editing = EditableProgram(program) },
-                    onScan: { router.addProgram(from: .scan) }
-                )
+                SessionCard(program: program) { router.startWorkout() }
 
                 WeekCard(week: week)
-
-                Text("Rebond ne remplace pas l'avis d'un professionnel de santé.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 4)
-                    .padding(.top, 4)
             }
             .padding(.horizontal)
             .padding(.bottom)
         }
+        // Pulling the page down brings back the alert of a painful session that was dismissed;
+        // the page bounces even when it is shorter than the screen.
+        .scrollBounceBehavior(.always)
+        .onScrollGeometryChange(for: Bool.self) { geometry in
+            geometry.contentOffset.y + geometry.contentInsets.top < -50
+        } action: { _, pulled in
+            guard pulled, dismissedPainAlert != 0 else { return }
+            withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) { dismissedPainAlert = 0 }
+            restoredAlert += 1
+        }
+        .sensoryFeedback(.success, trigger: restoredAlert)
         .background(alignment: .top) {
             // Tinted top, fading into the page, like Health's Summary.
             LinearGradient(colors: [Color.accentColor.opacity(0.45), .clear], startPoint: .top, endPoint: .bottom)
@@ -96,11 +90,6 @@ struct TodayView: View {
                 .ignoresSafeArea()
         }
         .background(Color(.systemGroupedBackground))
-        .safeAreaBar(edge: .bottom) {
-            SlideToStart { router.startWorkout() }
-                .padding(.horizontal)
-                .padding(.bottom, 8)
-        }
     }
 }
 
@@ -174,15 +163,14 @@ private struct BigValue: View {
 /// Today's session: how long it takes and how many exercises.
 private struct SessionCard: View {
     let program: Program
-    let onEdit: () -> Void
-    let onScan: () -> Void
+    let onStart: () -> Void
 
-    /// The program stays folded to keep the page light; "Plus de détails" unfolds it in place, like Health.
+    /// The exercises stay folded to keep the page light; "Voir les exercices" unfolds them in place.
     @State private var expanded = false
 
     var body: some View {
         SummaryCard(title: Text("Séance du jour"), systemImage: nil, color: .accentColor, sectionHeader: true) {
-            Text("\(program.exercises.count) exercices")
+            Text(Date.now, format: .dateTime.weekday(.wide))
         } content: {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .bottom) {
@@ -220,26 +208,31 @@ private struct SessionCard: View {
                         }
                     }
                     .transition(.asymmetric(insertion: .push(from: .top).combined(with: .opacity), removal: .opacity))
-
-                    HStack {
-                        Button("Modifier", systemImage: "pencil", action: onEdit)
-                        Button("Nouvelle feuille", systemImage: "doc.viewfinder", action: onScan)
-                    }
-                    .buttonStyle(.glass)
-                    .buttonBorderShape(.capsule)
-                    .transition(.opacity)
                 }
 
-                // Same button as Health's "Plus de détails": a tinted capsule with bold accent text.
-                Button(expanded ? "Moins de détails" : "Plus de détails") {
+                // A plain text link: the card's main action is Commencer.
+                Button {
                     withAnimation(.spring(response: 0.5, dampingFraction: 0.78)) { expanded.toggle() }
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(expanded ? "Masquer les exercices" : "Voir les exercices")
+                        Image(systemName: "chevron.down")
+                            .font(.footnote.weight(.semibold))
+                            .rotationEffect(.degrees(expanded ? 180 : 0))
+                    }
+                    .font(.body.weight(.medium))
                 }
-                .font(.title3.weight(.semibold))
-                .buttonStyle(.glass)
+                .buttonStyle(.plain)
+                .foregroundStyle(.tint)
+
+                Button(action: onStart) {
+                    Label("Commencer", systemImage: "play.fill")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
                 .buttonBorderShape(.capsule)
-                .controlSize(.regular)
-                .tint(.accentColor)
-                .contentTransition(.interpolate)
+                .controlSize(.large)
             }
         }
         .sensoryFeedback(.selection, trigger: expanded)
@@ -310,7 +303,8 @@ private struct WeekCard: View {
 /// After a painful session, a calm card with a yellow band, like Health's notifications. Dismissable.
 private struct PainAlertCard: View {
     let sessions: [Session]
-    @AppStorage("dismissedPainAlert") private var dismissed: Double = 0
+    static let dismissedKey = "dismissedPainAlert"
+    @AppStorage(dismissedKey) private var dismissed: Double = 0
 
     private var painful: Session? {
         guard let last = sessions.first,
@@ -331,7 +325,9 @@ private struct PainAlertCard: View {
                     Text(painful.date, format: .dateTime.day().month())
                         .font(.subheadline.weight(.semibold))
                     Button("Masquer", systemImage: "xmark") {
-                        dismissed = painful.date.timeIntervalSinceReferenceDate
+                        withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) {
+                            dismissed = painful.date.timeIntervalSinceReferenceDate
+                        }
                     }
                     .labelStyle(.iconOnly)
                     .buttonStyle(.glass)
@@ -435,107 +431,4 @@ extension Program {
         }
         return max(1, Int((Double(seconds) / 60).rounded()))
     }
-}
-
-/// "Glisser pour commencer": a Liquid Glass track with a glass thumb dragged from left to right.
-/// Released before the end, the thumb springs back; at the end, the session starts.
-/// VoiceOver sees a plain button, since dragging isn't practical with it.
-private struct SlideToStart: View {
-    let onStart: () -> Void
-
-    @State private var offset: Double = 0
-    @State private var started = 0
-    @State private var triggered = false
-    private let thumb: Double = 60
-    private let inset: Double = 5
-
-    var body: some View {
-        GeometryReader { geometry in
-            let travel = max(1, geometry.size.width - thumb - inset * 2)
-            let progress = min(1, offset / travel)
-            ZStack(alignment: .leading) {
-                Text("Glisser pour commencer")
-                    .font(.headline)
-                    .foregroundStyle(.secondary)
-                    .shimmer()
-                    .frame(maxWidth: .infinity)
-                    .padding(.leading, thumb * 0.6)
-                    .opacity(1 - progress * 1.4)
-
-                Image(systemName: progress > 0.95 ? "checkmark" : "play.fill")
-                    .font(.title2.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .contentTransition(.symbolEffect(.replace))
-                    .frame(width: thumb, height: thumb)
-                    // Plain glass, like the thumb of an incoming call's slider.
-                    .glassEffect(.regular.interactive(), in: .circle)
-                    .offset(x: inset + offset)
-                    .gesture(
-                        DragGesture(minimumDistance: 0)
-                            .onChanged { value in
-                                guard !triggered else { return }
-                                offset = min(max(0, value.translation.width), travel)
-                                // Reaching the end is enough: no need to wait for the finger to lift.
-                                if offset >= travel * 0.95 { start(travel: travel) }
-                            }
-                            .onEnded { _ in
-                                guard !triggered else { return }
-                                if offset >= travel * 0.85 {
-                                    start(travel: travel)
-                                } else {
-                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) { offset = 0 }
-                                }
-                            }
-                    )
-            }
-            .frame(height: thumb + inset * 2)
-            .glassEffect(.regular.interactive(), in: .capsule)
-        }
-        .frame(height: thumb + inset * 2)
-        .sensoryFeedback(.success, trigger: started)
-        .accessibilityRepresentation {
-            Button("Commencer la séance", action: onStart)
-        }
-    }
-
-    private func start(travel: Double) {
-        triggered = true
-        withAnimation(.spring(duration: 0.25)) { offset = travel }
-        started += 1
-        onStart()
-        Task {
-            try? await Task.sleep(for: .seconds(0.8))
-            offset = 0
-            triggered = false
-        }
-    }
-}
-
-/// A light sweeping across the text, like the "slide to answer" hint of an incoming call.
-private struct Shimmer: ViewModifier {
-    @State private var phase: Double = -1
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    func body(content: Content) -> some View {
-        content
-            .overlay {
-                if !reduceMotion {
-                    // The light moves inside a fixed frame, and only the letters show it.
-                    GeometryReader { geometry in
-                        LinearGradient(colors: [.clear, .white.opacity(0.8), .clear], startPoint: .leading, endPoint: .trailing)
-                            .frame(width: 70)
-                            .offset(x: (phase + 1) / 2 * (geometry.size.width + 70) - 70)
-                    }
-                    .mask(content)
-                    .allowsHitTesting(false)
-                }
-            }
-            .onAppear {
-                withAnimation(.linear(duration: 2.2).repeatForever(autoreverses: false)) { phase = 1 }
-            }
-    }
-}
-
-private extension View {
-    func shimmer() -> some View { modifier(Shimmer()) }
 }

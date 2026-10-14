@@ -1,22 +1,28 @@
 import SwiftData
 import SwiftUI
 
-/// Reminders, Rebond Plus, privacy and the medical notice.
+/// Settings on a single screen, without scrolling: the patient, the reminders, the physiotherapist space,
+/// and "À propos" (medical notice, privacy) one level down.
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.modelContext) private var context
     @AppStorage(PatientIdentity.nameKey) private var patientName = ""
     @AppStorage(AppRole.key) private var role = AppRole.patient.rawValue
     @Query(sort: \Program.createdAt, order: .reverse) private var programs: [Program]
     @AppStorage(ReminderSettings.enabledKey) private var remindersEnabled = false
     @AppStorage(ReminderSettings.hourKey) private var reminderHour = ReminderSettings.defaultHour
-    @State private var confirmingDemo = false
 
     private var sessionsPerWeek: Int { programs.first?.sessionsPerWeek ?? 3 }
 
     var body: some View {
         NavigationStack {
             Form {
+                Section {
+                    TextField("Votre nom", text: $patientName)
+                        .textContentType(.name)
+                } footer: {
+                    Text("Affiché sur le bilan envoyé à votre kiné.")
+                }
+
                 Section {
                     Toggle("Rappels de séance", isOn: Binding(
                         get: { remindersEnabled },
@@ -42,52 +48,52 @@ struct SettingsView: View {
                             Task { await ReminderScheduler.schedule(sessionsPerWeek: sessionsPerWeek, hour: reminderHour) }
                         }
                     }
-                } header: {
-                    Text("Rappels")
-                } footer: {
-                    Text("Un rappel les jours de séance (\(sessionsPerWeek) par semaine), et le dimanche pour envoyer votre bilan à votre kiné.")
                 }
 
                 Section {
-                    TextField("Votre nom", text: $patientName)
-                        .textContentType(.name)
-                } header: {
-                    Text("Vous")
-                } footer: {
-                    Text("Affiché sur le bilan que vous envoyez à votre kiné.")
-                }
-
-                Section {
-                    Button("Ouvrir l'espace kiné", systemImage: "stethoscope") {
+                    Button("Espace kiné", systemImage: "stethoscope") {
                         dismiss()
                         role = AppRole.physiotherapist.rawValue
                     }
-                } header: {
-                    Text("Vous êtes kiné ?")
-                } footer: {
-                    Text("Prescrivez vos programmes en QR code et suivez vos patients avec Rebond Pro.")
-                }
-
-                Section("Données") {
-                    Button("Charger les données de démo") { confirmingDemo = true }
-                        .confirmationDialog("Remplacer le programme et l'historique par les données de démo ?", isPresented: $confirmingDemo, titleVisibility: .visible) {
-                            Button("Remplacer", role: .destructive) { DemoData.load(into: context) }
-                        }
-                }
-
-                Section {
-                    Label("Rebond ne remplace pas l'avis d'un professionnel de santé. Seul votre kiné décide de votre programme.", systemImage: "stethoscope")
-                    Label("Tout reste sur votre iPhone : vos images, vos séances et votre programme. Seul le bilan que vous choisissez d'envoyer quitte l'appareil.", systemImage: "lock.shield")
-                    Link("Politique de confidentialité", destination: AppLinks.privacyPolicy)
-                } header: {
-                    Text("À propos")
+                    NavigationLink {
+                        AboutView()
+                    } label: {
+                        Label("À propos", systemImage: "info.circle")
+                    }
                 }
             }
+            .scrollDisabled(true)
             .navigationTitle("Réglages")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 Button("Fermer", systemImage: "xmark", role: .close) { dismiss() }
             }
         }
+    }
+}
+
+/// The medical notice, privacy, and the demo data (development builds only).
+private struct AboutView: View {
+    @Environment(\.modelContext) private var context
+    @State private var confirmingDemo = false
+
+    var body: some View {
+        Form {
+            Section {
+                Label("Rebond ne remplace pas l'avis d'un professionnel de santé. Seul votre kiné décide de votre programme.", systemImage: "stethoscope")
+                Label("Tout reste sur votre iPhone. Seul le bilan que vous choisissez d'envoyer quitte l'appareil.", systemImage: "lock.shield")
+                Link("Politique de confidentialité", destination: AppLinks.privacyPolicy)
+            }
+            #if DEBUG
+            Section("Démo") {
+                Button("Charger les données de démo") { confirmingDemo = true }
+                    .confirmationDialog("Remplacer le programme et l'historique par les données de démo ?", isPresented: $confirmingDemo, titleVisibility: .visible) {
+                        Button("Remplacer", role: .destructive) { DemoData.load(into: context) }
+                    }
+            }
+            #endif
+        }
+        .navigationTitle("À propos")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
