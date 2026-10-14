@@ -165,12 +165,16 @@ private struct SessionCard: View {
     let program: Program
     let onStart: () -> Void
 
-    /// The exercises stay folded to keep the page light; "Voir les exercices" unfolds them in place.
+    /// The exercises stay folded to keep the page light; tapping the card unfolds them in place.
     @State private var expanded = false
 
     var body: some View {
         SummaryCard(title: Text("Séance du jour"), systemImage: nil, color: .accentColor, sectionHeader: true) {
-            Text(Date.now, format: .dateTime.weekday(.wide))
+            // The chevron tells the card unfolds, like an expandable row in iOS.
+            Image(systemName: "chevron.down")
+                .font(.body.weight(.semibold))
+                .rotationEffect(.degrees(expanded ? 180 : 0))
+                .accessibilityHidden(true)
         } content: {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .bottom) {
@@ -210,21 +214,6 @@ private struct SessionCard: View {
                     .transition(.asymmetric(insertion: .push(from: .top).combined(with: .opacity), removal: .opacity))
                 }
 
-                // A plain text link: the card's main action is Commencer.
-                Button {
-                    withAnimation(.spring(response: 0.5, dampingFraction: 0.78)) { expanded.toggle() }
-                } label: {
-                    HStack(spacing: 4) {
-                        Text(expanded ? "Masquer les exercices" : "Voir les exercices")
-                        Image(systemName: "chevron.down")
-                            .font(.footnote.weight(.semibold))
-                            .rotationEffect(.degrees(expanded ? 180 : 0))
-                    }
-                    .font(.body.weight(.medium))
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.tint)
-
                 Button(action: onStart) {
                     Label("Commencer", systemImage: "play.fill")
                         .font(.headline)
@@ -234,6 +223,14 @@ private struct SessionCard: View {
                 .buttonBorderShape(.capsule)
                 .controlSize(.large)
             }
+        }
+        // Tapping anywhere on the card (except Commencer) shows or hides the exercises.
+        .contentShape(.rect(cornerRadius: 26))
+        .onTapGesture {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.78)) { expanded.toggle() }
+        }
+        .accessibilityAction(named: expanded ? Text("Masquer les exercices") : Text("Voir les exercices")) {
+            withAnimation { expanded.toggle() }
         }
         .sensoryFeedback(.selection, trigger: expanded)
     }
