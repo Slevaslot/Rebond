@@ -26,35 +26,43 @@ struct FollowUpSection: View {
                 .padding(.horizontal, 4)
                 .padding(.top, 10)
 
-            // Régularité and the history are one card: this week at a glance, the sessions in the detail.
-            Button { detail = .history } label: {
-                WeekCard(week: week, showsChevron: true)
+            TileCard(symbol: "calendar", title: "Régularité", color: .teal, trailing: Text("Cette semaine")) {
+                detail = .history
+            } value: {
+                TileValue(value: "\(week.done)", unit: "sur \(week.planned) séances")
+            } chart: {
+                // One bar per day of the week: full and colored when a session was done.
+                HealthBars(values: week.days.map { $0.done ? 1 : 0 }, maximum: 1, color: .teal,
+                           highlighted: Set(week.days.indices.filter { week.days[$0].done }))
             }
-            .buttonStyle(.plain)
 
-            TileCard(title: "Amplitude", color: .blue, trailing: progress.amplitude.last.map { Text($0.series) }) {
+            let amplitudes = progress.amplitude.last.map { last in progress.amplitude.filter { $0.series == last.series } } ?? []
+            TileCard(symbol: "arrow.up.and.down", title: "Amplitude", color: .blue,
+                     trailing: amplitudes.last.map { Text($0.date, format: .dateTime.day().month()) }) {
                 detail = .amplitude
             } value: {
-                if let last = progress.amplitude.last {
-                    TileValue(value: "\(Int(last.value.rounded()))", unit: "%")
+                if let last = amplitudes.last {
+                    TileValue(value: "\(Int(last.value.rounded()))", unit: "% · \(last.series)")
                 } else {
                     TileEmpty()
                 }
             } chart: {
-                if let last = progress.amplitude.last {
-                    MiniLine(values: progress.amplitude.filter { $0.series == last.series }.map(\.value), color: .blue)
-                }
+                let values = amplitudes.suffix(7).map(\.value)
+                HealthBars(values: values, maximum: max(110, values.max() ?? 0), color: .blue, highlighted: [values.count - 1])
             }
-            TileCard(title: "Douleur", color: .orange, trailing: Text("Dernière séance")) {
+
+            TileCard(symbol: "bandage.fill", title: "Douleur", color: .orange,
+                     trailing: sessions.first.map { Text($0.date, format: .dateTime.day().month()) }) {
                 detail = .pain
             } value: {
                 if let last = progress.pain.last {
-                    TileValue(value: "\(Int(last.value))", unit: "/ 10")
+                    TileValue(value: "\(Int(last.value))", unit: "sur 10")
                 } else {
                     TileEmpty()
                 }
             } chart: {
-                MiniBars(values: progress.pain.suffix(8).map(\.value), maximum: 10, color: .orange)
+                let values = progress.pain.suffix(7).map(\.value)
+                HealthBars(values: values, maximum: 10, color: .orange, highlighted: [values.count - 1])
             }
 
             // A plain row, like Health's "Afficher toutes les données Santé".
@@ -99,9 +107,10 @@ struct FollowUpSection: View {
 
 // MARK: - Tiles
 
-/// A full-width Health card: colored title, a detail and a chevron, then the value with a small chart beside it.
-/// The whole card opens the detail.
+/// A card like Health's "Épinglés": colored symbol and title, a detail and a chevron in gray,
+/// some air, then the value at bottom left and a few narrow bars at bottom right. The card opens the detail.
 private struct TileCard<Value: View, ChartContent: View>: View {
+    let symbol: String
     let title: LocalizedStringKey
     let color: Color
     let trailing: Text?
@@ -111,9 +120,9 @@ private struct TileCard<Value: View, ChartContent: View>: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Text(title)
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 6) {
+                    Label(title, systemImage: symbol)
                         .font(.headline)
                         .foregroundStyle(color)
                     Spacer()
@@ -123,20 +132,21 @@ private struct TileCard<Value: View, ChartContent: View>: View {
                             .foregroundStyle(.secondary)
                     }
                     Image(systemName: "chevron.right")
-                        .font(.footnote.weight(.bold))
+                        .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.tertiary)
                 }
-                HStack(alignment: .bottom, spacing: 16) {
+                Spacer(minLength: 34)
+                HStack(alignment: .bottom) {
                     value
-                    Spacer(minLength: 0)
+                    Spacer(minLength: 12)
                     chart
-                        .frame(width: 130, height: 48)
                 }
             }
-            .padding()
+            .padding(.horizontal, 18)
+            .padding(.vertical, 16)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 26))
-            .contentShape(.rect(cornerRadius: 26))
+            .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 24))
+            .contentShape(.rect(cornerRadius: 24))
         }
         .buttonStyle(.plain)
     }
@@ -149,10 +159,10 @@ private struct TileValue: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 4) {
             Text(value)
-                .font(.system(size: 32, weight: .semibold, design: .rounded))
+                .font(.system(size: 34, weight: .semibold))
                 .monospacedDigit()
             Text(unit)
-                .font(.subheadline.weight(.semibold))
+                .font(.headline)
                 .foregroundStyle(.secondary)
         }
         .lineLimit(1)
@@ -162,48 +172,33 @@ private struct TileValue: View {
 
 private struct TileEmpty: View {
     var body: some View {
-        Text("Pas encore de mesure")
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
+        Text("Aucune donnée")
+            .font(.title2.bold())
     }
 }
 
-private struct MiniLine: View {
-    let values: [Double]
-    let color: Color
-
-    var body: some View {
-        Chart(Array(values.suffix(10).enumerated()), id: \.offset) { item in
-            LineMark(x: .value("n", item.offset), y: .value("v", item.element))
-                .interpolationMethod(.monotone)
-                .foregroundStyle(color)
-        }
-        .chartXAxis(.hidden)
-        .chartYAxis(.hidden)
-        .chartYScale(domain: (values.min() ?? 0) - 5 ... (values.max() ?? 1) + 5)
-        .accessibilityHidden(true)
-    }
-}
-
-private struct MiniBars: View {
+/// Health's mini chart: a few narrow gray bars, rounded at the top, the highlighted ones in color.
+private struct HealthBars: View {
     let values: [Double]
     let maximum: Double
     let color: Color
-    /// Every bar in color; otherwise only the last one, as Health does for "today".
-    var highlightAll = false
+    let highlighted: Set<Int>
+    private let height = 52.0
 
     var body: some View {
-        Chart(Array(values.enumerated()), id: \.offset) { item in
-            BarMark(x: .value("n", item.offset), y: .value("v", max(item.element, 0.3)))
-                .foregroundStyle(highlightAll || item.offset == values.count - 1 ? color : Color(.tertiaryLabel))
-                .clipShape(.rect(cornerRadius: 2))
+        HStack(alignment: .bottom, spacing: 3) {
+            ForEach(Array(values.enumerated()), id: \.offset) { index, value in
+                UnevenRoundedRectangle(topLeadingRadius: 2, topTrailingRadius: 2)
+                    .fill(highlighted.contains(index) ? AnyShapeStyle(color) : AnyShapeStyle(Color(.systemGray3)))
+                    .frame(width: 8, height: max(4, height * min(value / max(maximum, 0.001), 1)))
+            }
         }
-        .chartXAxis(.hidden)
-        .chartYAxis(.hidden)
-        .chartYScale(domain: 0...maximum)
+        .frame(height: height, alignment: .bottom)
         .accessibilityHidden(true)
     }
 }
+
+
 
 // MARK: - Detail sheet
 

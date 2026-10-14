@@ -1,124 +1,115 @@
 import SwiftData
 import SwiftUI
 
-/// An alert card in the style of Health's "Liste de vérification": a small gray header in capitals with a
-/// close button, a separator, then a large colored symbol, a bold sentence, a gray explanation and one action.
-struct AlertCard: View {
-    let header: Text
-    let symbol: String
-    let color: Color
-    let title: Text
-    let message: Text
-    let actionTitle: LocalizedStringKey
-    let action: () -> Void
-    let onDismiss: () -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                header
-                    .textCase(.uppercase)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Button("Masquer", systemImage: "xmark", action: onDismiss)
-                    .labelStyle(.iconOnly)
-                    .font(.footnote.weight(.bold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 30, height: 30)
-                    .background(Color(.tertiarySystemFill), in: .circle)
-                    .buttonStyle(.plain)
-            }
-            .padding(.horizontal)
-            .padding(.vertical, 12)
-
-            Divider()
-
-            HStack(alignment: .top, spacing: 16) {
-                Image(systemName: symbol)
-                    .font(.system(size: 34))
-                    .foregroundStyle(color)
-                    .symbolRenderingMode(.hierarchical)
-                    .frame(width: 44)
-                VStack(alignment: .leading, spacing: 6) {
-                    title
-                        .font(.title3.weight(.semibold))
-                    message
-                        .foregroundStyle(.secondary)
-                    Button(actionTitle, action: action)
-                        .font(.headline)
-                        .buttonStyle(.bordered)
-                        .buttonBorderShape(.capsule)
-                        .tint(color)
-                        .padding(.top, 6)
-                }
-                .fixedSize(horizontal: false, vertical: true)
-            }
-            .padding()
-        }
-        .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 26))
-        .transition(.asymmetric(insertion: .opacity.combined(with: .scale(scale: 0.96)), removal: .opacity))
-    }
-}
-
-/// After a painful session: calm, never blocking, with a way to tell the physiotherapist.
-struct PainAlertCard: View {
+/// The alerts of the Résumé page, grouped in one compact card: one row each, newest first.
+struct AlertsGroup: View {
     let sessions: [Session]
     let onReport: () -> Void
-    static let dismissedKey = "dismissedPainAlert"
-    @AppStorage(dismissedKey) private var dismissed: Double = 0
+    let onShowProgram: () -> Void
 
+    static let dismissedKey = "dismissedPainAlert"
+    @AppStorage(dismissedKey) private var painDismissed: Double = 0
+    @AppStorage(ProgramChange.dateKey) private var changeDate: Double = 0
+    @AppStorage(ProgramChange.byKey) private var changeBy = ""
+    @AppStorage(ProgramChange.summaryKey) private var changeSummary = ""
+
+    /// The last session, when it was painful and its alert wasn't closed.
     private var painful: Session? {
         guard let last = sessions.first,
               last.pain >= WeeklyReport.highPain,
-              last.date.timeIntervalSinceReferenceDate > dismissed,
+              last.date.timeIntervalSinceReferenceDate > painDismissed,
               last.date > Date.now.addingTimeInterval(-7 * 86_400)
         else { return nil }
         return last
     }
 
     var body: some View {
-        if let painful {
-            AlertCard(
-                header: Text("Douleur · \(painful.date, format: .dateTime.day().month())"),
-                symbol: "heart.text.square.fill",
-                color: .orange,
-                title: Text("Douleur de \(painful.pain) sur 10 à la dernière séance."),
-                message: Text("Si elle est forte ou inhabituelle, faites une pause et parlez-en à votre kiné."),
-                actionTitle: "Prévenir mon kiné",
-                action: onReport,
-                onDismiss: {
-                    withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) {
-                        dismissed = painful.date.timeIntervalSinceReferenceDate
-                    }
+        let painful = painful
+        if changeDate > 0 || painful != nil {
+            VStack(spacing: 0) {
+                if changeDate > 0 {
+                    AlertRow(
+                        symbol: "list.bullet.clipboard.fill",
+                        color: .blue,
+                        title: Text("Nouveau programme"),
+                        date: Date(timeIntervalSinceReferenceDate: changeDate),
+                        message: changeBy.isEmpty ? Text(changeSummary) : Text("\(changeBy) · \(changeSummary)"),
+                        action: onShowProgram,
+                        onDismiss: { withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) { changeDate = 0 } }
+                    )
                 }
-            )
+                if changeDate > 0, painful != nil {
+                    Divider().padding(.leading, 62)
+                }
+                if let painful {
+                    AlertRow(
+                        symbol: "bandage.fill",
+                        color: .orange,
+                        title: Text("Douleur de \(painful.pain) sur 10"),
+                        date: painful.date,
+                        message: Text("Faites une pause et prévenez votre kiné."),
+                        action: onReport,
+                        onDismiss: {
+                            withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) {
+                                painDismissed = painful.date.timeIntervalSinceReferenceDate
+                            }
+                        }
+                    )
+                }
+            }
+            .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 24))
+            .transition(.opacity.combined(with: .scale(scale: 0.97)))
         }
     }
 }
 
-/// The physiotherapist changed the program (QR code or connected version): what changed, in one line.
-struct ProgramChangeCard: View {
-    let onShow: () -> Void
-    @AppStorage(ProgramChange.dateKey) private var date: Double = 0
-    @AppStorage(ProgramChange.byKey) private var by = ""
-    @AppStorage(ProgramChange.summaryKey) private var summary = ""
+/// One alert: a colored symbol, a bold line with its date, a gray line, and a small close button.
+/// The row opens the action.
+private struct AlertRow: View {
+    let symbol: String
+    let color: Color
+    let title: Text
+    let date: Date
+    let message: Text
+    let action: () -> Void
+    let onDismiss: () -> Void
 
     var body: some View {
-        if date > 0 {
-            AlertCard(
-                header: Text("Programme · \(Date(timeIntervalSinceReferenceDate: date), format: .dateTime.day().month())"),
-                symbol: "list.bullet.clipboard.fill",
-                color: .blue,
-                title: by.isEmpty ? Text("Votre kiné a modifié votre programme.") : Text("\(by) a modifié votre programme."),
-                message: Text(summary),
-                actionTitle: "Voir le programme",
-                action: onShow,
-                onDismiss: {
-                    withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) { date = 0 }
+        HStack(spacing: 12) {
+            Button(action: action) {
+                HStack(spacing: 12) {
+                    Image(systemName: symbol)
+                        .font(.title3)
+                        .foregroundStyle(color)
+                        .frame(width: 32)
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                            title.font(.headline)
+                            Text(date, format: .dateTime.day().month())
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                        .lineLimit(1)
+                        message
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
+                    Spacer(minLength: 0)
                 }
-            )
+                .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            Button("Masquer", systemImage: "xmark", action: onDismiss)
+                .labelStyle(.iconOnly)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(.secondary)
+                .frame(width: 26, height: 26)
+                .background(Color(.tertiarySystemFill), in: .circle)
+                .buttonStyle(.plain)
         }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
     }
 }
 

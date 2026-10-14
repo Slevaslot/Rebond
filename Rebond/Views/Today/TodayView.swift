@@ -11,7 +11,7 @@ struct TodayView: View {
     @Query(sort: \Program.createdAt, order: .reverse) private var programs: [Program]
     @Query(sort: \Session.date, order: .reverse) private var sessions: [Session]
     @AppStorage(PatientIdentity.nameKey) private var patientName = ""
-    @AppStorage(PainAlertCard.dismissedKey) private var dismissedPainAlert: Double = 0
+    @AppStorage(AlertsGroup.dismissedKey) private var dismissedPainAlert: Double = 0
     @State private var restoredAlert = 0
     @State private var showingSettings = false
     @State private var showingReport = false
@@ -82,8 +82,7 @@ struct TodayView: View {
         return ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 header
-                ProgramChangeCard { router.tab = .program }
-                PainAlertCard(sessions: sessions) { showingReport = true }
+                AlertsGroup(sessions: sessions, onReport: { showingReport = true }, onShowProgram: { router.tab = .program })
 
                 SessionCard(program: program) { router.startWorkout() }
 
@@ -275,55 +274,6 @@ private struct ExerciseBadge: View {
     }
 }
 
-/// This week: sessions done against the goal, with a bar per day (today highlighted), like Health's step card.
-struct WeekCard: View {
-    let week: WeekProgress
-    var showsChevron = false
-
-    var body: some View {
-        SummaryCard(title: Text("Régularité"), systemImage: "checkmark.circle.fill", color: .mint) {
-            HStack(spacing: 8) {
-                Text("Cette semaine")
-                if showsChevron {
-                    Image(systemName: "chevron.right")
-                        .font(.footnote.weight(.bold))
-                        .foregroundStyle(.tertiary)
-                }
-            }
-        } content: {
-            HStack(alignment: .bottom) {
-                VStack(alignment: .leading, spacing: 2) {
-                    BigValue(value: "\(week.done)", unit: "sur \(week.planned) séances")
-                    if week.done >= week.planned {
-                        Text("Objectif atteint, bravo !")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                Spacer(minLength: 12)
-                Chart(week.days, id: \.date) { day in
-                    BarMark(
-                        x: .value("Jour", day.date, unit: .day),
-                        y: .value("Séances", day.done ? 1 : 0.06)
-                    )
-                    .foregroundStyle(day.done ? Color.mint : Color(.tertiaryLabel))
-                    .clipShape(.rect(cornerRadius: 2))
-                }
-                .chartXAxis {
-                    AxisMarks(values: .stride(by: .day)) { value in
-                        AxisValueLabel(format: .dateTime.weekday(.narrow))
-                    }
-                }
-                .chartYAxis(.hidden)
-                .chartYScale(domain: 0...1)
-                .frame(width: 130, height: 64)
-            }
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("Régularité cette semaine"))
-        .accessibilityValue(Text(week.summary))
-    }
-}
 
 
 /// The patient's initials, or a person symbol, as Health's profile button.
