@@ -56,10 +56,6 @@
 	</dict>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Rebond se connecte au serveur de démonstration de votre kiné sur ce réseau.</string>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>Rebond écoute vos commandes vocales (« Pause », « Reprendre ») pendant la séance, si vous les activez. Rien n'est enregistré.</string>
-	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Rebond reconnaît vos commandes vocales sur l'iPhone pendant la séance. Rien n'est envoyé.</string>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<false/>
 </dict>

@@ -12,8 +12,9 @@ final class AppRouter {
         case program
     }
 
-    /// Ways to add a program: scanning the sheet, picking a photo of it, or typing it.
+    /// Ways to add a program: the physiotherapist's message, scanning the sheet, picking a photo of it, or typing it.
     enum ImportSource {
+        case message
         case scan
         case photo
         case manual

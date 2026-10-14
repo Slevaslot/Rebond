@@ -61,18 +61,23 @@ struct TodayView: View {
     }
 
     private var noProgram: some View {
+        // The program always comes from the physiotherapist: their message, or their sheet.
         ContentUnavailableView {
-            Label("Votre programme", systemImage: "doc.viewfinder")
+            Label("Votre programme vient de votre kiné", systemImage: "stethoscope")
         } description: {
-            Text("Scannez la feuille de votre kiné.")
+            Text("Collez le message où il vous décrit vos exercices, ou scannez sa feuille.")
         } actions: {
-            Button("Scanner ma feuille") { router.addProgram(from: .scan) }
+            Button("Coller son message", systemImage: "text.bubble") { router.addProgram(from: .message) }
                 .buttonStyle(.glassProminent)
                 .controlSize(.large)
-            Button("Saisir à la main") { router.addProgram(from: .manual) }
+            Button("Scanner sa feuille", systemImage: "doc.viewfinder") { router.addProgram(from: .scan) }
+                .buttonStyle(.glass)
+                .controlSize(.large)
+            #if DEBUG
             Button("Programme de démo") { DemoData.load(into: context) }
                 .font(.footnote)
                 .foregroundStyle(.secondary)
+            #endif
         }
     }
 
@@ -235,7 +240,7 @@ private struct SessionCard: View {
                 }
 
                 Button(action: onStart) {
-                    Label("Commencer", systemImage: "play.fill")
+                    Text("Commencer")
                         .font(.headline)
                         .frame(maxWidth: .infinity)
                 }
