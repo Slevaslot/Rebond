@@ -255,59 +255,45 @@ private struct ExerciseBadge: View {
     }
 }
 
-/// This week: sessions done against the goal, then the seven days as bubbles —
-/// done (check), planned (ring), today (accent) — like a calendar row.
+/// This week: sessions done against the goal, with a bar per day (today highlighted), like Health's step card.
 private struct WeekCard: View {
     let week: WeekProgress
 
     var body: some View {
-        SummaryCard(title: Text("Cette semaine"), systemImage: nil, color: .accentColor, sectionHeader: true) {
-            if week.done >= week.planned {
-                Label("Objectif atteint", systemImage: "checkmark.seal.fill")
-                    .foregroundStyle(.tint)
-            }
+        SummaryCard(title: Text("Régularité"), systemImage: nil, color: .accentColor, sectionHeader: true) {
+            Text("Cette semaine")
         } content: {
-            VStack(alignment: .leading, spacing: 16) {
-                BigValue(value: "\(week.done)", unit: "sur \(week.planned) séances")
-                HStack(spacing: 0) {
-                    ForEach(week.days, id: \.date) { day in
-                        DayBubble(day: day, planned: week.plannedWeekdays.contains(Calendar.current.component(.weekday, from: day.date)))
-                            .frame(maxWidth: .infinity)
+            HStack(alignment: .bottom) {
+                VStack(alignment: .leading, spacing: 2) {
+                    BigValue(value: "\(week.done)", unit: "sur \(week.planned) séances")
+                    if week.done >= week.planned {
+                        Text("Objectif atteint, bravo !")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
                     }
                 }
+                Spacer(minLength: 12)
+                Chart(week.days, id: \.date) { day in
+                    BarMark(
+                        x: .value("Jour", day.date, unit: .day),
+                        y: .value("Séances", day.done ? 1 : 0.06)
+                    )
+                    .foregroundStyle(day.done ? Color.accentColor : Color(.tertiaryLabel))
+                    .clipShape(.rect(cornerRadius: 2))
+                }
+                .chartXAxis {
+                    AxisMarks(values: .stride(by: .day)) { value in
+                        AxisValueLabel(format: .dateTime.weekday(.narrow))
+                    }
+                }
+                .chartYAxis(.hidden)
+                .chartYScale(domain: 0...1)
+                .frame(width: 130, height: 64)
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("Cette semaine"))
+        .accessibilityLabel(Text("Régularité cette semaine"))
         .accessibilityValue(Text(week.summary))
-    }
-}
-
-private struct DayBubble: View {
-    let day: (date: Date, done: Bool)
-    let planned: Bool
-
-    private var isToday: Bool { Calendar.current.isDateInToday(day.date) }
-
-    var body: some View {
-        VStack(spacing: 6) {
-            Text(day.date, format: .dateTime.weekday(.narrow))
-                .font(.caption.weight(isToday ? .bold : .regular))
-                .foregroundStyle(isToday ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
-            ZStack {
-                if day.done {
-                    Circle().fill(.tint)
-                    Image(systemName: "checkmark")
-                        .font(.footnote.weight(.bold))
-                        .foregroundStyle(.white)
-                } else if planned {
-                    Circle().strokeBorder(isToday ? AnyShapeStyle(.tint) : AnyShapeStyle(.tertiary), lineWidth: 2.5)
-                } else {
-                    Circle().fill(.quaternary).frame(width: 6, height: 6)
-                }
-            }
-            .frame(width: 32, height: 32)
-        }
     }
 }
 
@@ -409,9 +395,6 @@ struct WeekProgress {
             return (day, sessions.contains { calendar.isDate($0.date, inSameDayAs: day) })
         }
     }
-
-    /// Calendar weekdays of the planned sessions, spread like the reminders.
-    var plannedWeekdays: Set<Int> { Set(ReminderScheduler.sessionDays(count: planned)) }
 
     var summary: LocalizedStringKey {
         done >= planned ? "Objectif atteint : \(done) séances" : "\(done) séances sur \(planned)"
