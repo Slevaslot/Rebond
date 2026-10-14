@@ -93,7 +93,8 @@ struct OneArmRaiseTests {
 
     @Test func partialRaiseIsIncomplete() {
         var feeder = calibrated()
-        raiseRight(&feeder, to: 80)
+        // Under 70% of the 110° target (77°).
+        raiseRight(&feeder, to: 70)
         #expect(feeder.completed.isEmpty)
         #expect(feeder.incomplete == 1)
         #expect(feeder.corrections == [.raiseHigher])
@@ -218,7 +219,8 @@ struct LegRaiseCounterTests {
 
     @Test func lowRaiseIsIncomplete() {
         var feeder = standing()
-        raise(&feeder, to: 0.22)
+        // Under 70% of the 0.3 target (0.21), above half of it.
+        raise(&feeder, to: 0.18)
         #expect(feeder.completed.isEmpty)
         #expect(feeder.incomplete == 1)
         #expect(feeder.corrections == [.raiseLegHigher])

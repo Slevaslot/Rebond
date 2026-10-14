@@ -64,7 +64,7 @@ nonisolated struct ShoulderRotationCounter: MovementCounter {
             target: targetTurn,
             back: targetTurn * 0.2,
             reversalMargin: targetTurn * 0.25,
-            noise: targetTurn * 0.6,
+            noise: targetTurn * 0.5,
             // Slow and controlled, for the shoulder.
             minDuration: 1.5,
             shortfall: .turnForearmFurther

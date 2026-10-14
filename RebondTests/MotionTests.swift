@@ -126,7 +126,8 @@ struct ArmRaiseCounterTests {
 
     @Test func partialRaiseIsIncomplete() {
         var feeder = calibrated()
-        raise(&feeder, to: 60)
+        // Under 70% of the 80° target (56°), above the 50° under which an attempt is ignored.
+        raise(&feeder, to: 53)
         #expect(feeder.completed.isEmpty)
         #expect(feeder.incomplete == 1)
         #expect(feeder.corrections == [.raiseHigher])
@@ -154,6 +155,15 @@ struct ArmRaiseCounterTests {
         #expect(feeder.corrections.contains(.keepArmsStraight))
     }
 
+    @Test func countsFromSeventyPercent() throws {
+        var feeder = calibrated()
+        raise(&feeder, to: 62)
+        let result = try #require(feeder.completed.first)
+        #expect(result.amplitude > 0.7 && result.amplitude < 0.8)
+        #expect(AmplitudeTier(amplitude: result.amplitude) == .good)
+        #expect(feeder.corrections.isEmpty)
+    }
+
     @Test func fastRaiseIsFlagged() throws {
         var feeder = calibrated()
         raise(&feeder, to: 88, seconds: 0.4)
@@ -178,11 +188,25 @@ struct SquatCounterTests {
         // The median over 3 frames softens the very bottom of the movement.
         #expect(amplitude > 1.0 && amplitude < 1.2)
 
-        feeder.move(from: 0, to: 0.45, seconds: 1) { Body.squat(depth: $0) }
-        feeder.move(from: 0.45, to: 0, seconds: 1) { Body.squat(depth: $0) }
+        // Under 70% of the target (0.42): incomplete.
+        feeder.move(from: 0, to: 0.36, seconds: 1) { Body.squat(depth: $0) }
+        feeder.move(from: 0.36, to: 0, seconds: 1) { Body.squat(depth: $0) }
         feeder.feed(Body.squat(depth: 0), frames: 3)
         #expect(feeder.completed.count == 2)
         #expect(feeder.incomplete == 1)
         #expect(feeder.corrections.contains(.goLower))
+    }
+
+    @Test func countsFromSeventyPercentOfTheTarget() throws {
+        var feeder = Feeder(counter: RepCounter(targetDepth: 0.6))
+        feeder.feed(Body.squat(depth: 0), frames: 10)
+        feeder.move(from: 0, to: 0.48, seconds: 1) { Body.squat(depth: $0) }
+        let bottom = feeder.events.contains { if case .bottomReached = $0 { true } else { false } }
+        #expect(bottom)
+        feeder.move(from: 0.48, to: 0, seconds: 1) { Body.squat(depth: $0) }
+        feeder.feed(Body.squat(depth: 0), frames: 3)
+        let result = try #require(feeder.completed.first)
+        #expect(result.amplitude > 0.7 && result.amplitude < 0.85)
+        #expect(feeder.incomplete == 0)
     }
 }

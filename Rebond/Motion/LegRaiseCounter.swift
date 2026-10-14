@@ -92,7 +92,7 @@ nonisolated struct LegRaiseCounter: MovementCounter {
             target: targetLift,
             back: targetLift * 0.25,
             reversalMargin: targetLift * 0.3,
-            noise: targetLift * 0.6,
+            noise: targetLift * 0.5,
             minDuration: 1.5,
             shortfall: style == .straightLeg ? .raiseLegHigher : .raiseKneeHigher
         )

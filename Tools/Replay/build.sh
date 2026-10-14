@@ -3,8 +3,10 @@
 # Add the file of any new counter to the list below.
 HERE="$(cd "$(dirname "$0")" && pwd)"
 MOTION="$HERE/../../Rebond/Motion"
+# AmplitudeTier sets the 70% from which a repetition counts.
+TIER="$HERE/../../Rebond/Views/Session/AmplitudeTier.swift"
 swiftc -O "$HERE/kinect.swift" "$HERE/main.swift" \
     "$MOTION/RepCounter.swift" "$MOTION/RepCycle.swift" "$MOTION/ArmRaiseCounter.swift" \
     "$MOTION/SitToStandCounter.swift" "$MOTION/LegRaiseCounter.swift" "$MOTION/LungeCounter.swift" \
-    "$MOTION/ShoulderRotationCounter.swift" "$MOTION/PoseAnalyzer.swift" \
+    "$MOTION/ShoulderRotationCounter.swift" "$MOTION/PoseAnalyzer.swift" "$TIER" \
     -o "$HERE/replay" 2>&1 | grep -E "error|warning" | head -20

@@ -3,8 +3,8 @@ import Foundation
 /// The repetition state machine shared by the counters that follow one value going from rest to a target
 /// and back (arm angle, rise of the hips, height of the ankle).
 ///
-/// A repetition starts when the value passes `start`, reaches the target at `target` (`.bottomReached`),
-/// and is counted once back under `back`. Coming back before the target makes it incomplete;
+/// A repetition starts when the value passes `start`, goes far enough at `counted` (70% of `target`,
+/// `.bottomReached`), and is counted once back under `back`. Coming back before that makes it incomplete;
 /// a fault seen on `faultFrames` frames in a row cancels it until the patient is back at rest.
 /// The hysteresis between `start` and `back` keeps detection noise from counting twice.
 nonisolated struct RepCycle: Sendable {
@@ -20,7 +20,7 @@ nonisolated struct RepCycle: Sendable {
 
     /// The value at which a repetition starts.
     let start: Double
-    /// The value to reach for a complete repetition.
+    /// The exercise's target, 100% of the amplitude. A repetition counts from `counted`.
     let target: Double
     /// Back at rest under this value.
     let back: Double
@@ -40,6 +40,10 @@ nonisolated struct RepCycle: Sendable {
     private(set) var peak = 0.0
     private var repStart = 0.0
     private var faultStreak: (fault: Correction, frames: Int)?
+
+    /// The value from which a repetition counts: "Bien", 70% of the target. Elderly patients rarely reach
+    /// the full target; the amplitude reached (up to beyond 100%) tells the physio how far they went.
+    var counted: Double { target * AmplitudeTier.goodThreshold }
 
     var isInRepetition: Bool {
         phase == .going || phase == .targetReached || phase == .returnedEarly
@@ -87,7 +91,7 @@ nonisolated struct RepCycle: Sendable {
                 faultStreak = nil
             }
         case .going:
-            if value >= target {
+            if value >= counted {
                 phase = .targetReached
                 return .bottomReached
             } else if value < peak - reversalMargin {
@@ -104,7 +108,7 @@ nonisolated struct RepCycle: Sendable {
                 return .repCompleted(RepResult(amplitude: peak / target, tooFast: time - repStart < minDuration))
             }
         case .returnedEarly:
-            if value >= target {
+            if value >= counted {
                 phase = .targetReached
             } else if value <= back {
                 phase = .rest

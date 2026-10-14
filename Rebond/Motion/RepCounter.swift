@@ -68,7 +68,7 @@ nonisolated struct RepResult: Sendable {
 nonisolated enum RepEvent: Sendable {
     /// The resting position has been measured for the first time: counting starts.
     case calibrated
-    /// The target depth is reached: time to come back up.
+    /// Deep enough for the repetition to count (70% of the target): time to come back up.
     case bottomReached
     case repCompleted(RepResult)
     case repIncomplete(amplitude: Double)
@@ -133,8 +133,9 @@ nonisolated struct RepCounter: MovementCounter {
     private let returnDepth = 0.2
     /// How far the hips must rise from their lowest point to count as coming back up.
     private let reversalMargin = 0.2
-    /// Below this depth, an attempt is too small to be worth a correction.
-    private let noiseDepth = 0.4
+    /// Below this depth, an attempt is too small to be worth a correction: half the target, under the 70%
+    /// from which it counts, so a squat a little short is still told to go lower.
+    private var noiseDepth: Double { targetDepth * 0.5 }
     /// Maximum ankle movement during a repetition, in torso lengths. Beyond: a step, a lunge, walking.
     private let feetTolerance = 0.5
     /// Maximum widening of the stance during a repetition, in torso lengths.
@@ -190,6 +191,9 @@ nonisolated struct RepCounter: MovementCounter {
     init(targetDepth: Double) {
         self.targetDepth = targetDepth
     }
+
+    /// Depth from which a repetition counts: "Bien", 70% of the target.
+    private var countedDepth: Double { targetDepth * AmplitudeTier.goodThreshold }
 
     private var isInRepetition: Bool {
         phase == .descending || phase == .bottomReached || phase == .risingTooEarly
@@ -276,7 +280,7 @@ nonisolated struct RepCounter: MovementCounter {
 
     private mutating func advance(depth: Double, measure: PoseMeasure, time: Double) -> RepEvent? {
         if isInRepetition {
-            if depth >= targetDepth * 0.8, measure.leftKnee != nil, measure.rightKnee != nil {
+            if depth >= countedDepth, measure.leftKnee != nil, measure.rightKnee != nil {
                 sawBothKneesAtBottom = true
             }
             maxDepth = max(maxDepth, depth)
@@ -305,7 +309,7 @@ nonisolated struct RepCounter: MovementCounter {
                 sawBothKneesAtBottom = false
             }
         case .descending:
-            if depth >= targetDepth {
+            if depth >= countedDepth {
                 phase = .bottomReached
                 return .bottomReached
             } else if depth < maxDepth - reversalMargin {
@@ -328,7 +332,7 @@ nonisolated struct RepCounter: MovementCounter {
                 ))
             }
         case .risingTooEarly:
-            if depth >= targetDepth {
+            if depth >= countedDepth {
                 phase = .bottomReached
             } else if depth <= returnDepth {
                 phase = .rest

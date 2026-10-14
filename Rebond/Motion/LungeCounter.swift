@@ -76,7 +76,7 @@ nonisolated struct LungeCounter: MovementCounter {
             target: target,
             back: target * 0.25,
             reversalMargin: target * 0.3,
-            noise: target * 0.6,
+            noise: target * 0.5,
             minDuration: 1.5,
             shortfall: direction == .forward ? .goLower : .lungeFurther
         )
