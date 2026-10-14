@@ -26,7 +26,7 @@ Rebond/
 ├── Report/              statistiques, données des graphiques, PDF
 ├── Reminders/           notifications locales
 ├── Store/               abonnement Rebond Pro (StoreKit 2)
-├── Pro/                 rôle patient / kiné, transferts (lien du programme, fichier de bilan)
+├── Pro/                 rôle patient / kiné, transferts (lien du programme, fichier de bilan), synthèse d'un patient
 ├── Intents/             App Intents
 ├── Views/               écrans SwiftUI, regroupés par onglet
 └── Resources/           String Catalog, données de démo, PrivacyInfo
@@ -154,7 +154,10 @@ ExerciseResult                     copie autonome, pas de lien vers PlannedExerc
 
 - **Prescription** : `ProgramTransfer` (JSON compact, base64url) dans un lien `rebond://programme?d=…`, affiché en QR code (Core Image). Le patient le scanne avec l'appareil photo : `onOpenURL` ouvre l'écran de vérification.
 - **Suivi** : le bilan partagé contient le PDF et un fichier `.rebond` (`ReportTransfer`, 6 dernières semaines, identifiant stable du patient). Ouvert avec Rebond, il crée ou met à jour un `TrackedPatient` ; le kiné voit le même résumé et les mêmes graphiques que le patient.
-- **Accès** : `ProStore` lit les droits StoreKit ; l'espace kiné demande l'abonnement, l'app patient jamais.
+- **Activation** : `AppRole` (`UserDefaults`, clé `appRole`). Activé, il ajoute l'onglet `AppRouter.AppTab.physio`, sélectionné au lancement. Ouvrir un bilan l'active et ouvre la fiche du patient (`AppRouter.openPhysioSpace(patient:)`).
+- **Synthèse** : `PatientOverview` (logique pure, testée) résume le dernier bilan : régularité, douleur (séances ≥ 7), répétitions, amplitude, et ce qui demande l'attention (douleur forte, peu de séances, bilan ancien) pour trier la liste.
+- **Accès** : `ProStore` lit les droits StoreKit ; offre gratuite limitée à 3 patients (`TrackedPatient.importReport`), Rebond Pro illimité. L'app patient ne demande jamais l'abonnement.
+- **Aucun serveur** : la version connectée de démo a été retirée. Programmes par QR code, bilans par fichier `.rebond`, sur geste du patient.
 
 ## Bonus, dans l'ordre
 

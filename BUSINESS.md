@@ -29,9 +29,8 @@ Livrable demandé par le Build Challenge (« a go-to-market plan, including mone
 |---|---|---|
 | Prescrire un programme en QR code | ✓ | ✓ |
 | Suivre ses patients (régularité, répétitions, amplitude, douleur, alertes) | **3 patients** | **Illimité** |
-| Modifier un programme et le renvoyer | ✓ (nouveau QR code) | ✓ **à distance, sans QR code** |
-| Patients liés en permanence, bilans reçus automatiquement | — | ✓ |
-| Données | Sur l'iPhone, aucun serveur | Serveur certifié HDS (hébergeur de données de santé) |
+| Modifier un programme et le renvoyer (nouveau QR code) | ✓ | ✓ |
+| Données | Sur l'iPhone, aucun serveur | Sur l'iPhone, aucun serveur |
 | Prix | 0 € | 19,99 € HT / mois ou 199 € HT / an, 1 mois offert |
 
 Le patient ne paie jamais.
@@ -39,11 +38,12 @@ Le patient ne paie jamais.
 **Pourquoi ce découpage :**
 - L'offre gratuite fait adopter l'outil : le kiné l'essaie sur 3 patients, avec toutes les fonctions locales.
 - Le moment de payer est naturel : au 4ᵉ patient, il a déjà vu la valeur.
-- Le serveur apporte ce que le local ne peut pas faire (liens permanents, bilans automatiques, modifications à distance) et justifie l'abonnement.
+- Pas de serveur : rien à héberger, aucune donnée de santé confiée à un tiers, adoption simple pour le cabinet.
 
 **État pour le hackathon :**
 - Le build App Store contient l'offre gratuite et Rebond Pro en patients illimités (StoreKit 2). L'écran d'achat ne promet que ce qui existe déjà.
-- La version connectée est un **prototype de démo** (`Server/`, patients fictifs) présent seulement dans les versions installées depuis Xcode. En production, elle sera hébergée chez un hébergeur certifié HDS (AWS, Azure, OVHcloud…), avec consentement du patient et vérification du kiné (RPPS).
+- L'espace kiné est un onglet de la même app, activé dans Réglages (« Je suis kiné ») ou en ouvrant un bilan. Des patients de démo permettent de le montrer sans attendre de vrais bilans.
+- La version connectée de démo (serveur) a été abandonnée : tout reste local. Une version hébergée (HDS, consentement du patient, vérification RPPS) reste une piste après le hackathon, pas une promesse de l'offre.
 
 ## Hypothèses à tester pendant le hackathon (équipe business)
 
@@ -77,7 +77,7 @@ Le patient ne paie jamais.
 ## Pour le pitch (3 minutes)
 
 1. Le problème, raconté du côté du kiné (30 s).
-2. Démo (deux iPhone, version connectée) : le kiné invite le patient par QR code → le patient fait sa séance guidée par la caméra → le bilan arrive chez le kiné → le kiné ajuste le programme → il apparaît sur l'iPhone du patient (90 s).
+2. Démo (deux iPhone) : le kiné prescrit le programme par QR code → le patient le scanne et fait sa séance guidée par la caméra → il envoie son bilan → le kiné l'ouvre, voit la douleur et la régularité, ajuste le programme et montre le nouveau QR code (90 s).
 3. 100 % Apple, 100 % sur l'appareil : Foundation Models, Vision, VisionKit, Swift Charts, StoreKit, App Intents (20 s).
-4. Le modèle : gratuit pour le patient ; pour le kiné, gratuit jusqu'à 3 patients, puis Rebond Pro connecté (30 s).
-5. La suite : hébergement HDS et pilote avec 5 cabinets (10 s).
+4. Le modèle : gratuit pour le patient ; pour le kiné, gratuit jusqu'à 3 patients, puis Rebond Pro en patients illimités (30 s).
+5. La suite : pilote avec 5 cabinets (10 s).

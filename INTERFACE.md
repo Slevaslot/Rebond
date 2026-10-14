@@ -16,8 +16,9 @@ Un titre clair (pas le logo), une action principale évidente, une suite visible
 
 ## Deux rôles
 
-- **Patient** (par défaut, entièrement gratuit) : les trois onglets ci-dessous.
-- **Kiné** : un espace dédié (« Je suis kiné » à l'accueil, ou Réglages) avec prescription par QR code et liste des patients. L'abonnement Rebond Pro y est proposé avec `SubscriptionStoreView` ; l'app patient n'affiche jamais d'écran payant.
+- **Patient** (par défaut, entièrement gratuit) : les onglets ci-dessous.
+- **Kiné** : Réglages › « Je suis kiné » (dernière section, pour ne pas gêner le patient) ajoute l'onglet **Kiné** (`stethoscope`), qui devient l'onglet affiché au lancement tant que l'espace est activé. Ouvrir un bilan `.rebond` l'active aussi et ouvre la fiche du patient. Le kiné garde les autres onglets pour essayer l'app côté patient. On désactive l'espace dans ses réglages (roue dentée de l'onglet Kiné) ou dans Réglages.
+- **Onglet Kiné** : même style que l'accueil (cartes façon Santé). « Cette semaine » (patients suivis, à regarder, bilans reçus), « Prescrire un programme » (QR code), « Mes patients » (une carte par patient : régularité, douleur, répétitions, amplitude ; douleur forte en premier, signalée par symbole et texte), importer un bilan, offre gratuite / Rebond Pro. Fiche patient : séances à douleur forte, régularité, douleur, exercices, amplitude, programme actuel et « Ajuster le programme » (nouveau QR code). État vide avec « Importer un bilan » et « Essayer avec des patients de démo ». L'abonnement Rebond Pro y est proposé avec `SubscriptionStoreView` ; l'app patient n'affiche jamais d'écran payant.
 
 ## Structure de l'app patient
 
@@ -25,9 +26,10 @@ Trois onglets, pas plus (HIG *Tab bars* : les onglets servent à naviguer, jamai
 
 | Onglet | Symbole | Contenu |
 |---|---|---|
-| **Aujourd'hui** | `figure.strengthtraining.functional` | Séance du jour, bouton principal « Commencer la séance », progression de la semaine (séances faites / prévues). |
+| **Accueil** (page « Aujourd'hui ») | `house` | Séance du jour, bouton principal « Commencer la séance », progression de la semaine (séances faites / prévues). |
 | **Programme** | `list.bullet.clipboard` | Exercices du kiné, modification, « Nouvelle feuille » (scan) dans la barre d'outils. |
 | **Progrès** | `chart.line.uptrend.xyaxis` | Graphiques (amplitude, douleur, régularité), historique, bouton « Envoyer à mon kiné ». |
+| **Kiné** (seulement si l'espace kiné est activé) | `stethoscope` | Espace de travail du kiné, voir « Deux rôles ». Onglet affiché au lancement quand il est activé. |
 
 - Pas de programme enregistré : l'onglet Aujourd'hui affiche un état vide avec une seule suite claire, « Photographier ma feuille », et « Saisir à la main » en secondaire (HIG *Writing* : donner une suite claire sur tout écran vide).
 - Réglages et « À propos » (avertissement médical, données de démo) dans un menu de la barre d'outils, pas dans un onglet.

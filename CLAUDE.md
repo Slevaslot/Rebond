@@ -10,7 +10,7 @@ Rebond est une app iPhone de rééducation à domicile.
 4. En fin de séance, le patient indique son niveau de douleur (0 à 10).
 5. Le patient envoie à son kiné un bilan hebdomadaire (régularité, répétitions, amplitude, douleur), pour que le kiné ajuste le programme. Un rappel l'y invite chaque semaine.
 
-**Côté kiné (Rebond Pro, payant)** : dans la même app, un espace kiné permet de prescrire un programme par QR code (le patient le scanne avec l'appareil photo) et de suivre ses patients à partir des bilans reçus (fichier `.rebond`). Aucun serveur : les données passent directement du patient au kiné.
+**Côté kiné (Rebond Pro, payant)** : dans la même app, le kiné active l'espace kiné (Réglages › « Je suis kiné », ou en ouvrant un bilan `.rebond`). Un onglet « Kiné » s'ajoute et devient l'onglet affiché au lancement ; il permet de prescrire un programme par QR code (le patient le scanne avec l'appareil photo) et de suivre ses patients à partir des bilans reçus (fichier `.rebond`). Aucun serveur : les données passent directement du patient au kiné.
 
 **Problème résolu :** le kiné ne sait pas si un traitement échoue parce qu'il est inefficace ou parce que le patient a sauté ou mal fait ses exercices.
 
@@ -47,8 +47,9 @@ Prévoir des données de démo (un programme et quelques séances pré-remplies)
 | Semaine du rapport | Les 7 derniers jours, dates exactes affichées. |
 | Seuil de douleur élevée | 7, paramétrable, à valider avec un kiné. |
 | Langues | Français (source) et anglais. |
-| Modèle économique | Le patient ne paie jamais. Kiné : offre gratuite (tout en local, 3 patients suivis) et Rebond Pro (illimité + version connectée avec serveur). Voir `BUSINESS.md`. |
-| Serveur | Prototype de démo uniquement (`Server/`, patients fictifs), compilé seulement en Debug (`#if DEBUG`). Le build App Store reste sans serveur. |
+| Modèle économique | Le patient ne paie jamais. Kiné : offre gratuite (tout en local, 3 patients suivis) et Rebond Pro (patients illimités, tout en local). Voir `BUSINESS.md`. |
+| Serveur | Aucun. La version connectée de démo (`Server/`, `DemoServer`) a été supprimée : les bilans et les programmes passent seulement par le fichier `.rebond` et le QR code. |
+| Espace kiné | Un onglet « Kiné » de plus (pas une app à part) : le kiné garde l'accès à l'app patient. Activé dans Réglages ou en ouvrant un bilan, il reste activé d'un lancement à l'autre et l'app s'ouvre dessus. Patients de démo pour la présentation. |
 | Tutoriel | Aucun écran d'accueil ni tutoriel : la séance guide le patient à la voix. |
 | Commandes à distance | Geste de la main (paume ouverte = pause) doublé d'un bouton. Pas d'AirPods, pas de boutons de volume. |
 | HealthKit | Seulement s'il est réellement utilisé dans le build soumis. Ne pas déclarer la capacité avant. |
