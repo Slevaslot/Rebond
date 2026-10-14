@@ -17,6 +17,8 @@ struct WorkoutView: View {
     @State private var confirmingStop = false
     /// The set on screen has started (a repetition counted, the timer running): stopping would lose it.
     @State private var currentSetStarted = false
+    /// Asked from the Passer menu: the set's screen answers with what it did so far.
+    @State private var skipRequest: SkipRequest?
 
     init(program: Program) {
         let plan = WorkoutPlan(exercises: program.orderedExercises.map(\.workoutExercise))
@@ -46,8 +48,32 @@ struct WorkoutView: View {
                                     Button("Continuer la séance", role: .cancel) {}
                                 }
                         }
+                        ToolbarItem(placement: .topBarTrailing) {
+                            skipMenu
+                        }
                     }
                 }
+        }
+    }
+
+    /// Moving on without finishing: always one tap away, whatever the set is doing.
+    @ViewBuilder
+    private var skipMenu: some View {
+        if case .sets = stage, let step = plan.currentStep {
+            Menu("Passer", systemImage: "forward.end.fill") {
+                Button(plan.nextStep == nil ? "Terminer cette série" : "Passer à la série suivante", systemImage: "forward.frame") {
+                    skipRequest = SkipRequest(kind: .set)
+                }
+                if step.exercise.sets > step.set || plan.nextStep?.exerciseIndex != step.exerciseIndex {
+                    Button("Passer cet exercice", systemImage: "forward.end") {
+                        skipRequest = SkipRequest(kind: .exercise)
+                    }
+                }
+                Button("Terminer la séance", systemImage: "flag.checkered") {
+                    if plan.nothingDone, !currentSetStarted { dismiss() } else { confirmingStop = true }
+                }
+            }
+            .menuIndicator(.hidden)
         }
     }
 
@@ -58,6 +84,7 @@ struct WorkoutView: View {
             if let step = plan.currentStep {
                 stepView(step)
                     .environment(\.reportSetActivity) { currentSetStarted = true }
+                    .environment(\.skipRequest, skipRequest)
                     // A fresh screen (and camera analysis) for every set.
                     .id(plan.currentIndex)
             }
@@ -74,7 +101,14 @@ struct WorkoutView: View {
         switch step.exercise.mode {
         case .camera(let catalogID):
             if let exercise = CatalogExercise.find(catalogID) {
-                SessionView(exercise: exercise, targetReps: step.exercise.reps, setTitle: title, onFinish: finish)
+                SessionView(
+                    exercise: exercise,
+                    targetReps: step.exercise.reps,
+                    setTitle: title,
+                    showsDemonstration: plan.isFirstSetOfExercise,
+                    nextTitle: nextTitle,
+                    onFinish: finish
+                )
             }
         case .manual:
             ManualSetView(name: step.exercise.name, targetReps: step.exercise.reps, setTitle: title, onFinish: finish)
@@ -83,9 +117,22 @@ struct WorkoutView: View {
         }
     }
 
+    /// What comes after this set, for the end-of-set card.
+    private var nextTitle: LocalizedStringKey? {
+        guard let next = plan.nextStep else { return nil }
+        return next.exerciseIndex == plan.currentStep?.exerciseIndex
+            ? "Série \(next.set) sur \(next.exercise.sets)"
+            : "\(next.exercise.name), série 1 sur \(next.exercise.sets)"
+    }
+
     private func finish(_ result: SetResult) {
         currentSetStarted = false
-        plan.record(result)
+        if skipRequest?.kind == .exercise {
+            plan.skipExercise(keeping: result)
+        } else {
+            plan.record(result)
+        }
+        skipRequest = nil
         if plan.isFinished { stage = .pain }
     }
 
@@ -108,9 +155,6 @@ struct WorkoutView: View {
         let session = Session(pain: pain, duration: Date.now.timeIntervalSince(start), results: results)
         context.insert(session)
         stage = .summary(session)
-        #if DEBUG
-        Task { await DemoServer.shared.pushReport(context: context) }
-        #endif
     }
 }
 
@@ -127,7 +171,21 @@ extension PlannedExercise {
     }
 }
 
+/// "Passer" was chosen in the session's menu: the set's screen finishes with what it did so far.
+struct SkipRequest: Equatable {
+    enum Kind {
+        /// Only this set.
+        case set
+        /// This set and the exercise's remaining sets.
+        case exercise
+    }
+
+    let kind: Kind
+    let id = UUID()
+}
+
 extension EnvironmentValues {
     /// Called by a set's screen once something was done in it, so stopping the session asks before losing it.
     @Entry var reportSetActivity: () -> Void = {}
+    @Entry var skipRequest: SkipRequest? = nil
 }

@@ -11,6 +11,7 @@ struct ManualSetView: View {
 
     @State private var count = 0
     @Environment(\.reportSetActivity) private var reportSetActivity
+    @Environment(\.skipRequest) private var skipRequest
 
     var body: some View {
         VStack(spacing: 40) {
@@ -60,6 +61,7 @@ struct ManualSetView: View {
         }
         .animation(.default, value: count)
         .onChange(of: count) { if count > 0 { reportSetActivity() } }
+        .onChange(of: skipRequest) { if skipRequest != nil { onFinish(SetResult(completedReps: count)) } }
         .sensoryFeedback(.increase, trigger: count)
         .navigationTitle(name)
         .navigationSubtitle(Text(setTitle))
@@ -80,6 +82,7 @@ struct HoldSetView: View {
     @State private var elapsed: TimeInterval = 0
     @State private var coach = Coach()
     @State private var muted = false
+    @Environment(\.skipRequest) private var skipRequest
     @Environment(\.reportSetActivity) private var reportSetActivity
 
     private var remaining: Int { max(0, targetSeconds - Int(elapsed)) }
@@ -108,6 +111,7 @@ struct HoldSetView: View {
         }
         .animation(.default, value: remaining)
         .animation(.default, value: phase)
+        .onChange(of: skipRequest) { if skipRequest != nil { onFinish(SetResult(heldSeconds: Int(elapsed))) } }
         .navigationTitle(name)
         .navigationSubtitle(Text(setTitle))
         .navigationBarTitleDisplayMode(.inline)

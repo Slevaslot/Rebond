@@ -36,6 +36,26 @@ struct WorkoutPlanTests {
         #expect(plan.summary.count == 2)
         #expect(plan.summary[1].tally.setsDone == 0)
     }
+
+    @Test func skippingAnExerciseGoesToTheNextOne() {
+        var plan = WorkoutPlan(exercises: exercises)
+        #expect(plan.isFirstSetOfExercise)
+        #expect(plan.nextStep?.set == 2)
+        plan.skipExercise(keeping: SetResult(completedReps: 4))
+        #expect(plan.currentStep?.exercise.name == "Gainage")
+        #expect(plan.isFirstSetOfExercise)
+        #expect(plan.tallies[0].completedReps == 4)
+        #expect(plan.nextStep == nil)
+        plan.skipExercise()
+        #expect(plan.isFinished)
+    }
+
+    @Test func laterSetsSkipTheDemonstration() {
+        var plan = WorkoutPlan(exercises: exercises)
+        plan.record(SetResult(completedReps: 10))
+        #expect(plan.currentStep?.set == 2)
+        #expect(!plan.isFirstSetOfExercise)
+    }
 }
 
 @Suite("Bilan hebdomadaire")

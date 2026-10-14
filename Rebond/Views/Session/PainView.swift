@@ -29,7 +29,7 @@ struct PainView: View {
                     } maximumValueLabel: {
                         Text("10")
                     }
-                    .accessibilityValue(Text("\(level) sur 10") + Text(", ") + Text(Self.word(for: level)))
+                    .accessibilityValue(Text("\(level) sur 10, \(Text(Self.word(for: level)))"))
                 }
                 .padding(.vertical)
                 .animation(.default, value: level)

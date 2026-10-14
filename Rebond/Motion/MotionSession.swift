@@ -43,7 +43,11 @@ final class MotionSession {
 
     let exercise: CatalogExercise
     let targetReps: Int
+    /// The guide shows the movement before the set: only before the first set of an exercise.
+    let showsDemonstration: Bool
     let liveFrame = LiveFrame()
+    /// Called when the patient asks for the next set, with a thumbs up from where they stand.
+    @ObservationIgnored var onNext: (() -> Void)?
 
     private(set) var cameraUnavailable = false
     /// Access was refused, as opposed to a device without a front camera.
@@ -65,10 +69,11 @@ final class MotionSession {
     /// and counting resumes once they are back in it.
     private(set) var isLost = false
 
-    /// The model is large in front of the patient: they watch the movement, the camera is blurred and nothing
-    /// is counted. Once it goes back to its card, it's their turn.
+    /// The patient opened the model large during the set: they watch the movement, the camera is blurred and
+    /// nothing is counted. Once it goes back to its card, it's their turn.
+    /// The first demonstration isn't watched this way: many start moving with it, and those repetitions count.
     var isWatching: Bool {
-        (phase == .demonstrating || phase == .active) && guideDisplay == .large
+        phase == .active && guideDisplay == .large
     }
     /// When the current demonstration started, so the guide begins it standing.
     private(set) var demonstrationStart = Date.now
@@ -116,9 +121,10 @@ final class MotionSession {
     @ObservationIgnored private var lastTempoReminder = -10
     private let tempoReminderInterval = 3
 
-    init(exercise: CatalogExercise, targetReps: Int) {
+    init(exercise: CatalogExercise, targetReps: Int, showsDemonstration: Bool = true) {
         self.exercise = exercise
         self.targetReps = targetReps
+        self.showsDemonstration = showsDemonstration
         processor = FrameProcessor(exercise: exercise)
         processor.onImage = { [weak self] image in
             Task { @MainActor [self] in self?.liveFrame.image = image }
@@ -181,15 +187,19 @@ final class MotionSession {
         deactivateAudio()
     }
 
+    /// Pause at any moment, even before the set starts (getting in place, demonstration).
     func togglePause() {
-        guard phase == .active else { return }
+        guard phase != .finished else { return }
         isPaused.toggle()
         if isPaused {
             // The set resumes with the model in its card, as it normally is.
             demonstration?.cancel()
-            guideDisplay = .corner
+            if phase == .demonstrating { beginSet(announce: false) }
+            if phase == .active { guideDisplay = .corner }
+            lostDelay?.cancel()
         }
         coach.say(isPaused ? "Pause" : "On reprend")
+        if !isPaused { startDemonstrationIfReady() }
     }
 
     /// While the patient watches the model or pauses, the whole picture is blurred, in one blur with the background.
@@ -203,6 +213,9 @@ final class MotionSession {
         case .openPalm: togglePause()
         case .spread: expandModel()
         case .pinch: shrinkModel()
+        case .thumbsUp:
+            guard !isPaused else { return }
+            onNext?()
         }
     }
 
@@ -227,7 +240,7 @@ final class MotionSession {
     /// and a new one waits a few seconds after the previous.
     func announce(_ message: LocalizedStringResource) {
         let text = String(localized: message)
-        guard phase == .calibrating || isLost, text != lastAnnouncement,
+        guard phase == .calibrating || isLost, !isPaused, text != lastAnnouncement,
               Date.now.timeIntervalSince(lastAnnouncementDate) > 3
         else { return }
         lastAnnouncement = text
@@ -247,25 +260,35 @@ final class MotionSession {
         startDemonstrationIfReady()
     }
 
-    /// Once the patient is in place and still: the guide shows the movement, moves to its corner,
-    /// then counting starts.
+    /// Once the patient is in place and still: the guide shows the movement once, large, over the camera,
+    /// then moves to its corner. Counting already runs during the demonstration: a patient who starts with
+    /// the model is counted, and the model steps aside as soon as they move.
+    /// Later sets of the same exercise skip the demonstration.
     private func startDemonstrationIfReady() {
-        guard phase == .calibrating, isCalibrated, isInPlace else { return }
+        guard phase == .calibrating, isCalibrated, isInPlace, !isPaused else { return }
+        guard showsDemonstration else {
+            beginSet(announce: true)
+            return
+        }
         phase = .demonstrating
         guideDisplay = .large
         demonstrationStart = .now
-        coach.say("Regardez d'abord le mouvement, restez immobile")
+        coach.say("Voici le mouvement. Faites-le avec le modèle")
         intro = Task {
             try? await Task.sleep(for: .seconds(Self.demonstrationDuration))
             guard !Task.isCancelled else { return }
-            guideDisplay = .corner
-            // Time for the guide to move to its corner.
-            try? await Task.sleep(for: .seconds(0.8))
-            guard !Task.isCancelled else { return }
-            phase = .active
-            demonstrationStart = .now
-            coach.say("C'est parti !")
+            beginSet(announce: true)
         }
+    }
+
+    /// The set starts: the model goes to its card.
+    private func beginSet(announce: Bool) {
+        guard phase == .calibrating || phase == .demonstrating else { return }
+        intro?.cancel()
+        phase = .active
+        guideDisplay = .corner
+        demonstrationStart = .now
+        if announce { coach.say("À vous !") }
     }
 
     /// The patient opens the model large, in front of them, to follow it while doing the movement.
@@ -369,7 +392,11 @@ final class MotionSession {
             isCalibrated = true
             startDemonstrationIfReady()
         }
-        // Nothing counts before the end of the demonstration, during a pause, nor until the patient is back in place.
+        // Moving during the demonstration: the patient started with the model, it's their set now.
+        if phase == .demonstrating, !isPaused, update.progress >= 0.3 || update.event.isRepetition {
+            beginSet(announce: false)
+        }
+        // Nothing counts during a pause, while watching the model, nor until the patient is back in place.
         guard phase == .active, !isPaused, !isLost, !isWatching else { return }
         depthProgress = update.progress
         faultToHighlight = update.posture ?? heldFault
@@ -495,5 +522,15 @@ nonisolated final class FrameProcessor: NSObject, AVCaptureVideoDataOutputSample
         }
 
         onImage?(blur.apply(to: pixelBuffer, patient: patient, everything: blursEverything.withLock { $0 }))
+    }
+}
+
+private extension Optional where Wrapped == RepEvent {
+    /// A repetition reached its target, or ended.
+    var isRepetition: Bool {
+        switch self {
+        case .bottomReached, .repCompleted, .repIncomplete: true
+        default: false
+        }
     }
 }

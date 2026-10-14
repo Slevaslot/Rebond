@@ -92,6 +92,25 @@ nonisolated struct WorkoutPlan: Sendable {
         currentIndex += 1
     }
 
+    /// The set after the current one, if any.
+    var nextStep: WorkoutStep? {
+        steps.indices.contains(currentIndex + 1) ? steps[currentIndex + 1] : nil
+    }
+
+    /// Whether the current step is the first set of its exercise: the guide shows the movement only then.
+    var isFirstSetOfExercise: Bool {
+        currentStep?.set == 1
+    }
+
+    /// Skips the current set and the exercise's remaining sets, keeping what the current set produced.
+    mutating func skipExercise(keeping result: SetResult = SetResult()) {
+        guard let step = currentStep else { return }
+        record(result)
+        while let next = currentStep, next.exerciseIndex == step.exerciseIndex {
+            currentIndex += 1
+        }
+    }
+
     /// Stops early: the remaining sets are left undone.
     mutating func finishEarly() {
         currentIndex = steps.count

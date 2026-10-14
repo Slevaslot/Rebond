@@ -5,21 +5,36 @@ struct SessionView: View {
     let exercise: CatalogExercise
     /// Shown under the exercise name, e.g. "Série 1 sur 3".
     let setTitle: LocalizedStringKey
+    /// What comes next, shown at the end of the set. Nil after the last set.
+    let nextTitle: LocalizedStringKey?
     let onFinish: (SetResult) -> Void
 
     @State private var motion: MotionSession
     @Environment(\.reportSetActivity) private var reportSetActivity
+    @Environment(\.skipRequest) private var skipRequest
+    /// Seconds before the next set starts on its own, once this one is finished.
+    @State private var restRemaining = SessionView.restDuration
+    /// Long enough to breathe and walk back, short enough not to have to touch the phone.
+    private static let restDuration = 20
     @State private var placement = GuidePlacement.notVisible
     @ScaledMetric private var ringSize = 64
     /// The model's card during the set: fixed, in the middle of the left edge.
     @ScaledMetric private var cardWidth = 110
     @ScaledMetric private var pauseIconSize = 72
 
-    init(exercise: CatalogExercise, targetReps: Int, setTitle: LocalizedStringKey, onFinish: @escaping (SetResult) -> Void) {
+    init(
+        exercise: CatalogExercise,
+        targetReps: Int,
+        setTitle: LocalizedStringKey,
+        showsDemonstration: Bool = true,
+        nextTitle: LocalizedStringKey? = nil,
+        onFinish: @escaping (SetResult) -> Void
+    ) {
         self.exercise = exercise
         self.setTitle = setTitle
+        self.nextTitle = nextTitle
         self.onFinish = onFinish
-        _motion = State(initialValue: MotionSession(exercise: exercise, targetReps: targetReps))
+        _motion = State(initialValue: MotionSession(exercise: exercise, targetReps: targetReps, showsDemonstration: showsDemonstration))
     }
 
     var body: some View {
@@ -42,10 +57,14 @@ struct SessionView: View {
                 }
             }
             if showsPlacementGuide {
+                // Still measuring the placement while hidden: the outline appears once the patient stands
+                // far enough for their whole body to fit.
                 MovementGuide(exercise: exercise, skeleton: motion.skeleton, isDemonstrating: false) { placement in
                     self.placement = placement
                     motion.updatePlacement(placement)
                 }
+                .opacity(isFarEnough ? 1 : 0)
+                .animation(.smooth(duration: 0.6), value: isFarEnough)
             }
         }
         .ignoresSafeArea()
@@ -55,16 +74,21 @@ struct SessionView: View {
                     topCard(title: "Caméra indisponible", detail: motion.cameraAccessDenied
                         ? "Autorisez l'accès à la caméra dans Réglages pour que Rebond suive vos mouvements."
                         : "Aucune caméra avant n'est disponible. Vous pouvez terminer la série.")
+                } else if motion.isPaused {
+                    EmptyView()
                 } else if motion.phase == .calibrating, placement == .notVisible {
                     topCard(title: "Posez votre iPhone debout",
                             detail: "Calez-le à hauteur de hanche, puis reculez à 2 ou 3 mètres pour voir tout votre corps.")
+                } else if motion.phase == .calibrating || motion.isLost, !isFarEnough {
+                    topCard(title: "Reculez",
+                            detail: "Éloignez-vous du téléphone jusqu'à voir tout votre corps, pieds compris. La silhouette apparaîtra alors.")
                 } else if motion.phase == .calibrating || motion.isLost {
                     placementHint
                 } else if motion.phase == .demonstrating {
-                    topCard(title: "Regardez d'abord le mouvement", detail: "Restez immobile, vous commencerez après")
+                    topCard(title: "Faites le mouvement avec le modèle", detail: "Vos répétitions comptent déjà")
                 } else if isWatching, !motion.isPaused {
                     topCard(title: "Regardez le mouvement", detail: "Touchez le modèle pour reprendre")
-                } else if !motion.isPaused {
+                } else {
                     counter
                 }
             }
@@ -106,11 +130,14 @@ struct SessionView: View {
                     if let feedback = motion.feedback {
                         feedbackBanner(feedback)
                     }
-                    // During setup the guide outline needs the space; the back button is still there.
+                    // During setup the guide outline needs the space; Passer stays in the toolbar.
                     if motion.phase == .active || motion.cameraUnavailable {
                         Button("Terminer la série") { onFinish(motion.result) }
                             .buttonStyle(.glass)
                             .controlSize(.extraLarge)
+                    }
+                    if motion.phase == .active, exercise.allowsHandGestures {
+                        gestureReminder
                     }
                 }
                 .padding()
@@ -122,7 +149,7 @@ struct SessionView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                if motion.phase == .active {
+                if motion.phase != .finished, !motion.cameraUnavailable {
                     Button(motion.isPaused ? "Reprendre" : "Pause",
                            systemImage: motion.isPaused ? "play.fill" : "pause.fill") {
                         motion.togglePause()
@@ -139,7 +166,27 @@ struct SessionView: View {
         .onChange(of: isWatching || motion.isPaused, initial: true) { _, blurred in
             motion.blurWholePicture(blurred)
         }
-        .task { await motion.start() }
+        .task {
+            // Thumbs up from where the patient stands: next set.
+            let session = motion
+            session.onNext = { [weak session] in
+                guard let session else { return }
+                onFinish(session.result)
+            }
+            await motion.start()
+        }
+        .onChange(of: skipRequest) { if skipRequest != nil { onFinish(motion.result) } }
+        .task(id: motion.phase == .finished) {
+            // The next set starts on its own after a short rest: no need to walk back to the phone.
+            guard motion.phase == .finished else { return }
+            restRemaining = Self.restDuration
+            while restRemaining > 0 {
+                try? await Task.sleep(for: .seconds(1))
+                guard !Task.isCancelled, motion.phase == .finished else { return }
+                restRemaining -= 1
+            }
+            onFinish(motion.result)
+        }
         .onDisappear { motion.stop() }
         .onChange(of: motion.repCount + motion.incompleteCount) { reportSetActivity() }
         .sensoryFeedback(.success, trigger: motion.repCount)
@@ -186,6 +233,28 @@ struct SessionView: View {
         .padding()
         .glassEffect(in: .rect(cornerRadius: 28))
         .accessibilityElement(children: .combine)
+    }
+
+    /// Far enough from the phone for the outline: the whole body is seen at a size that fits it.
+    private var isFarEnough: Bool {
+        switch placement {
+        case .notVisible, .showFeet, .stepBack: false
+        case .stepCloser, .moveLeft, .moveRight, .almost, .aligned: true
+        }
+    }
+
+    /// The hand signs, from where the patient stands.
+    private var gestureReminder: some View {
+        HStack(spacing: 16) {
+            Label("Pause", systemImage: "hand.raised.fill")
+            Label("Série suivante", systemImage: "hand.thumbsup.fill")
+        }
+        .font(.footnote.weight(.semibold))
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .glassEffect(in: .capsule)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("Main ouverte levée : pause. Pouce levé : série suivante."))
     }
 
     /// The model is large: the patient watches, the camera fades back.
@@ -318,6 +387,25 @@ struct SessionView: View {
                 card(systemImage: "checkmark.circle.fill", color: .green,
                      title: "Série terminée !",
                      detail: "\(motion.repCount) répétitions")
+                VStack(spacing: 6) {
+                    if let nextTitle {
+                        Text("Ensuite : \(Text(nextTitle))")
+                            .font(.headline)
+                    }
+                    Text(nextTitle == nil ? "Fin dans \(restRemaining) s" : "Reprise dans \(restRemaining) s")
+                        .font(.subheadline)
+                        .monospacedDigit()
+                        .contentTransition(.numericText(countsDown: true))
+                        .animation(.default, value: restRemaining)
+                    if exercise.allowsHandGestures {
+                        Label("Pouce levé pour continuer tout de suite", systemImage: "hand.thumbsup.fill")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .multilineTextAlignment(.center)
+                .padding()
+                .glassEffect(in: .rect(cornerRadius: 24))
                 HStack {
                     Button("Recommencer", systemImage: "arrow.counterclockwise") {
                         motion.restart()
@@ -360,19 +448,14 @@ struct SessionView: View {
         }
     }
 
-    /// "Bien", "Très bien" or "Parfait !", with one to three stars in the tier's color.
+    /// "Bien", "Très bien" or "Parfait !", in the tier's color.
     private func tierBanner(_ tier: AmplitudeTier, id: UUID) -> some View {
-        HStack(spacing: 10) {
-            HStack(spacing: 2) {
-                ForEach(1...3, id: \.self) { star in
-                    Image(systemName: star <= tier.stars ? "star.fill" : "star")
-                        .foregroundStyle(star <= tier.stars ? AnyShapeStyle(.white) : AnyShapeStyle(.white.opacity(0.5)))
-                }
-            }
-            .font(.headline)
+        Label {
             Text(tier.message)
-                .font(.title3.bold())
+        } icon: {
+            Image(systemName: "checkmark.circle.fill")
         }
+        .font(.title3.bold())
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
         .glassEffect(.regular.tint(tier.color.opacity(0.7)), in: .capsule)

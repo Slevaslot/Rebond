@@ -35,9 +35,6 @@ nonisolated enum AmplitudeTier: Int, Comparable, Sendable {
         }
     }
 
-    /// Filled stars out of three.
-    var stars: Int { rawValue }
-
     var color: Color {
         switch self {
         case .good: .blue

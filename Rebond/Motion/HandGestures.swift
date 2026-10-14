@@ -11,6 +11,8 @@ nonisolated enum HandGesture: Sendable {
     case spread
     /// Thumb and index apart, then coming together: put the model back in its card.
     case pinch
+    /// Fist with the thumb up, held a moment: next set.
+    case thumbsUp
 }
 
 /// Recognizes `HandGesture`s with Vision's hand pose.
@@ -62,6 +64,8 @@ nonisolated struct HandGestureDetector {
 
     /// About 0.6 s: a pause shouldn't come from a hand passing by.
     private var palm = Hold(frames: 9)
+    /// About 0.6 s as well: moving on to the next set is not undone easily.
+    private var thumb = Hold(frames: 9)
 
     /// Gap between the thumb and index tips, in palm sizes: below, they touch; above, they are apart.
     private let closedGap = 0.35
@@ -75,6 +79,13 @@ nonisolated struct HandGestureDetector {
         let hand = raisedArms == 1 && hands.count == 1 ? hands[0] : nil
 
         if palm.update(hand.map(Self.isOpenPalm) ?? false) { return .openPalm }
+        let isThumbUp = hand.map(Self.isThumbUp) ?? false
+        if thumb.update(isThumbUp) { return .thumbsUp }
+        // A thumb going up from a fist also opens the thumb-index gap: it isn't a spread.
+        if isThumbUp {
+            gaps = []
+            return nil
+        }
 
         guard let gap = hand.flatMap(Self.fingerGap) else {
             // A missed detection doesn't break the gesture, but the window still moves on.
@@ -140,6 +151,20 @@ nonisolated struct HandGestureDetector {
               let thumb = hand[.thumbTip], let index = hand[.indexMCP], let palm = palmSize(hand)
         else { return false }
         return hypot(thumb.x - index.x, thumb.y - index.y) > palm * 0.5
+    }
+
+    /// The four fingers folded into the palm, the thumb stretched upward.
+    private static func isThumbUp(_ hand: [VNHumanHandPoseObservation.JointName: CGPoint]) -> Bool {
+        guard let wrist = hand[.wrist], let thumb = hand[.thumbTip], let index = hand[.indexMCP], let palm = palmSize(hand)
+        else { return false }
+        let folded = [(VNHumanHandPoseObservation.JointName.indexTip, VNHumanHandPoseObservation.JointName.indexPIP),
+                      (.middleTip, .middlePIP), (.ringTip, .ringPIP), (.littleTip, .littlePIP)]
+            .filter { tip, pip in
+                guard let tip = hand[tip], let pip = hand[pip] else { return false }
+                return hypot(wrist.x - tip.x, wrist.y - tip.y) < hypot(wrist.x - pip.x, wrist.y - pip.y) * 1.05
+            }
+        // Pixels, origin top-left: up is a smaller y.
+        return folded.count >= 3 && index.y - thumb.y > palm * 0.6
     }
 
     /// Gap between the thumb and index tips, in palm sizes.
