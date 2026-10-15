@@ -255,9 +255,16 @@ struct ProgramEditorView: View {
             exercise.mode = .reps
             if exercise.name.trimmingCharacters(in: .whitespaces).isEmpty {
                 exercise.name = uniqueName(movement.name)
+                // A new exercise: the sets and repetitions planned from what was measured.
+                if let plan = movement.plan {
+                    exercise.sets = plan.sets
+                    exercise.reps = plan.reps
+                }
             }
             program.exercises[index] = exercise
             analyses[id] = nil
+        } catch ReferenceError.poorCapture(let advice) {
+            analyses[id] = .failed("\(advice)")
         } catch ReferenceError.noBody {
             analyses[id] = .failed("Corps mal visible : filmez de face, le corps entier dans l'image.")
         } catch {
