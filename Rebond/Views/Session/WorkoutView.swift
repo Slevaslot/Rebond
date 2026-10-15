@@ -16,6 +16,8 @@ struct WorkoutView: View {
     @State private var start = Date.now
     /// Filmed exercises whose example the patient has watched in this session.
     @State private var examplesSeen: Set<Int> = []
+    /// Exercises counted by hand because the camera is unavailable.
+    @State private var countedByHand: Set<Int> = []
     @State private var confirmingStop = false
     /// The set on screen has started (a repetition counted, the timer running): stopping would lose it.
     @State private var currentSetStarted = false
@@ -129,13 +131,19 @@ struct WorkoutView: View {
 
     @ViewBuilder
     private func stepView(_ step: WorkoutStep) -> some View {
-        let title: LocalizedStringKey = "Série \(step.set) sur \(step.exercise.sets)"
+        let title: LocalizedStringKey = switch step.side {
+        case .right: "Série \(step.set) sur \(step.exercise.sets) · côté droit"
+        case .left: "Série \(step.set) sur \(step.exercise.sets) · côté gauche"
+        case nil: "Série \(step.set) sur \(step.exercise.sets)"
+        }
         switch step.exercise.mode {
+        case .camera where countedByHand.contains(step.exerciseIndex):
+            ManualSetView(name: step.exercise.name, targetReps: step.exercise.reps, setTitle: title, onFinish: finish)
         case .camera(let catalogID):
             if let exercise = CatalogExercise.find(catalogID), let reference = exercise.reference,
                plan.isFirstSetOfExercise, !examplesSeen.contains(step.exerciseIndex) {
                 // Filmed at the physiotherapist's: the patient watches their video before doing it.
-                ReferenceExampleView(movement: reference, setTitle: title) {
+                ReferenceExampleView(movement: reference, setTitle: title, isMirrored: step.isMirrored) {
                     examplesSeen.insert(step.exerciseIndex)
                 }
             } else if let exercise = CatalogExercise.find(catalogID) {
@@ -146,6 +154,8 @@ struct WorkoutView: View {
                     showsDemonstration: plan.isFirstSetOfExercise,
                     nextTitle: nextTitle,
                     onAnotherSet: anotherSetAction,
+                    onCountByHand: { countedByHand.insert(step.exerciseIndex) },
+                    mirrorsModel: step.isMirrored,
                     onFinish: finish
                 )
             }
@@ -185,6 +195,10 @@ struct WorkoutView: View {
     /// What comes after this set, for the end-of-set card.
     private var nextTitle: LocalizedStringKey? {
         guard let next = plan.nextStep else { return nil }
+        // The other side of the same set: say only which side.
+        if next.exerciseIndex == plan.currentStep?.exerciseIndex, next.set == plan.currentStep?.set, let side = next.side {
+            return side == .left ? "Côté gauche" : "Côté droit"
+        }
         return next.exerciseIndex == plan.currentStep?.exerciseIndex
             ? "Série \(next.set) sur \(next.exercise.sets)"
             : "\(next.exercise.name), série 1 sur \(next.exercise.sets)"
@@ -224,10 +238,10 @@ struct WorkoutView: View {
                 exerciseName: exercise.name,
                 catalogID: exercise.catalogID,
                 order: index,
-                plannedReps: holdSeconds == 0 ? exercise.sets * exercise.reps : 0,
+                plannedReps: holdSeconds == 0 ? exercise.sets * exercise.reps * exercise.sideCount : 0,
                 completedReps: tally.completedReps,
                 incompleteReps: tally.incompleteReps,
-                plannedSeconds: exercise.sets * holdSeconds,
+                plannedSeconds: exercise.sets * holdSeconds * exercise.sideCount,
                 heldSeconds: tally.heldSeconds,
                 amplitude: tally.amplitude
             )
@@ -250,7 +264,10 @@ extension PlannedExercise {
         } else {
             .manual
         }
-        return WorkoutExercise(name: name, catalogID: catalogID, mode: mode, sets: sets, reps: reps)
+        // A film starts on the side it shows, the other one mirrored; Rebond's models start on the right.
+        let firstSide = catalogExercise?.reference?.filmedSide ?? .right
+        return WorkoutExercise(name: name, catalogID: catalogID, mode: mode, sets: sets, reps: reps,
+                               bothSides: bothSides, firstSide: firstSide)
     }
 }
 

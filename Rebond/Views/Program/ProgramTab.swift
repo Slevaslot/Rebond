@@ -1,8 +1,8 @@
 import SwiftData
 import SwiftUI
 
-/// "Exercices": the week, creating an exercise, "Mes exercices", then the programs made of them (exercises ticked,
-/// with their days). The day's session gathers the programs planned that day.
+/// "Exercices": the week, the programs (exercises ticked, with their days), then "Mes exercices" and creating one.
+/// The day's session gathers the programs planned that day.
 struct ProgramTab: View {
     @Environment(AppRouter.self) private var router
     @Environment(\.modelContext) private var context
@@ -50,43 +50,7 @@ struct ProgramTab: View {
                 WeekPlanCard(programs: programs).pageRow()
             }
 
-            // Exercises first: one is created on its own, then added to a program.
-            AddExerciseMenu(label: {
-                Text("Créer un exercice")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity, alignment: .center)
-            }, offersPhysiotherapist: false)
-            .buttonStyle(.glassProminent)
-            .buttonBorderShape(.capsule)
-            .controlSize(.large)
-            // In a list, a menu keeps its label's width: stretch the menu itself, its text centered.
-            .frame(maxWidth: .infinity, alignment: .center)
-            .pageRow()
-
-            sectionTitle("Mes exercices")
-            if library.isEmpty {
-                Text("Filmez l'exercice bien fait, ou choisissez un exercice Rebond.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 4)
-                    .pageRow()
-            } else {
-                VStack(spacing: 0) {
-                    ForEach(Array(library.enumerated()), id: \.element.id) { index, exercise in
-                        if index > 0 { Divider().padding(.leading, 74) }
-                        Button { path.append(exercise) } label: {
-                            LibraryExerciseRow(exercise: exercise)
-                                .padding(.horizontal)
-                                .padding(.vertical, 10)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 22))
-                .pageRow()
-            }
-
-            // Then the programs: the patient's exercises, with their days.
+            // The programs first, to manage them without scrolling past every exercise.
             sectionTitle("Mes programmes")
             ForEach(programs) { program in
                 Button { path.append(program) } label: {
@@ -116,6 +80,42 @@ struct ProgramTab: View {
             .controlSize(.large)
             .frame(maxWidth: .infinity, alignment: .center)
             .pageRow()
+
+            // Then the exercises: one is created on its own, then added to a program.
+            sectionTitle("Mes exercices")
+            AddExerciseMenu(label: {
+                Text("Créer un exercice")
+                    .font(.headline)
+                    .frame(maxWidth: .infinity, alignment: .center)
+            }, offersPhysiotherapist: false)
+            .buttonStyle(.glassProminent)
+            .buttonBorderShape(.capsule)
+            .controlSize(.large)
+            // In a list, a menu keeps its label's width: stretch the menu itself, its text centered.
+            .frame(maxWidth: .infinity, alignment: .center)
+            .pageRow()
+
+            if library.isEmpty {
+                Text("Filmez l'exercice bien fait, ou choisissez un exercice Rebond.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 4)
+                    .pageRow()
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(Array(library.enumerated()), id: \.element.id) { index, exercise in
+                        if index > 0 { Divider().padding(.leading, 74) }
+                        Button { path.append(exercise) } label: {
+                            LibraryExerciseRow(exercise: exercise)
+                                .padding(.horizontal)
+                                .padding(.vertical, 10)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 22))
+                .pageRow()
+            }
         }
         .listStyle(.plain)
         .contentMargins(.top, 0, for: .scrollContent)
@@ -403,7 +403,8 @@ struct OtherProgramWays: View {
 
     var body: some View {
         Section {
-            Button("Composer moi-même", systemImage: "square.and.pencil") { router.addProgram(from: .manual) }
+            // One page at a time: tick the exercises of "Mes exercices", then set the program.
+            Button("Composer moi-même", systemImage: "square.and.pencil") { router.newProgram() }
             Button("Coller le message", systemImage: "text.bubble") { router.addProgram(from: .message) }
             Button("Scanner la feuille", systemImage: "doc.viewfinder") { router.addProgram(from: .scan) }
             Button("Photo de la feuille", systemImage: "photo") { router.addProgram(from: .photo) }
@@ -468,6 +469,8 @@ struct NoProgramView<Header: View>: View {
                 }
 
                 FreeExerciseCard()
+
+                MedicalDisclaimer()
             }
             .padding(.horizontal)
             .padding(.bottom)

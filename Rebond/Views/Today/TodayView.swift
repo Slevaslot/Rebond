@@ -75,6 +75,8 @@ struct TodayView: View {
                 }
 
                 FollowUpSection(sessions: sessions, sessionsPerWeek: programs.sessionsPerWeek, week: week)
+
+                MedicalDisclaimer()
             }
             .padding(.horizontal)
             .padding(.bottom)
@@ -163,6 +165,8 @@ struct BigValue: View {
         }
         .lineLimit(1)
         .minimumScaleFactor(0.7)
+        // Read as one: "4 min", "2 sur 10".
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -176,6 +180,7 @@ private struct SessionCard: View {
 
     /// The exercises stay folded to keep the page light; tapping the card unfolds them in place.
     @State private var expanded = false
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         SummaryCard(title: Text("Séance du jour"), systemImage: nil, color: .accentColor, sectionHeader: true) {
@@ -193,6 +198,7 @@ private struct SessionCard: View {
                 }
                 HStack(alignment: .bottom) {
                     BigValue(value: "\(program.estimatedMinutes)", unit: "min")
+                        .accessibilityLabel(Text("Durée estimée : \(program.estimatedMinutes) minutes"))
                     Spacer()
                     if !expanded {
                         HStack(spacing: -6) {
@@ -205,6 +211,9 @@ private struct SessionCard: View {
                         .accessibilityHidden(true)
                     }
                 }
+
+                // With the largest text sizes the list is long: Commencer stays on screen, above it.
+                if dynamicTypeSize.isAccessibilitySize { startButton }
 
                 if expanded {
                     VStack(spacing: 0) {
@@ -228,16 +237,7 @@ private struct SessionCard: View {
                     .transition(.opacity.combined(with: .scale(scale: 0.97, anchor: .top)))
                 }
 
-                Button(action: onStart) {
-                    Text("Commencer")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.glassProminent)
-                .buttonBorderShape(.capsule)
-                .controlSize(.extraLarge)
-                // A soft glow lifts the main action off the card.
-                .shadow(color: Color.accentColor.opacity(0.45), radius: 14, y: 6)
+                if !dynamicTypeSize.isAccessibilitySize { startButton }
             }
         }
         // The session zooms out of the whole card: a plain rounded shape, so nothing of the glass button
@@ -252,6 +252,32 @@ private struct SessionCard: View {
             withAnimation { expanded.toggle() }
         }
         .sensoryFeedback(.selection, trigger: expanded)
+    }
+
+    private var startButton: some View {
+        Button(action: onStart) {
+            Text("Commencer")
+                .font(.headline)
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.glassProminent)
+        .buttonBorderShape(.capsule)
+        .controlSize(.extraLarge)
+        // A soft glow lifts the main action off the card.
+        .shadow(color: Color.accentColor.opacity(0.45), radius: 14, y: 6)
+    }
+}
+
+/// Required on the App Store and in the spirit of Rebond: at the foot of Accueil, with or without a program.
+struct MedicalDisclaimer: View {
+    var body: some View {
+        Label("Rebond ne remplace pas l'avis d'un professionnel de santé. Seul votre kiné décide de votre programme.",
+              systemImage: "info.circle")
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, 4)
+            .padding(.top, 8)
     }
 }
 
@@ -488,8 +514,14 @@ struct WeekProgress {
 extension PlannedExercise {
     /// "3 séries de 10 répétitions" or "2 séries de 30 s de maintien".
     var prescriptionDetail: LocalizedStringKey {
-        if let holdSeconds { return "^[\(sets) série](inflect: true) de \(holdSeconds) s de maintien" }
-        return "^[\(sets) série](inflect: true) de ^[\(reps) répétition](inflect: true)"
+        if let holdSeconds {
+            return bothSides
+                ? "^[\(sets) série](inflect: true) de \(holdSeconds) s de maintien, de chaque côté"
+                : "^[\(sets) série](inflect: true) de \(holdSeconds) s de maintien"
+        }
+        return bothSides
+            ? "^[\(sets) série](inflect: true) de ^[\(reps) répétition](inflect: true), de chaque côté"
+            : "^[\(sets) série](inflect: true) de ^[\(reps) répétition](inflect: true)"
     }
 
     /// "Suivi caméra", "Comptage manuel" or "Minuteur", with its symbol.
@@ -544,7 +576,7 @@ nonisolated extension Array where Element == PlannedExercise {
     var estimatedMinutes: Int {
         let seconds = reduce(0) { total, exercise in
             let perSet = exercise.holdSeconds ?? exercise.reps * 4
-            return total + exercise.sets * (perSet + 30)
+            return total + exercise.sets * (exercise.bothSides ? 2 : 1) * (perSet + 30)
         }
         return Swift.max(1, Int((Double(seconds) / 60).rounded()))
     }

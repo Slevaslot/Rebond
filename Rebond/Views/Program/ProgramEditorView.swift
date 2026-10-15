@@ -244,6 +244,8 @@ struct ProgramEditorView: View {
             var exercise = program.exercises[index]
             exercise.catalogID = movement.catalogID
             exercise.mode = .reps
+            // Filmed on one side: both sides by default, the film mirrored for the other one.
+            exercise.bothSides = movement.filmedSide != nil
             if exercise.name.trimmingCharacters(in: .whitespaces).isEmpty {
                 exercise.name = uniqueName(movement.name)
             }
@@ -363,6 +365,12 @@ private struct ExerciseCard: View {
         exercise.mode == .reps ? exercise.catalogID.flatMap(CatalogExercise.find) : nil
     }
 
+    /// "3 × 10", "3 × 30 s", with "· 2 côtés" when done on both.
+    private var dose: String {
+        let base = exercise.mode == .hold ? "\(exercise.sets) × \(exercise.holdSeconds) s" : "\(exercise.sets) × \(exercise.reps)"
+        return exercise.bothSides ? String(localized: "\(base) · 2 côtés") : base
+    }
+
     private var symbol: String {
         if exercise.mode == .hold { return "figure.core.training" }
         return catalog?.symbol ?? "figure.cooldown"
@@ -389,7 +397,7 @@ private struct ExerciseCard: View {
                     }
                     Spacer(minLength: 8)
                     if case .none = analysis {
-                        Text(exercise.mode == .hold ? "\(exercise.sets) × \(exercise.holdSeconds) s" : "\(exercise.sets) × \(exercise.reps)")
+                        Text(dose)
                             .font(.headline)
                             .monospacedDigit()
                             .foregroundStyle(.tint)
@@ -413,6 +421,20 @@ private struct ExerciseCard: View {
                 .onChange(of: exercise.sets) { exercise.guessed.remove(.sets) }
                 .onChange(of: exercise.reps) { exercise.guessed.remove(.reps) }
                 .onChange(of: exercise.holdSeconds) { exercise.guessed.remove(.holdSeconds) }
+                // One film or model for both sides: no need to film the other one.
+                Toggle(isOn: $exercise.bothSides) {
+                    Label {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Des deux côtés")
+                            Text("Chaque série d'un côté puis de l'autre, avec le même modèle en miroir : un seul film suffit.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    } icon: {
+                        Image(systemName: "arrow.left.and.right")
+                    }
+                }
+                .font(.subheadline)
                 TextField("Nom", text: $exercise.name, prompt: Text(name))
                     .textFieldStyle(.roundedBorder)
                 if allowsVideos, exercise.mode == .reps {

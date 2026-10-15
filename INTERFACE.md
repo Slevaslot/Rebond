@@ -27,7 +27,7 @@ Deux onglets, plus Kiné si l'espace kiné est activé (HIG *Tab bars* : les ong
 | Onglet | Symbole | Contenu |
 |---|---|---|
 | **Accueil** | `house` | Séance du jour (les exercices de tous les programmes prévus ce jour-là, ou un jour de repos avec la prochaine séance), bouton « Commencer », puis « Suivi » : régularité de la semaine, amplitude, douleur et « Envoyer à mon kiné ». |
-| **Exercices** (dès qu'un programme ou un exercice est enregistré) | `figure.mixed.cardio` | La semaine (une couleur par programme), « Créer un exercice », « Mes exercices », puis « Mes programmes » et « Créer un programme ». |
+| **Exercices** (dès qu'un programme ou un exercice est enregistré) | `figure.mixed.cardio` | La semaine (une couleur par programme), « Mes programmes » et « Créer un programme », puis « Mes exercices » et « Créer un exercice ». |
 | **Kiné** (seulement si l'espace kiné est activé) | `stethoscope` | Espace de travail du kiné, voir « Deux rôles ». Onglet affiché au lancement quand il est activé. |
 
 ### Vocabulaire : l'exercice d'abord
@@ -40,6 +40,7 @@ Deux onglets, plus Kiné si l'espace kiné est activé (HIG *Tab bars* : les ong
 
 - On crée d'abord un exercice. Une fois enregistré, l'app propose la suite : « Ajouter à « … » » pour chaque programme, « Créer un programme avec cet exercice », ou « Plus tard ». Un exercice seul n'est dans aucune séance.
 - « Créer un exercice » ne crée jamais de programme ; « Créer un programme » crée directement un programme entier, sur l'Accueil vide comme dans l'onglet Exercices.
+- **Des deux côtés** (réglage de chaque exercice d'un programme) : chaque série se fait d'un côté puis de l'autre, avec un seul film ou modèle, montré en miroir pour le second côté. Activé par défaut pour un exercice filmé d'un seul côté (une jambe, un bras). La séance affiche « Série 1 sur 3 · côté gauche », la fin de série annonce « Côté droit ». La caméra compte les deux côtés avec le même film.
 - **Essayer un exercice** (hors programme) n'est pas une séance : il est enregistré pour l'historique de l'exercice, mais ne compte ni dans la régularité, ni dans le suivi, ni dans le bilan envoyé au kiné (`Session.isTrial`).
 
 ### Sans programme
@@ -56,14 +57,15 @@ Le QR code prescrit depuis l'espace Kiné n'a pas besoin de bouton : le patient 
 
 ### Avec programme
 
-- Onglet Exercices : « Créer un exercice » en premier, « Mes exercices », puis « Mes programmes » et « Créer un programme » (menu : composer moi-même, coller le message, scanner la feuille, photo de la feuille, comme sur l'Accueil vide).
+- Onglet Exercices : « Mes programmes » et « Créer un programme » en premier (pour les gérer sans faire défiler tous les exercices), puis « Mes exercices » et « Créer un exercice » (menu : composer moi-même, coller le message, scanner la feuille, photo de la feuille, comme sur l'Accueil vide).
 - Page d'un exercice : le faire maintenant, les programmes qui l'utilisent, « Ajouter à un programme », renommer, supprimer.
 - Réglages (profil, rappels, avertissement médical, espace kiné, données de démo) derrière le bouton profil en haut à droite, pas dans un onglet.
 
 ## Premier lancement (HIG *Launching*, *Onboarding*, *Privacy*)
 
 - Écran de lancement de la couleur de fond du premier écran, sans logo ni texte.
-- **Pas d'écran d'accueil ni de tutoriel** (décision dans `CLAUDE.md`) : l'app s'ouvre sur l'Accueil sans programme décrit plus haut, et la séance guide le patient à la voix. L'avertissement « Rebond ne remplace pas l'avis d'un professionnel de santé » est dans Réglages et dans le bilan PDF.
+- **Un seul écran de bienvenue**, au premier lancement (`WelcomeView`) : « Votre rééducation à la maison, suivie par votre kiné. », l'avertissement médical, puis « Je suis patient » (Accueil) ou « Je suis kiné » (onglet Kiné). Aucune autorisation demandée. Le choix se change dans Réglages. Il n'apparaît pas quand l'app est ouverte par un QR code ou un bilan.
+- **Pas de tutoriel** : l'Accueil sans programme montre les étapes, la séance guide le patient à la voix. L'avertissement médical est aussi en bas de l'Accueil, dans Réglages et dans le bilan PDF.
 - **Aucune autorisation demandée au lancement.** La caméra est demandée au premier scan ou à la première séance, après un écran d'explication à **un seul bouton** qui ouvre l'alerte système.
 - Les notifications sont proposées après la première séance réussie, quand le patient comprend leur intérêt.
 

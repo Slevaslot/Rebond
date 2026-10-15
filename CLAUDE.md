@@ -50,7 +50,7 @@ Prévoir des données de démo (un programme et quelques séances pré-remplies)
 | Modèle économique | Le patient ne paie jamais. Kiné : offre gratuite (tout en local, 3 patients suivis) et Rebond Pro (patients illimités, tout en local). Voir `BUSINESS.md`. |
 | Serveur | Aucun. La version connectée de démo (`Server/`, `DemoServer`) a été supprimée : les bilans et les programmes passent seulement par le fichier `.rebond` et le QR code. |
 | Espace kiné | Un onglet « Kiné » de plus (pas une app à part) : le kiné garde l'accès à l'app patient. Activé dans Réglages ou en ouvrant un bilan, il reste activé d'un lancement à l'autre et l'app s'ouvre dessus. Patients de démo pour la présentation. |
-| Tutoriel | Aucun écran d'accueil ni tutoriel : la séance guide le patient à la voix. |
+| Premier lancement | Un seul écran : une phrase, l'avertissement médical, « Je suis patient » / « Je suis kiné » (le kiné arrive sur son espace). Pas de tutoriel : la séance guide le patient à la voix. |
 | Commandes à distance | Geste de la main (paume ouverte = pause) doublé d'un bouton. Pas d'AirPods, pas de boutons de volume. |
 | HealthKit | Utilisé : chaque séance enregistrée devient un entraînement « renforcement fonctionnel » dans Santé. Par la montre (avec fréquence cardiaque et calories) quand elle suit la séance, sinon par l'iPhone si le patient l'a activé. Jamais les deux. Aucune donnée Santé ne sort des appareils ni n'entre dans le bilan. |
 | Apple Watch | App compagnon (pas autonome) : série en direct, haptique, pause et série suivante (boutons, Double Tap, Siri), entraînement HealthKit, complications. Liaison directe par WatchConnectivity, sans serveur. |

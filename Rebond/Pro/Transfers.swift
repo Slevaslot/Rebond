@@ -15,6 +15,8 @@ nonisolated struct ProgramTransfer: Codable, Equatable, Sendable {
         var r: Int
         /// Seconds held, for a held exercise.
         var h: Int?
+        /// Both sides, one then the other. Absent from older links and when false.
+        var b: Bool? = nil
     }
 
     static let scheme = "rebond"
@@ -37,7 +39,8 @@ nonisolated struct ProgramTransfer: Codable, Equatable, Sendable {
         let title = program.name.trimmingCharacters(in: .whitespaces)
         t = title.isEmpty ? nil : title
         e = program.exercises.map {
-            Exercise(n: program.displayName(of: $0), c: $0.mode == .reps ? $0.catalogID : nil, s: $0.sets, r: $0.reps, h: $0.mode == .hold ? $0.holdSeconds : nil)
+            Exercise(n: program.displayName(of: $0), c: $0.mode == .reps ? $0.catalogID : nil, s: $0.sets, r: $0.reps,
+                     h: $0.mode == .hold ? $0.holdSeconds : nil, b: $0.bothSides ? true : nil)
         }
         let name = physiotherapist?.trimmingCharacters(in: .whitespaces)
         k = name?.isEmpty == false ? name : nil
@@ -72,6 +75,7 @@ nonisolated struct ProgramTransfer: Codable, Equatable, Sendable {
                 item.mode = .hold
                 item.holdSeconds = hold
             }
+            item.bothSides = exercise.b ?? false
             return item
         }
         return program

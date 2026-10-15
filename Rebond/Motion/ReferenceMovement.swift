@@ -42,6 +42,16 @@ nonisolated struct ReferenceMovement: Codable, Sendable, Identifiable {
 
     var catalogID: String { ReferenceStore.catalogPrefix + id.uuidString }
 
+    /// The patient's side the film shows, when the movement is mostly on one side (one arm, one leg).
+    /// Nil for a movement of both sides alike (a squat, both arms).
+    var filmedSide: BodySide? {
+        let weight = { (indices: [Int]) in indices.reduce(0) { $0 + abs(axis.indices.contains($1) ? axis[$1] : 0) } }
+        let left = weight(MovementFeatures.sidePairs.map(\.0)), right = weight(MovementFeatures.sidePairs.map(\.1))
+        if left > right * 1.5 { return .left }
+        if right > left * 1.5 { return .right }
+        return nil
+    }
+
     static let symbol = "video.fill"
 }
 

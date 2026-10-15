@@ -61,14 +61,17 @@ final class PlannedExercise {
     /// Seconds to hold per set, for a held exercise (plank…). Nil for repetitions.
     var holdSeconds: Int? = nil
     var order: Int
+    /// Done on one side then the other at each set, from a single film or model.
+    var bothSides: Bool = false
 
-    init(catalogID: String?, name: String, sets: Int, reps: Int, holdSeconds: Int? = nil, order: Int) {
+    init(catalogID: String?, name: String, sets: Int, reps: Int, holdSeconds: Int? = nil, order: Int, bothSides: Bool = false) {
         self.catalogID = catalogID
         self.name = name
         self.sets = sets
         self.reps = reps
         self.holdSeconds = holdSeconds
         self.order = order
+        self.bothSides = bothSides
     }
 
     var catalogExercise: CatalogExercise? {

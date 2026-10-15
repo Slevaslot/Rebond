@@ -85,6 +85,8 @@ struct ReferenceVideoSheet: View {
 struct ReferenceExampleView: View {
     let movement: ReferenceMovement
     let setTitle: LocalizedStringKey
+    /// The other side of an exercise done on both: the film shown as in a mirror.
+    var isMirrored = false
     let onReady: () -> Void
 
     @State private var player: AVQueuePlayer?
@@ -95,6 +97,7 @@ struct ReferenceExampleView: View {
             Color.black
             if let player {
                 PlayerLayerView(player: player)
+                    .scaleEffect(x: isMirrored ? -1 : 1, y: 1)
             }
         }
         .ignoresSafeArea()

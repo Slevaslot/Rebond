@@ -33,8 +33,18 @@ struct PrescriptionView: View {
                         Label("Impossible de créer le QR code.", systemImage: "exclamationmark.triangle")
                     }
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("^[\(transfer.f) séance](inflect: true) par semaine")
-                            .font(.headline)
+                        // What the patient will find: the program's name and its days.
+                        if let name = transfer.t, !name.isEmpty {
+                            Text(name)
+                                .font(.title3.bold())
+                        }
+                        if let days = transfer.w, !days.isEmpty {
+                            Text("^[\(days.count) séance](inflect: true) par semaine : \(ProgramSchedule.describe(days))")
+                                .font(.headline)
+                        } else {
+                            Text("^[\(transfer.f) séance](inflect: true) par semaine")
+                                .font(.headline)
+                        }
                         ForEach(Array(transfer.e.enumerated()), id: \.offset) { _, exercise in
                             HStack {
                                 Text(exercise.n)

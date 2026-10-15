@@ -86,17 +86,19 @@ struct PatientMetrics: View {
                            accessibilityValue: Text("Aucune séance"))
             }
             if overview.plannedReps > 0 {
-                MetricTile(title: "Répét.", symbol: "repeat", color: .purple,
+                MetricTile(title: "Répétitions", symbol: "repeat", color: .purple,
                            value: "\(overview.completedReps)", unit: "/\(overview.plannedReps)",
                            accessibilityValue: Text("\(overview.completedReps) sur \(overview.plannedReps), \(overview.incompleteReps) incomplètes"))
             } else {
-                MetricTile(title: "Répét.", symbol: "repeat", color: .purple, value: "–", unit: "",
+                MetricTile(title: "Répétitions", symbol: "repeat", color: .purple, value: "–", unit: "",
                            accessibilityValue: Text("Aucune répétition prévue"))
             }
             if let amplitude = overview.amplitude {
+                // Past the goal, the physiotherapist reads 100 %: "101 %" looks like a measuring error.
+                let shown = min(Int(amplitude.rounded()), 100)
                 MetricTile(title: "Amplitude", symbol: "arrow.up.and.down", color: .blue,
-                           value: "\(Int(amplitude.rounded()))", unit: "%",
-                           accessibilityValue: Text("\(Int(amplitude.rounded())) % de l'objectif"))
+                           value: "\(shown)", unit: "%",
+                           accessibilityValue: Text(shown == 100 ? "Objectif atteint" : "\(shown) % de l'objectif"))
             } else {
                 MetricTile(title: "Amplitude", symbol: "arrow.up.and.down", color: .blue, value: "–", unit: "",
                            accessibilityValue: Text("Pas de mesure"))
@@ -168,7 +170,7 @@ extension PatientOverview {
     var summaryLine: String {
         var parts = [String.inflected("^[\(sessionsDone) séance](inflect: true) sur \(sessionsPlanned)")]
         if let lastPain { parts.append(String(localized: "douleur \(lastPain)/10")) }
-        if let amplitude { parts.append(String(localized: "amplitude \(Int(amplitude.rounded())) %")) }
+        if let amplitude { parts.append(String(localized: "amplitude \(min(Int(amplitude.rounded()), 100)) %")) }
         return parts.joined(separator: " · ")
     }
 }
