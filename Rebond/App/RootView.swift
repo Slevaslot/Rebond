@@ -63,6 +63,8 @@ struct RootView: View {
             }
         }
         .tabBarMinimizeBehavior(.never)
+        // Wide screens (unfolded foldable, landscape): pages keep a readable width, centred.
+        .readableWidth()
         // The last program deleted: its tab goes away, back to Accueil.
         .onChange(of: programs.isEmpty) {
             if programs.isEmpty, library.isEmpty, router.tab == .program { router.tab = .today }
