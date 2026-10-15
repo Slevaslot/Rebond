@@ -89,6 +89,8 @@ struct WeeklyReportTests {
         #expect(report.exercises[1].isHeld)
         #expect(report.exercises[1].heldSeconds == 135)
         #expect(report.painfulSessionDates.count == 1)
+        #expect(report.sessionLines.map(\.pain) == [4, 8, 3])
+        #expect(report.painfulSessions.map(\.pain) == [8])
         #expect(report.firstPain == 4)
         #expect(report.lastPain == 3)
     }

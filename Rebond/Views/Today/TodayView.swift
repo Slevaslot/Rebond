@@ -22,14 +22,20 @@ struct TodayView: View {
                 if let program = programs.first {
                     today(program)
                 } else {
-                    noProgram
+                    NoProgramView { header }
                 }
             }
-            .navigationTitle("Aujourd'hui")
+            .navigationTitle("Accueil")
             // Fitness-style top bar: the large title and the profile on the same line, in the page.
             .toolbarVisibility(.hidden, for: .navigationBar)
             .sheet(isPresented: $showingSettings) {
                 SettingsView()
+            }
+            // Reminders follow the program's frequency, whichever way it was saved.
+            .task(id: programs.first?.sessionsPerWeek) {
+                if let sessionsPerWeek = programs.first?.sessionsPerWeek {
+                    await ReminderScheduler.refreshIfEnabled(sessionsPerWeek: sessionsPerWeek)
+                }
             }
             .sheet(isPresented: $showingReport) {
                 NavigationStack {
@@ -44,7 +50,7 @@ struct TodayView: View {
 
     private var header: some View {
         HStack(alignment: .center) {
-            Text("Aujourd'hui")
+            Text("Accueil")
                 .font(.largeTitle.bold())
                 .accessibilityAddTraits(.isHeader)
             Spacer()
@@ -58,27 +64,6 @@ struct TodayView: View {
         }
         .padding(.top, 8)
         .padding(.bottom, 4)
-    }
-
-    private var noProgram: some View {
-        // The program always comes from the physiotherapist: their message, or their sheet.
-        ContentUnavailableView {
-            Label("Votre programme vient de votre kiné", systemImage: "stethoscope")
-        } description: {
-            Text("Collez le message où il vous décrit vos exercices, ou scannez sa feuille.")
-        } actions: {
-            Button("Coller son message", systemImage: "text.bubble") { router.addProgram(from: .message) }
-                .buttonStyle(.glassProminent)
-                .controlSize(.large)
-            Button("Scanner sa feuille", systemImage: "doc.viewfinder") { router.addProgram(from: .scan) }
-                .buttonStyle(.glass)
-                .controlSize(.large)
-            #if DEBUG
-            Button("Programme de démo") { DemoData.load(into: context) }
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-            #endif
-        }
     }
 
     private func today(_ program: Program) -> some View {
@@ -281,8 +266,9 @@ private struct WorkoutSource: ViewModifier {
     }
 }
 
-/// An exercise's pictogram in a tinted circle.
-private struct ExerciseBadge: View {
+/// An exercise's pictogram in a tinted circle: the drawn pictogram for the camera's exercises,
+/// a `figure.*` symbol for the others.
+struct ExerciseBadge: View {
     let exercise: PlannedExercise
     let size: Double
 
@@ -291,9 +277,10 @@ private struct ExerciseBadge: View {
             if let catalog = exercise.catalogExercise {
                 ExerciseIcon(exercise: catalog).padding(size * 0.2)
             } else {
-                Image(systemName: exercise.symbol).font(.system(size: size * 0.45))
+                Image(systemName: exercise.figureSymbol).font(.system(size: size * 0.45))
             }
         }
+        .accessibilityHidden(true)
         .foregroundStyle(.tint)
         .frame(width: size, height: size)
         .background(Color(.tertiarySystemGroupedBackground), in: .circle)
@@ -359,20 +346,41 @@ struct WeekProgress {
 }
 
 extension PlannedExercise {
-    /// "3 séries de 10 répétitions" or "3 × 30 s".
+    /// "3 séries de 10 répétitions" or "2 séries de 30 s de maintien".
     var prescriptionDetail: LocalizedStringKey {
-        if let holdSeconds { return "\(sets) × \(holdSeconds) s" }
-        return "\(sets) séries de \(reps) répétitions"
+        if let holdSeconds { return "^[\(sets) série](inflect: true) de \(holdSeconds) s de maintien" }
+        return "^[\(sets) série](inflect: true) de ^[\(reps) répétition](inflect: true)"
     }
 
+    /// "Suivi caméra", "Comptage manuel" or "Minuteur", with its symbol.
     var trackingSymbol: String {
         if catalogExercise != nil { return "camera.viewfinder" }
         return holdSeconds == nil ? "hand.tap" : "timer"
     }
 
     var trackingLabel: Text {
-        if catalogExercise != nil { return Text("Caméra") }
-        return holdSeconds == nil ? Text("Manuel") : Text("Minuteur")
+        if catalogExercise != nil { return Text("Suivi caméra") }
+        return holdSeconds == nil ? Text("Comptage manuel") : Text("Minuteur")
+    }
+
+    /// A `figure.*` symbol for an exercise the camera doesn't follow, guessed from its name.
+    var figureSymbol: String {
+        if let catalogExercise { return catalogExercise.symbol }
+        let name = self.name.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+        let symbols: [(words: [String], symbol: String)] = [
+            (["gainage", "planche", "plank", "abdo"], "figure.core.training"),
+            (["etirement", "stretch", "souplesse"], "figure.flexibility"),
+            (["escalier", "step"], "figure.stairs"),
+            (["velo", "pedal"], "figure.indoor.cycle"),
+            (["marche", "walk"], "figure.walk"),
+            (["equilibre", "unipodal", "balance"], "figure.stand"),
+            (["respiration", "relaxation"], "figure.mind.and.body"),
+            (["bras", "epaule", "coude", "poignet"], "figure.arms.open"),
+        ]
+        if let match = symbols.first(where: { entry in entry.words.contains { name.contains($0) } }) {
+            return match.symbol
+        }
+        return holdSeconds == nil ? "figure.cooldown" : "figure.core.training"
     }
 }
 

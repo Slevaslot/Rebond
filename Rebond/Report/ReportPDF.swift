@@ -71,8 +71,15 @@ struct ReportSummary: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Séances : \(report.sessionsDone) sur \(report.sessionsPlanned) prévues")
-                .font(.headline)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Séances : \(report.sessionsDone) sur \(report.sessionsPlanned) prévues")
+                    .font(.headline)
+                if !report.sessionLines.isEmpty {
+                    Text(report.sessionLines.map { $0.date.formatted(.dateTime.weekday(.abbreviated).day().month()) }
+                        .formatted(.list(type: .and)))
+                        .foregroundStyle(.secondary)
+                }
+            }
 
             ForEach(report.exercises) { line in
                 VStack(alignment: .leading, spacing: 2) {
@@ -102,9 +109,14 @@ struct ReportSummary: View {
                     if let first = report.firstPain, let last = report.lastPain {
                         Text("Évolution : \(first) → \(last)")
                     }
-                    ForEach(report.painfulSessionDates, id: \.self) { date in
-                        Label("Douleur forte (≥ \(WeeklyReport.highPain)) le \(date, format: .dateTime.weekday(.wide).day().month())", systemImage: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.orange)
+                    ForEach(report.painfulSessions) { session in
+                        // The symbol carries the color; the text stays dark enough to read.
+                        Label {
+                            Text("Douleur forte (\(session.pain) sur 10) le \(session.date, format: .dateTime.weekday(.wide).day().month())")
+                                .fontWeight(.semibold)
+                        } icon: {
+                            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                        }
                     }
                 }
             } else {

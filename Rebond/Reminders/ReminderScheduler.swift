@@ -23,6 +23,15 @@ enum ReminderScheduler {
         return true
     }
 
+    /// Moves the session reminders to the new frequency after the program changed, when they are on.
+    /// Asks nothing: without the setting turned on, nothing is scheduled.
+    static func refreshIfEnabled(sessionsPerWeek: Int) async {
+        let defaults = UserDefaults.standard
+        guard defaults.bool(forKey: ReminderSettings.enabledKey) else { return }
+        let hour = defaults.object(forKey: ReminderSettings.hourKey) as? Int ?? ReminderSettings.defaultHour
+        await schedule(sessionsPerWeek: sessionsPerWeek, hour: hour)
+    }
+
     static func disable() {
         UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
     }

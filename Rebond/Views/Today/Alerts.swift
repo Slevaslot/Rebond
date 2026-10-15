@@ -1,7 +1,7 @@
 import SwiftData
 import SwiftUI
 
-/// The alerts of the Aujourd'hui page, grouped in one compact card: one row each, newest first.
+/// The alerts of the Accueil page, grouped in one compact card: one row each, newest first.
 struct AlertsGroup: View {
     let sessions: [Session]
     let onReport: () -> Void
@@ -113,17 +113,32 @@ private struct AlertRow: View {
     }
 }
 
-/// Remembers the last change made by the physiotherapist, to show it on the Aujourd'hui page.
+/// Remembers the last change made by the physiotherapist, to show it on the Accueil page.
 enum ProgramChange {
     static let dateKey = "programChangeDate"
     static let byKey = "programChangeBy"
     static let summaryKey = "programChangeSummary"
+    /// Who prescribed the program and when, kept after the alert is closed, for the Programme page.
+    static let prescriberKey = "programPrescriber"
+    static let prescribedAtKey = "programPrescribedAt"
 
     static func record(from old: Program?, to new: EditableProgram, by name: String?) {
         let defaults = UserDefaults.standard
-        defaults.set(Date.now.timeIntervalSinceReferenceDate, forKey: dateKey)
+        let now = Date.now.timeIntervalSinceReferenceDate
+        defaults.set(now, forKey: dateKey)
         defaults.set(name ?? "", forKey: byKey)
         defaults.set(describe(from: old.map(EditableProgram.init), to: new), forKey: summaryKey)
+        defaults.set(name ?? "", forKey: prescriberKey)
+        defaults.set(now, forKey: prescribedAtKey)
+    }
+
+    /// The physiotherapist who prescribed this program, when it came from them (QR code or the demo):
+    /// an empty name when it is unknown, nil when the program was added by the patient.
+    static func prescriber(of program: Program, prescribedAt: Double, name: String) -> String? {
+        guard prescribedAt > 0,
+              abs(program.createdAt.timeIntervalSinceReferenceDate - prescribedAt) < 120
+        else { return nil }
+        return name
     }
 
     /// The change in plain words, short enough for one line: "Squat : plus de répétitions."
