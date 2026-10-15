@@ -299,7 +299,8 @@ struct SessionView: View {
     /// The model's card: full screen to watch the movement, or a fixed card on the left.
     private func floatingGuideFrame(in size: CGSize) -> CGRect {
         guard guideInCard else { return CGRect(origin: .zero, size: size) }
-        let width = cardWidth
+        // A video needs more room than the pictogram to be seen from 2 or 3 meters.
+        let width = exercise.reference != nil ? cardWidth * 1.4 : cardWidth
         let height = width * 1.5
         return CGRect(x: 16, y: (size.height - height) / 2, width: width, height: height)
     }
@@ -334,17 +335,27 @@ struct SessionView: View {
                     .opacity(guideInCard ? 1 : 0)
                     .frame(width: card.width, height: card.height)
                     .position(x: card.midX, y: card.midY)
-                MovementGuide(
-                    exercise: exercise,
-                    skeleton: nil,
-                    isDemonstrating: true,
-                    demonstrationStart: motion.demonstrationStart,
-                    isCompact: true,
-                    lineWidth: guideInCard ? 3 / scale : 6
-                )
-                .frame(width: large.width, height: large.height)
-                .scaleEffect(scale)
-                .position(x: figure.midX, y: figure.midY)
+                if let reference = exercise.reference {
+                    // A filmed movement: the video of the physiotherapist's, moving as the patient moves.
+                    ReferenceFramesView(movement: reference,
+                                        progress: guideInCard ? motion.depthProgress : nil,
+                                        contentMode: guideInCard ? .fill : .fit)
+                        .frame(width: card.width, height: card.height)
+                        .clipShape(.rect(cornerRadius: guideInCard ? 20 : 0))
+                        .position(x: card.midX, y: card.midY)
+                } else {
+                    MovementGuide(
+                        exercise: exercise,
+                        skeleton: nil,
+                        isDemonstrating: true,
+                        demonstrationStart: motion.demonstrationStart,
+                        isCompact: true,
+                        lineWidth: guideInCard ? 3 / scale : 6
+                    )
+                    .frame(width: large.width, height: large.height)
+                    .scaleEffect(scale)
+                    .position(x: figure.midX, y: figure.midY)
+                }
             }
             .frame(width: geometry.size.width, height: geometry.size.height)
             // Only the model itself reacts to touches: the rest of the screen stays usable.

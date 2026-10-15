@@ -205,10 +205,27 @@ private struct ExerciseChooser: View {
     /// An exercise Rebond doesn't know, waiting for its name.
     @State private var naming: EditableProgram.Exercise?
     @State private var name = ""
+    @State private var filming = false
+    @State private var filmed: ReferenceMovement?
+    private let filmedMovements = ReferenceStore.all()
 
     var body: some View {
         NavigationStack {
             List {
+                Section("Filmés chez votre kiné") {
+                    Button {
+                        filming = true
+                    } label: {
+                        Label { Text("Filmer un nouveau mouvement").foregroundStyle(.primary) } icon: { Image(systemName: "video.badge.plus") }
+                    }
+                    ForEach(filmedMovements) { movement in
+                        Button {
+                            choose(EditableProgram.Exercise(movement))
+                        } label: {
+                            Label { Text(movement.name).foregroundStyle(.primary) } icon: { Image(systemName: ReferenceMovement.symbol) }
+                        }
+                    }
+                }
                 Section("Suivis par la caméra") {
                     ForEach(CatalogExercise.all) { catalog in
                         Button {
@@ -238,6 +255,11 @@ private struct ExerciseChooser: View {
             }
             .navigationTitle("Ajouter un exercice")
             .navigationBarTitleDisplayMode(.inline)
+            .fullScreenCover(isPresented: $filming, onDismiss: {
+                if let filmed { choose(EditableProgram.Exercise(filmed)) }
+            }) {
+                RecordMovementView { filmed = $0 }
+            }
             .alert("Nom de l'exercice", isPresented: Binding(get: { naming != nil }, set: { if !$0 { naming = nil } })) {
                 TextField(naming?.mode == .hold ? "Ex. : Gainage" : "Ex. : Pont fessier", text: $name)
                     .textInputAutocapitalization(.sentences)

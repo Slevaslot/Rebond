@@ -1,0 +1,413 @@
+import CoreGraphics
+import Foundation
+import Vision
+
+/// A movement filmed at the physiotherapist's, done right by the patient: any exercise, learned from the video.
+///
+/// The body of each frame becomes a few measures (angles of the elbows, shoulders, knees and hips, height of the
+/// hips, wrists and ankles). The movement is the direction in which those measures change the most from the
+/// resting position: one value along it goes from 0 at rest to `target` at the end of the movement, and counts
+/// the repetitions like the catalog's exercises. The average repetition (`template`) is what each repetition at
+/// home is compared to, for the resemblance score shown to the patient.
+nonisolated struct ReferenceMovement: Codable, Sendable, Identifiable {
+    let id: UUID
+    var name: String
+    let createdAt: Date
+    /// Unit direction of the movement among the measures.
+    let axis: [Double]
+    /// Value along the axis at the end of a filmed repetition (median of them).
+    let target: Double
+    /// The average repetition, from its start to its return, resampled: one vector of measures per point.
+    let template: [[Double]]
+    /// Seconds: a repetition faster than that is flagged "too fast".
+    let minDuration: Double
+    /// Repetitions found in the video.
+    let repCount: Int
+    /// Raw names of the joints that move, highlighted on the skeleton.
+    let highlightedJoints: [String]
+    /// The patient's own body at rest and at the end of the movement, in the guide's unit box.
+    let restPose: [String: CGPoint]
+    let targetPose: [String: CGPoint]
+    /// Images of the clearest repetition saved with it, from its start to its return.
+    let frameCount: Int
+    /// The image at the end of the movement, among them.
+    let peakFrame: Int
+
+    var catalogID: String { ReferenceStore.catalogPrefix + id.uuidString }
+
+    static let symbol = "video.fill"
+}
+
+// MARK: - Measures
+
+/// The measures of one body that make a movement, comparable from one body to the other: angles in units of
+/// 60°, positions in torso lengths.
+nonisolated enum MovementFeatures {
+    static let count = 16
+    /// Left and right measures, swapped when the patient does the movement on the other side.
+    static let sidePairs = [(0, 1), (2, 3), (4, 5), (6, 7), (11, 12), (14, 15)]
+    /// Sideways positions, reversed with the side.
+    static let sidewaysIndices = [9, 10]
+
+    /// Joints each measure follows, to highlight the moving ones.
+    static let joints: [[VNHumanBodyPoseObservation.JointName]] = [
+        [.leftShoulder, .leftElbow, .leftWrist], [.rightShoulder, .rightElbow, .rightWrist],
+        [.leftShoulder, .leftElbow], [.rightShoulder, .rightElbow],
+        [.leftHip, .leftKnee, .leftAnkle], [.rightHip, .rightKnee, .rightAnkle],
+        [.leftHip, .leftKnee], [.rightHip, .rightKnee],
+        [.leftHip, .rightHip], [.leftHip, .rightHip], [.neck],
+        [.leftWrist], [.rightWrist], [.neck],
+        [.leftAnkle], [.rightAnkle],
+    ]
+
+    /// - Parameter torso: The body's scale, measured at rest.
+    static func vector(_ m: PoseMeasure, torso: Double) -> [Double?] {
+        let scale = max(torso, 0.01)
+        func angle(_ a: CGPoint?, _ b: CGPoint?, _ c: CGPoint?) -> Double? {
+            guard let a, let b, let c else { return nil }
+            let u = CGVector(dx: a.x - b.x, dy: a.y - b.y), v = CGVector(dx: c.x - b.x, dy: c.y - b.y)
+            let lengths = hypot(u.dx, u.dy) * hypot(v.dx, v.dy)
+            guard lengths > 0 else { return nil }
+            let cosine = Double((u.dx * v.dx + u.dy * v.dy) / lengths)
+            return acos(max(-1, min(1, cosine))) * 180 / .pi / 60
+        }
+        func height(_ p: CGPoint?) -> Double? {
+            p.map { (Double($0.y) - Double(m.hips.y)) / scale }
+        }
+        return [
+            angle(m.leftShoulder, m.leftElbow, m.leftWrist),
+            angle(m.rightShoulder, m.rightElbow, m.rightWrist),
+            angle(m.leftHip, m.leftShoulder, m.leftElbow),
+            angle(m.rightHip, m.rightShoulder, m.rightElbow),
+            angle(m.leftHip, m.leftKnee, m.leftAnkle),
+            angle(m.rightHip, m.rightKnee, m.rightAnkle),
+            angle(m.leftShoulder, m.leftHip, m.leftKnee),
+            angle(m.rightShoulder, m.rightHip, m.rightKnee),
+            Double(m.hips.y) / scale,
+            Double(m.hips.x) / scale,
+            (Double(m.neck.x) - Double(m.hips.x)) / scale,
+            height(m.leftWrist),
+            height(m.rightWrist),
+            Double(m.neck.y) / scale,
+            height(m.leftAnkle),
+            height(m.rightAnkle),
+        ]
+    }
+
+    /// The same measures with left and right swapped.
+    static func swapped(_ v: [Double]) -> [Double] {
+        var result = v
+        for (a, b) in sidePairs { (result[a], result[b]) = (v[b], v[a]) }
+        for i in sidewaysIndices { result[i] = -v[i] }
+        return result
+    }
+
+    static func dot(_ a: [Double], _ b: [Double]) -> Double {
+        zip(a, b).reduce(0) { $0 + $1.0 * $1.1 }
+    }
+
+    static func distance(_ a: [Double], _ b: [Double]) -> Double {
+        sqrt(zip(a, b).reduce(0) { $0 + ($1.0 - $1.1) * ($1.0 - $1.1) })
+    }
+
+    static func norm(_ a: [Double]) -> Double { sqrt(dot(a, a)) }
+
+    /// Points of a repetition, evenly spaced from its start to its end.
+    static func resample(_ trajectory: [[Double]], points: Int) -> [[Double]] {
+        guard let first = trajectory.first else { return [] }
+        guard trajectory.count > 1 else { return Array(repeating: first, count: points) }
+        return (0..<points).map { k in
+            let position = Double(k) / Double(points - 1) * Double(trajectory.count - 1)
+            let i = Int(position), fraction = position - Double(i)
+            let a = trajectory[i], b = trajectory[min(i + 1, trajectory.count - 1)]
+            return zip(a, b).map { $0 + ($1 - $0) * fraction }
+        }
+    }
+
+    /// How close a repetition is to the filmed one: 1 for the same, 0 when it differs by the whole movement.
+    static func resemblance(_ trajectory: [[Double]], to template: [[Double]]) -> Double {
+        guard !trajectory.isEmpty, !template.isEmpty else { return 0 }
+        let scale = template.map(norm).max() ?? 0
+        guard scale > 0 else { return 0 }
+        func score(_ points: [[Double]]) -> Double {
+            let resampled = resample(points, points: template.count)
+            let mean = zip(resampled, template).map { distance($0, $1) }.reduce(0, +) / Double(template.count)
+            return max(0, min(1, 1 - mean / scale))
+        }
+        return max(score(trajectory), score(trajectory.map(swapped)))
+    }
+}
+
+// MARK: - Learning from the video
+
+/// One analyzed frame of the filmed video.
+nonisolated struct ReferenceSample: Sendable {
+    let time: Double
+    let measure: PoseMeasure?
+    /// Joints in the image, normalized, origin top-left.
+    let points: [VNHumanBodyPoseObservation.JointName: CGPoint]
+    let imageSize: CGSize
+}
+
+nonisolated enum ReferenceError: Error {
+    /// The body wasn't seen well enough.
+    case noBody
+    /// The body was seen, but no movement repeated.
+    case noRepetition
+}
+
+/// What the video taught: everything of a `ReferenceMovement` but its name, and when its clearest repetition is.
+nonisolated struct ReferenceAnalysis: Sendable {
+    let axis: [Double]
+    let target: Double
+    let template: [[Double]]
+    let minDuration: Double
+    let repCount: Int
+    let highlightedJoints: [String]
+    let restPose: [String: CGPoint]
+    let targetPose: [String: CGPoint]
+    /// Times, in the video, of the clearest repetition.
+    let bestStart: Double
+    let bestPeak: Double
+    let bestEnd: Double
+}
+
+nonisolated enum ReferenceAnalyzer {
+    static let templatePoints = 24
+    /// A repetition starts and ends at these fractions of the movement, as when counting at home.
+    static let startFraction = 0.2
+    static let backFraction = 0.12
+
+    static func analyze(_ samples: [ReferenceSample]) throws(ReferenceError) -> ReferenceAnalysis {
+        let valid = samples.filter { $0.measure != nil }
+        guard valid.count >= 20 else { throw .noBody }
+
+        // The patient stands still at the start of the video: that's the resting position.
+        let restCount = min(8, valid.count)
+        let torso = median(valid.prefix(restCount).map { $0.measure!.torsoLength })
+        guard torso > 0 else { throw .noBody }
+
+        // Measures of every frame; a measure missing on a frame keeps its last value.
+        var raw = valid.map { MovementFeatures.vector($0.measure!, torso: torso) }
+        for f in 0..<MovementFeatures.count {
+            let firstSeen = raw.lazy.compactMap { $0[f] }.first ?? 0
+            var last = firstSeen
+            for i in raw.indices {
+                if let value = raw[i][f] { last = value } else { raw[i][f] = last }
+            }
+        }
+        let features = smooth(raw.map { $0.map { $0 ?? 0 } })
+        let rest = (0..<MovementFeatures.count).map { f in median(features.prefix(restCount).map { $0[f] }) }
+        let deviations = features.map { zip($0, rest).map { $0 - $1 } }
+
+        // The movement's direction: where the measures change the most, together.
+        var axis = principalDirection(of: deviations)
+        var values = deviations.map { MovementFeatures.dot($0, axis) }
+        if (values.max() ?? 0) < -(values.min() ?? 0) {
+            axis = axis.map { -$0 }
+            values = values.map { -$0 }
+        }
+        let highest = values.max() ?? 0
+        // Less than about 9° or 0.15 torso length: nothing moved.
+        guard highest > 0.15 else { throw .noRepetition }
+
+        // The repetitions: from the start threshold, past half the movement, back under the return threshold.
+        var reps: [(start: Int, peak: Int, end: Int)] = []
+        var start: Int?
+        var peak = 0
+        for (i, value) in values.enumerated() {
+            if let s = start {
+                if value > values[peak] { peak = i }
+                if value <= highest * backFraction {
+                    if values[peak] >= highest * 0.5 { reps.append((s, peak, i)) }
+                    start = nil
+                }
+            } else if value >= highest * startFraction {
+                start = i
+                peak = i
+            }
+        }
+        guard !reps.isEmpty else { throw .noRepetition }
+
+        let target = median(reps.map { values[$0.peak] })
+        let trajectories = reps.map { Array(deviations[$0.start...$0.end]) }
+        let resampled = trajectories.map { MovementFeatures.resample($0, points: templatePoints) }
+        let template = (0..<templatePoints).map { k in
+            (0..<MovementFeatures.count).map { f in resampled.map { $0[k][f] }.reduce(0, +) / Double(resampled.count) }
+        }
+        let best = reps.indices.max {
+            MovementFeatures.resemblance(trajectories[$0], to: template) < MovementFeatures.resemblance(trajectories[$1], to: template)
+        }!
+        let durations = reps.map { valid[$0.end].time - valid[$0.start].time }
+
+        let strongest = axis.map(abs).max() ?? 0
+        var joints = Set<String>()
+        for (f, weight) in axis.enumerated() where abs(weight) >= strongest * 0.35 {
+            for joint in MovementFeatures.joints[f] { joints.insert(joint.rawValue.rawValue) }
+        }
+
+        let restFrame = valid[restCount / 2]
+        let peakFrame = valid[reps[best].peak]
+        let poses = guidePoses(rest: restFrame, target: peakFrame)
+
+        return ReferenceAnalysis(
+            axis: axis,
+            target: target,
+            template: template,
+            minDuration: median(durations) * 0.45,
+            repCount: reps.count,
+            highlightedJoints: joints.sorted(),
+            restPose: poses.rest,
+            targetPose: poses.target,
+            bestStart: valid[reps[best].start].time,
+            bestPeak: peakFrame.time,
+            bestEnd: valid[reps[best].end].time
+        )
+    }
+
+    /// The patient's body at rest and at the end of the movement, in the guide's unit box (as wide as 0.65 of
+    /// its height), standing on its feet: the outline they fit in before the set is their own body.
+    static func guidePoses(rest: ReferenceSample, target: ReferenceSample) -> (rest: [String: CGPoint], target: [String: CGPoint]) {
+        let aspect = rest.imageSize.width / max(rest.imageSize.height, 1)
+        func inHeightUnits(_ p: CGPoint) -> CGPoint { CGPoint(x: p.x * aspect, y: p.y) }
+        let restPoints = rest.points.mapValues(inHeightUnits)
+        let top = restPoints[.nose]?.y ?? restPoints[.neck].map { $0.y - 0.06 } ?? 0.1
+        let feet = [restPoints[.leftAnkle], restPoints[.rightAnkle]].compactMap { $0?.y }.max() ?? 0.9
+        let hips = [restPoints[.leftHip], restPoints[.rightHip], restPoints[.root]].compactMap { $0?.x }
+        let centerX = hips.isEmpty ? 0.5 * aspect : hips.reduce(0, +) / Double(hips.count)
+        let scale = 0.87 / max(feet - top, 0.1)
+
+        func box(_ points: [VNHumanBodyPoseObservation.JointName: CGPoint]) -> [String: CGPoint] {
+            // The pictogram needs every joint: the ones Vision didn't see come from a standing figure.
+            var result = CatalogExercise.squat.guideRest
+            for (joint, point) in points.mapValues(inHeightUnits) {
+                result[joint] = CGPoint(x: 0.5 + (point.x - centerX) * scale / 0.65, y: 0.08 + (point.y - top) * scale)
+            }
+            result[.root] = nil
+            return Dictionary(uniqueKeysWithValues: result.map { ($0.key.rawValue.rawValue, $0.value) })
+        }
+        return (box(rest.points), box(target.points))
+    }
+
+    /// The direction along which the deviations spread the most (power iteration).
+    static func principalDirection(of vectors: [[Double]]) -> [Double] {
+        let n = MovementFeatures.count
+        var direction = vectors.max { MovementFeatures.norm($0) < MovementFeatures.norm($1) } ?? Array(repeating: 1, count: n)
+        for _ in 0..<60 {
+            var next = Array(repeating: 0.0, count: n)
+            for v in vectors {
+                let projection = MovementFeatures.dot(v, direction)
+                for f in 0..<n { next[f] += v[f] * projection }
+            }
+            let length = MovementFeatures.norm(next)
+            guard length > 0 else { break }
+            direction = next.map { $0 / length }
+        }
+        let length = MovementFeatures.norm(direction)
+        return length > 0 ? direction.map { $0 / length } : direction
+    }
+
+    /// Moving average over three frames: Vision's points shake a little from one frame to the next.
+    static func smooth(_ vectors: [[Double]]) -> [[Double]] {
+        vectors.indices.map { i in
+            let window = vectors[max(0, i - 1)...min(vectors.count - 1, i + 1)]
+            return (0..<MovementFeatures.count).map { f in window.map { $0[f] }.reduce(0, +) / Double(window.count) }
+        }
+    }
+
+    static func median(_ values: [Double]) -> Double {
+        guard !values.isEmpty else { return 0 }
+        let sorted = values.sorted()
+        let middle = sorted.count / 2
+        return sorted.count.isMultiple(of: 2) ? (sorted[middle - 1] + sorted[middle]) / 2 : sorted[middle]
+    }
+}
+
+// MARK: - Counting at home
+
+/// Counts the repetitions of a filmed movement and scores each one against the film.
+/// The resting position is measured once the patient stands still, and again whenever they rest still.
+nonisolated struct ReferenceCounter: MovementCounter {
+    let movement: ReferenceMovement
+    private var cycle: RepCycle
+    private var rest: [Double]?
+    private var torso = 0.0
+    /// Recent frames, to find a still moment.
+    private var recent: [(features: [Double?], torso: Double)] = []
+    private var trajectory: [[Double]] = []
+    private let stillFrames = 10
+
+    init(movement: ReferenceMovement) {
+        self.movement = movement
+        let target = movement.target
+        cycle = RepCycle(start: target * ReferenceAnalyzer.startFraction, target: target,
+                         back: target * ReferenceAnalyzer.backFraction, reversalMargin: target * 0.1,
+                         noise: target * 0.4, minDuration: movement.minDuration, shortfall: .followReference)
+    }
+
+    mutating func process(_ measure: PoseMeasure?, at time: Double) -> CounterUpdate {
+        guard let measure else {
+            cycle.abandon()
+            trajectory = []
+            recent = []
+            return CounterUpdate(progress: 0, event: nil)
+        }
+
+        var calibratedNow = false
+        recent.append((MovementFeatures.vector(measure, torso: torso > 0 ? torso : measure.torsoLength), measure.torsoLength))
+        if recent.count > stillFrames { recent.removeFirst() }
+        if !cycle.isInRepetition, let still = stillPosition() {
+            if rest == nil { calibratedNow = true }
+            // Again at each still moment at rest: the patient may have moved a little in the room.
+            if rest == nil || abs(deviationValue(still.features)) < movement.target * 0.15 {
+                rest = still.features
+                torso = still.torso
+            }
+        }
+        guard let rest else { return CounterUpdate(progress: 0, event: nil) }
+
+        let features = MovementFeatures.vector(measure, torso: torso).enumerated().map { $1 ?? rest[$0] }
+        let deviation = zip(features, rest).map { $0 - $1 }
+        let value = max(MovementFeatures.dot(deviation, movement.axis),
+                        MovementFeatures.dot(MovementFeatures.swapped(deviation), movement.axis))
+
+        let wasInRepetition = cycle.isInRepetition
+        let (event, posture) = cycle.advance(value, fault: nil, at: time)
+        if cycle.isInRepetition || wasInRepetition { trajectory.append(deviation) }
+        if !cycle.isInRepetition, !wasInRepetition { trajectory = [] }
+
+        var result = event
+        switch event {
+        case .repCompleted(let rep):
+            let score = MovementFeatures.resemblance(trajectory, to: movement.template)
+            result = .repCompleted(RepResult(amplitude: score, tooFast: rep.tooFast))
+            trajectory = []
+        case .repIncomplete:
+            trajectory = []
+        default:
+            break
+        }
+        if calibratedNow, case .none = result { result = .calibrated }
+        return CounterUpdate(progress: min(1, max(0, value / movement.target)), event: result, posture: posture)
+    }
+
+    /// The mean measures of the last frames, when the body barely moved over them.
+    private func stillPosition() -> (features: [Double], torso: Double)? {
+        guard recent.count == stillFrames else { return nil }
+        let mean = (0..<MovementFeatures.count).map { f -> Double in
+            let values = recent.compactMap { $0.features[f] }
+            return values.isEmpty ? 0 : values.reduce(0, +) / Double(values.count)
+        }
+        let isStill = recent.allSatisfy { frame in
+            let filled = frame.features.enumerated().map { $1 ?? mean[$0] }
+            return MovementFeatures.distance(filled, mean) < 0.3
+        }
+        guard isStill else { return nil }
+        return (mean, recent.map(\.torso).reduce(0, +) / Double(recent.count))
+    }
+
+    private func deviationValue(_ features: [Double]) -> Double {
+        guard let rest else { return 0 }
+        return MovementFeatures.dot(zip(features, rest).map { $0 - $1 }, movement.axis)
+    }
+}

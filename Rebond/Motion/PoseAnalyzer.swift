@@ -79,15 +79,22 @@ nonisolated struct PoseAnalyzer {
     private let minimumConfidence: Float = 0.3
 
     func analyze(_ pixelBuffer: CVPixelBuffer) -> PoseFrame {
+        analyze(VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: orientation), size: uprightSize(of: pixelBuffer))
+    }
+
+    /// An image of a filmed video, already upright.
+    func analyze(_ image: CGImage) -> PoseFrame {
+        analyze(VNImageRequestHandler(cgImage: image, orientation: orientation), size: CGSize(width: image.width, height: image.height))
+    }
+
+    private func analyze(_ handler: VNImageRequestHandler, size: CGSize) -> PoseFrame {
         let request = VNDetectHumanBodyPoseRequest()
-        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: orientation)
         guard (try? handler.perform([request])) != nil,
               let visible = patientPoints(in: request.results ?? [])
         else { return PoseFrame(skeleton: nil, measure: nil) }
 
         guard visible.count >= 4 else { return PoseFrame(skeleton: nil, measure: nil) }
 
-        let size = uprightSize(of: pixelBuffer)
         let skeleton = PoseSkeleton(
             points: visible.mapValues { CGPoint(x: $0.location.x, y: 1 - $0.location.y) },
             imageSize: size

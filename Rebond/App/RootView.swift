@@ -25,6 +25,8 @@ struct RootView: View {
 
     @State private var draft: Draft?
     @State private var pickedPhoto: PhotosPickerItem?
+    /// A movement just filmed, waiting for the camera to close to open its new séance.
+    @State private var filmed: ReferenceMovement?
     @State private var savedProgram = 0
     /// Set while the program being reviewed comes from the physiotherapist.
     @State private var prescriber: String?
@@ -84,6 +86,19 @@ struct RootView: View {
                 if let image { draft = Draft(content: .photo(image)) }
             }
             .ignoresSafeArea()
+        }
+        .fullScreenCover(isPresented: Binding(
+            get: { router.importSource == .film },
+            set: { if !$0 { router.importSource = nil } }
+        ), onDismiss: {
+            // Once the camera is gone: the new séance with the filmed movement, to complete and save.
+            guard let filmed else { return }
+            self.filmed = nil
+            var program = EditableProgram()
+            program.exercises = [EditableProgram.Exercise(filmed)]
+            draft = Draft(content: .program(program, notice: "Ajoutez d'autres exercices si besoin, puis enregistrez la séance."))
+        }) {
+            RecordMovementView { movement in filmed = movement }
         }
         .photosPicker(
             isPresented: Binding(

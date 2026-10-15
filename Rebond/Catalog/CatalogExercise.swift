@@ -23,6 +23,8 @@ nonisolated struct CatalogExercise: Identifiable, Sendable {
         case sideLunge(targetShift: Double)
         /// Shoulder rotation in the 90/90 position, in forearm lengths of the wrist coming down toward the elbow.
         case shoulderRotation(targetTurn: Double)
+        /// Any movement, filmed at the physiotherapist's and learned from the video.
+        case recorded(ReferenceMovement)
     }
 
     /// How the guide pictogram moves its arms.
@@ -61,6 +63,7 @@ nonisolated struct CatalogExercise: Identifiable, Sendable {
         case .forwardLunge(let targetDrop): LungeCounter(direction: .forward, target: targetDrop)
         case .sideLunge(let targetShift): LungeCounter(direction: .side, target: targetShift)
         case .shoulderRotation(let targetTurn): ShoulderRotationCounter(targetTurn: targetTurn)
+        case .recorded(let movement): ReferenceCounter(movement: movement)
         }
     }
 }
@@ -343,8 +346,17 @@ nonisolated extension CatalogExercise {
         .forwardLunge, .sideLunge, .shoulderRotation,
     ]
 
+    /// An exercise of the catalog, or a movement filmed at the physiotherapist's.
     static func find(_ id: String) -> CatalogExercise? {
-        all.first { $0.id == id }
+        if let reference = ReferenceStore.id(fromCatalogID: id) {
+            return ReferenceStore.load(reference)?.catalogExercise
+        }
+        return all.first { $0.id == id }
+    }
+
+    /// The filmed movement this exercise was learned from, if it was.
+    var reference: ReferenceMovement? {
+        if case .recorded(let movement) = analysis { movement } else { nil }
     }
 }
 
@@ -369,7 +381,7 @@ nonisolated extension CatalogExercise {
     func canFollow(_ measure: PoseMeasure?) -> Bool {
         guard let measure else { return false }
         switch analysis {
-        case .squat, .sitToStand, .forwardLunge, .sideLunge:
+        case .squat, .sitToStand, .forwardLunge, .sideLunge, .recorded:
             // The hips and the neck give the movement.
             return true
         case .armRaise, .oneArmRaise:

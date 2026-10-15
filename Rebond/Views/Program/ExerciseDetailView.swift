@@ -75,6 +75,9 @@ struct ExerciseDetailView: View {
     }
 
     private func howItIsFollowed(_ exercise: PlannedExercise) -> LocalizedStringKey {
+        if exercise.catalogExercise?.reference != nil {
+            return "Rebond compare chaque répétition au mouvement filmé chez votre kiné. Pendant la séance, la vidéo avance avec vous. Posez l'iPhone comme pendant le film, à 2 ou 3 mètres."
+        }
         if exercise.catalogExercise != nil {
             return "La caméra compte vos répétitions et vous conseille pendant le mouvement. Posez l'iPhone debout, à 2 ou 3 mètres, et placez-vous face à lui."
         }
@@ -110,10 +113,24 @@ struct MovementCard: View {
     let symbol: String
     var height: Double = 260
     @State private var start = Date.now
+    @State private var showingVideo = false
 
     var body: some View {
         Group {
-            if let catalog {
+            if let reference = catalog?.reference {
+                // Filmed at the physiotherapist's: the patient's own movement, in a loop.
+                ReferenceFramesView(movement: reference)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: height)
+                    .clipped()
+                    .overlay(alignment: .bottomTrailing) {
+                        Button("Vidéo complète", systemImage: "play.fill") { showingVideo = true }
+                            .font(.subheadline.weight(.semibold))
+                            .buttonStyle(.glass)
+                            .padding(12)
+                    }
+                    .sheet(isPresented: $showingVideo) { ReferenceVideoSheet(movement: reference) }
+            } else if let catalog {
                 MovementGuide(exercise: catalog, skeleton: nil, isDemonstrating: true, demonstrationStart: start,
                               isCompact: true, lineWidth: 5, hasEdge: false)
                     .padding(24)
@@ -126,6 +143,7 @@ struct MovementCard: View {
         .frame(maxWidth: .infinity)
         .frame(height: height)
         .background(Color.accentColor.gradient, in: .rect(cornerRadius: 26))
-        .accessibilityElement()
+        .clipShape(.rect(cornerRadius: 26))
+        .accessibilityElement(children: .contain)
     }
 }

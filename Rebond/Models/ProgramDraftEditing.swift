@@ -150,3 +150,11 @@ extension Program {
         }
     }
 }
+
+extension EditableProgram.Exercise {
+    /// A movement filmed at the physiotherapist's, followed by the camera.
+    init(_ movement: ReferenceMovement) {
+        self.init(name: movement.name, catalogID: movement.catalogID,
+                  sets: EditableProgram.defaultSets, reps: EditableProgram.defaultReps)
+    }
+}

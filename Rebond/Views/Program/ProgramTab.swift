@@ -300,6 +300,7 @@ private struct AddSessionButton: View {
     var body: some View {
         // The system's bubble, opening from the button: nothing darkens the page.
         Menu {
+            Button("Filmer un exercice chez mon kiné", systemImage: "video") { router.addProgram(from: .film) }
             Button("Coller le message du kiné", systemImage: "text.bubble") { router.addProgram(from: .message) }
             Button("Scanner sa feuille", systemImage: "doc.viewfinder") { router.addProgram(from: .scan) }
             Button("Choisir une photo", systemImage: "photo") { router.addProgram(from: .photo) }
@@ -324,6 +325,7 @@ struct AddProgramMenu: View {
 
     var body: some View {
         Menu {
+            Button("Filmer un exercice chez mon kiné", systemImage: "video") { router.addProgram(from: .film) }
             Button("Coller le message du kiné", systemImage: "text.bubble") { router.addProgram(from: .message) }
             Button("Scanner sa feuille", systemImage: "doc.viewfinder") { router.addProgram(from: .scan) }
             Button("Choisir une photo", systemImage: "photo") { router.addProgram(from: .photo) }
@@ -353,14 +355,14 @@ struct NoProgramView<Header: View>: View {
                     EmptyView()
                 } content: {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Ajoutez les exercices donnés par votre kiné.")
+                        Text("Filmez vos exercices chez votre kiné : Rebond les apprend sur votre corps.")
                             .font(.title3.weight(.semibold))
                             .fixedSize(horizontal: false, vertical: true)
                             .padding(.bottom, 8)
                         Button {
-                            router.addProgram(from: .message)
+                            router.addProgram(from: .film)
                         } label: {
-                            Label("Coller son message", systemImage: "text.bubble")
+                            Label("Filmer un exercice", systemImage: "video.fill")
                                 .font(.headline)
                                 .frame(maxWidth: .infinity)
                         }
@@ -368,6 +370,8 @@ struct NoProgramView<Header: View>: View {
                         .buttonBorderShape(.capsule)
                         .controlSize(.large)
                         .padding(.bottom, 6)
+                        AddRow(title: "Coller son message", symbol: "text.bubble") { router.addProgram(from: .message) }
+                        Divider().padding(.leading, 44)
                         AddRow(title: "Scanner sa feuille", symbol: "doc.viewfinder") { router.addProgram(from: .scan) }
                         Divider().padding(.leading, 44)
                         AddRow(title: "Choisir une photo", symbol: "photo") { router.addProgram(from: .photo) }

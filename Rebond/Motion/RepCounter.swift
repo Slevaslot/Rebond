@@ -31,6 +31,8 @@ nonisolated enum Correction: Sendable {
     case turnForearmFurther
     /// Shoulder rotation: the elbow drops below shoulder height.
     case keepElbowUp
+    /// A filmed movement: the repetition stopped short of the one in the video.
+    case followReference
 
     var message: LocalizedStringResource {
         switch self {
@@ -54,6 +56,7 @@ nonisolated enum Correction: Sendable {
         case .bendFrontKnee: "Pliez le genou de la jambe qui avance"
         case .turnForearmFurther: "Basculez l'avant-bras un peu plus loin"
         case .keepElbowUp: "Gardez le coude à hauteur d'épaule"
+        case .followReference: "Allez un peu plus loin, comme sur la vidéo"
         case .keepStandingLegStraight: "Gardez la jambe d'appui tendue"
         }
     }
