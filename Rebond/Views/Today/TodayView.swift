@@ -4,7 +4,7 @@ import SwiftUI
 
 /// The session to do, laid out like the Health app's Summary: a tinted header, large cards with a colored
 /// category label, a big rounded value and a small chart, bold section titles. Liquid Glass stays in the
-/// navigation layer (toolbar, tab bar). Editing the program lives in the Programme tab.
+/// navigation layer (toolbar, tab bar). Changing the program lives in the Programme tab.
 struct TodayView: View {
     @Environment(AppRouter.self) private var router
     @Environment(\.modelContext) private var context
@@ -63,15 +63,13 @@ struct TodayView: View {
                 header
                 AlertsGroup(sessions: sessions, onReport: { showingReport = true }, onShowProgram: { router.tab = .program })
 
-                if todays.isEmpty {
-                    RestDayCard(programs: programs)
-                } else {
-                    ForEach(todays) { program in
-                        // With several programs, the card says which one it is.
-                        SessionCard(program: program, title: programs.active.count > 1 ? program.title : nil) {
-                            router.startWorkout(program)
-                        }
+                if let todays {
+                    // With several séances, the card says which one it is.
+                    SessionCard(program: todays, title: programs.count > 1 ? todays.title : nil) {
+                        router.startWorkout(todays)
                     }
+                } else {
+                    RestDayCard(programs: programs)
                 }
 
                 FollowUpSection(sessions: sessions, sessionsPerWeek: programs.sessionsPerWeek, week: week)
@@ -273,16 +271,16 @@ private struct RestDayCard: View {
             EmptyView()
         } content: {
             VStack(alignment: .leading, spacing: 14) {
-                if programs.active.isEmpty {
-                    Label("Aucune séance suivie", systemImage: "list.bullet.clipboard")
+                if programs.allDays.isEmpty {
+                    Label("Aucun jour prévu", systemImage: "calendar")
                         .font(.title2.bold())
-                    Text("Choisissez la séance à suivre dans Exercices.")
+                    Text("Choisissez les jours de vos séances dans Programme.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                     Button {
                         router.tab = .program
                     } label: {
-                        Text("Choisir une séance")
+                        Text("Choisir les jours")
                             .font(.headline)
                             .frame(maxWidth: .infinity)
                     }
@@ -304,13 +302,12 @@ private struct RestDayCard: View {
     }
 
     private var anywayButton: some View {
-        let followed = programs.active
-        return Group {
-            if followed.count == 1 {
-                Button { router.startWorkout(followed[0]) } label: { anywayLabel }
+        Group {
+            if programs.count == 1 {
+                Button { router.startWorkout(programs[0]) } label: { anywayLabel }
             } else {
                 Menu {
-                    ForEach(followed) { program in
+                    ForEach(programs) { program in
                         Button(program.title) { router.startWorkout(program) }
                     }
                 } label: { anywayLabel }

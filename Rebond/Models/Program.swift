@@ -1,8 +1,9 @@
 import Foundation
 import SwiftData
 
-/// An exercise program given by the physiotherapist. The patient may follow several, each on its own days
-/// (the knee on Monday, Wednesday and Friday, the back on Tuesday and Thursday).
+/// One séance of the patient's program: a group of exercises done on its own days. All the séances together
+/// make the program, at most one séance a day (the knee on Monday, Wednesday and Friday, the back on Tuesday
+/// and Thursday).
 @Model
 final class Program {
     var createdAt: Date
@@ -15,9 +16,6 @@ final class Program {
     var weekdays: [Int] = []
     /// The physiotherapist who prescribed it, when it came from them.
     var prescriber: String? = nil
-    /// Selected by the patient: only the followed programs make the day's session, the week and the reminders.
-    /// The others stay ready, to pick again later.
-    var isActive: Bool = true
 
     init(createdAt: Date = .now, sessionsPerWeek: Int, exercises: [PlannedExercise], name: String = "",
          weekdays: [Int] = [], prescriber: String? = nil) {

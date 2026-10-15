@@ -16,14 +16,13 @@ final class AppRouter {
         case physio
     }
 
-    /// Ways to add a séance: the physiotherapist's videos (picked in Photos or filmed), their message or sheet
-    /// (scanned or picked from the photos), or exercises picked in the list.
+    /// Ways to add what the physiotherapist gave: exercises filmed at their office, photos or videos already on
+    /// the iPhone (a sheet is read, a video is learned), their sheet scanned, their message, or the list.
     enum ImportSource {
-        case videos
         case film
-        case message
+        case library
         case scan
-        case photo
+        case message
         /// Exercises picked in the list (or typed).
         case manual
     }
@@ -66,7 +65,7 @@ final class AppRouter {
 
     func addProgram(from source: ImportSource) {
         // Without the document scanner (simulator), pick a photo of the sheet instead.
-        importSource = source == .scan && !DocumentScanner.isAvailable ? .photo : source
+        importSource = source == .scan && !DocumentScanner.isAvailable ? .library : source
     }
 }
 

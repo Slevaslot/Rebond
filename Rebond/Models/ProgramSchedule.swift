@@ -32,33 +32,30 @@ nonisolated enum ProgramSchedule {
 }
 
 extension Array where Element == Program {
-    /// The programs the patient follows now.
-    var active: [Program] { filter(\.isActive) }
-
-    /// The followed programs planned on that day, oldest first so the order stays the same.
-    func scheduled(on date: Date) -> [Program] {
-        active.filter { $0.isScheduled(on: date) }.sorted { $0.createdAt < $1.createdAt }
+    /// The séance planned on that day, if any (at most one a day; the oldest if older data has two).
+    func scheduled(on date: Date) -> Program? {
+        filter { $0.isScheduled(on: date) }.min { $0.createdAt < $1.createdAt }
     }
 
-    /// Every day with at least one session of a followed program, for the reminders and the week's dots.
+    /// Every day with a séance, for the reminders and the week.
     var allDays: [Int] {
-        ProgramSchedule.days(weekdays: active.flatMap(\.days), sessionsPerWeek: 0)
+        ProgramSchedule.days(weekdays: flatMap(\.days), sessionsPerWeek: 0)
     }
 
-    /// Sessions planned in a week, followed programs together.
+    /// Séances planned in a week.
     var sessionsPerWeek: Int {
-        active.reduce(0) { $0 + $1.days.count }
+        allDays.count
     }
 
-    /// The next session of a followed program after `date`: which program, which day.
+    /// The next séance after `date`: which one, which day.
     func next(after date: Date = .now) -> (program: Program, day: Date)? {
-        active.compactMap { program in ProgramSchedule.nextDay(after: date, in: program.days).map { (program, $0) } }
+        compactMap { program in ProgramSchedule.nextDay(after: date, in: program.days).map { (program, $0) } }
             .min { $0.1 < $1.1 }
     }
 
-    /// The program to show first: the one of the day, otherwise the next one coming.
+    /// The séance to show first: the one of the day, otherwise the next one coming.
     func current(on date: Date = .now) -> Program? {
-        scheduled(on: date).first ?? next(after: date)?.program ?? active.first ?? first
+        scheduled(on: date) ?? next(after: date)?.program ?? first
     }
 }
 

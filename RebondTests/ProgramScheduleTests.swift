@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 import Testing
 @testable import Rebond
 
@@ -43,5 +44,33 @@ struct ProgramScheduleTests {
         let received = try #require(ProgramTransfer(url: url)).editableProgram
         #expect(received.weekdays == [3, 5])
         #expect(received.name == "Genou")
+    }
+
+    @MainActor
+    @Test func oneSeanceADay() throws {
+        let container = try ModelContainer(for: Program.self, Session.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+        let context = container.mainContext
+        var knee = EditableProgram()
+        knee.weekdays = [2, 4, 6]
+        knee.exercises = [.init(name: "Squat", catalogID: "squat", sets: 2, reps: 10)]
+        let first = Program.add(knee, in: context)
+        var back = EditableProgram()
+        back.weekdays = [3, 4]
+        back.exercises = [.init(name: "Gainage", catalogID: nil, sets: 2, reps: 10)]
+        let second = Program.add(back, in: context)
+
+        // Wednesday goes to the new séance.
+        #expect(first.days == [2, 6])
+        #expect(second.days == [3, 4])
+
+        // Monday given back to the back séance from the week.
+        second.toggle(2, in: context)
+        #expect(first.days == [6])
+        #expect(second.days == [2, 3, 4])
+
+        // Resting on Friday: no séance keeps it.
+        first.toggle(6, in: context)
+        #expect(first.days.isEmpty)
+        #expect([first, second].allDays == [2, 3, 4])
     }
 }

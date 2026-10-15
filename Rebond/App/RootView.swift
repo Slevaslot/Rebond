@@ -1,6 +1,7 @@
 import PhotosUI
 import SwiftData
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// The tabs (HIG: tabs are for navigation, never for actions): Accueil and Programme for everyone, plus Kiné when the
 /// physiotherapist space is turned on. Also opens what other apps hand over: a program prescribed by QR code,
@@ -24,10 +25,10 @@ struct RootView: View {
     }
 
     @State private var draft: Draft?
-    @State private var pickedPhoto: PhotosPickerItem?
     /// Videos just filmed, waiting for the camera to close to open their new séance.
     @State private var filmed: [URL] = []
-    @State private var pickedVideos: [PhotosPickerItem] = []
+    /// Photos of the sheet and videos of the exercises, picked together.
+    @State private var picked: [PhotosPickerItem] = []
     @State private var savedProgram = 0
     /// Set while the program being reviewed comes from the physiotherapist.
     @State private var prescriber: String?
@@ -47,9 +48,8 @@ struct RootView: View {
                     .environment(\.workoutTransition, workoutTransition)
             }
             // Without a program, Accueil already offers to add one: a second tab would be the same page.
-            // "Exercices": the programs, and single exercises to do on their own.
             if !programs.isEmpty {
-                Tab("Exercices", systemImage: "figure.mixed.cardio", value: .program) {
+                Tab("Programme", systemImage: "list.bullet.clipboard", value: .program) {
                     ProgramTab()
                 }
             }
@@ -101,25 +101,18 @@ struct RootView: View {
         }
         .photosPicker(
             isPresented: Binding(
-                get: { router.importSource == .videos },
+                get: { router.importSource == .library },
                 set: { if !$0 { router.importSource = nil } }
             ),
-            selection: $pickedVideos,
-            matching: .videos
+            selection: $picked,
+            matching: .any(of: [.images, .videos])
         )
-        .onChange(of: pickedVideos) {
-            guard !pickedVideos.isEmpty else { return }
-            draft = Draft(content: .program(EditableProgram(), notice: nil, start: .videos(pickedVideos)))
-            pickedVideos = []
+        .onChange(of: picked) {
+            guard !picked.isEmpty else { return }
+            let items = picked
+            picked = []
+            openPicked(items)
         }
-        .photosPicker(
-            isPresented: Binding(
-                get: { router.importSource == .photo },
-                set: { if !$0 { router.importSource = nil } }
-            ),
-            selection: $pickedPhoto,
-            matching: .images
-        )
         .onChange(of: router.importSource) {
             if router.importSource == .manual {
                 router.importSource = nil
@@ -127,15 +120,6 @@ struct RootView: View {
             } else if router.importSource == .message {
                 router.importSource = nil
                 draft = Draft(content: .message)
-            }
-        }
-        .onChange(of: pickedPhoto) {
-            guard let pickedPhoto else { return }
-            Task {
-                if let data = try? await pickedPhoto.loadTransferable(type: Data.self), let image = UIImage(data: data) {
-                    draft = Draft(content: .photo(image))
-                }
-                self.pickedPhoto = nil
             }
         }
         .sheet(item: $draft) { draft in
@@ -159,6 +143,20 @@ struct RootView: View {
             Text("Demandez à votre patient de vous renvoyer le fichier « Bilan Rebond » joint à son PDF.")
         }
         .sensoryFeedback(.success, trigger: savedProgram)
+    }
+
+    /// Videos become the exercises of a new séance; without videos, the photo of the sheet is read.
+    private func openPicked(_ items: [PhotosPickerItem]) {
+        let videos = items.filter { $0.supportedContentTypes.contains { $0.conforms(to: .movie) } }
+        if !videos.isEmpty {
+            draft = Draft(content: .program(EditableProgram(), notice: nil, start: .videos(videos)))
+            return
+        }
+        Task {
+            if let data = try? await items[0].loadTransferable(type: Data.self), let image = UIImage(data: data) {
+                draft = Draft(content: .photo(image))
+            }
+        }
     }
 
     /// A program link scanned from the physiotherapist's QR code, or a report file opened with Rebond.

@@ -27,10 +27,12 @@ Trois onglets, pas plus (HIG *Tab bars* : les onglets servent à naviguer, jamai
 | Onglet | Symbole | Contenu |
 |---|---|---|
 | **Accueil** (page « Aujourd'hui ») | `house` | Séance du jour, bouton principal « Commencer la séance », progression de la semaine (séances faites / prévues). |
-| **Programme** | `list.bullet.clipboard` | Exercices du kiné, modification, « Nouvelle feuille » (scan) dans la barre d'outils. |
+| **Programme** (page « Mon programme ») | `list.bullet.clipboard` | Le programme du kiné : la semaine (toucher un jour pour choisir sa séance ou « Repos »), les séances, et un seul bouton « Ajouter ce que m'a donné mon kiné ». « Faire un exercice seul » dans le menu ⋯. |
 | **Progrès** | `chart.line.uptrend.xyaxis` | Graphiques (amplitude, douleur, régularité), historique, bouton « Envoyer à mon kiné ». |
 | **Kiné** (seulement si l'espace kiné est activé) | `stethoscope` | Espace de travail du kiné, voir « Deux rôles ». Onglet affiché au lancement quand il est activé. |
 
+- **Vocabulaire, toujours le même :** le *programme*, c'est tout ce que le kiné a donné (un seul) ; une *séance*, un groupe d'exercices fait certains jours (une ou plusieurs) ; un *exercice*, un mouvement. **Au plus une séance par jour** : donner un jour à une séance le retire à celle qui l'avait. Pas de séance « suivie » ou « non suivie ».
+- **Ajouter** : une seule entrée, « Ajouter ce que m'a donné mon kiné » : filmer chez le kiné, photos ou vidéos (une vidéo devient un exercice, une photo de feuille est lue), scanner la feuille, coller son message, ou choisir dans la liste. Dans une séance, un seul « Ajouter un exercice » qui ouvre la même liste.
 - Pas de programme enregistré : l'onglet Aujourd'hui affiche un état vide avec une seule suite claire, « Photographier ma feuille », et « Saisir à la main » en secondaire (HIG *Writing* : donner une suite claire sur tout écran vide).
 - Réglages et « À propos » (avertissement médical, données de démo) dans un menu de la barre d'outils, pas dans un onglet.
 
