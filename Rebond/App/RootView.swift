@@ -43,8 +43,11 @@ struct RootView: View {
                 TodayView()
                     .environment(\.workoutTransition, workoutTransition)
             }
-            Tab("Programme", systemImage: "list.bullet.clipboard", value: .program) {
-                ProgramTab()
+            // Without a program, Accueil already offers to add one: a second tab would be the same page.
+            if !programs.isEmpty {
+                Tab("Programme", systemImage: "list.bullet.clipboard", value: .program) {
+                    ProgramTab()
+                }
             }
             if isPhysiotherapist {
                 Tab("Kiné", systemImage: "stethoscope", value: .physio) {
@@ -53,6 +56,10 @@ struct RootView: View {
             }
         }
         .tabBarMinimizeBehavior(.never)
+        // The last program deleted: its tab goes away, back to Accueil.
+        .onChange(of: programs.isEmpty) {
+            if programs.isEmpty, router.tab == .program { router.tab = .today }
+        }
         // Turning the space off from Réglages leaves its tab.
         .onChange(of: role) {
             if !isPhysiotherapist, router.tab == .physio { router.tab = .today }
