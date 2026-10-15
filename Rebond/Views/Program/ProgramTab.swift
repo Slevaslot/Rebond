@@ -1,37 +1,35 @@
 import SwiftData
 import SwiftUI
 
-/// The patient's programs, laid out like the Accueil page: the week at a glance (which program on which day),
-/// then one card per program. A card opens the program: its exercises, start it, change it, or do one exercise.
+/// "Exercices": a button to add an exercise, the patient's programs (exercises ticked, with their days), and their
+/// exercises. The day's session gathers the programs planned that day.
 struct ProgramTab: View {
     @Environment(AppRouter.self) private var router
-    @Query(sort: \Program.createdAt) private var programs: [Program]
     @Environment(\.modelContext) private var context
+    @Query(sort: \Program.createdAt) private var programs: [Program]
+    @Query(sort: \LibraryExercise.createdAt) private var library: [LibraryExercise]
     @State private var showingSettings = false
-    @State private var path: [Program] = []
+    @State private var path = NavigationPath()
 
     var body: some View {
         NavigationStack(path: $path) {
-            Group {
-                if programs.isEmpty {
-                    NoProgramView { header }
-                } else {
-                    content
+            content
+                .navigationTitle("Exercices")
+                // Same top bar as the Accueil page: the large title and its controls on the same line, in the page.
+                .toolbarVisibility(.hidden, for: .navigationBar)
+                .navigationDestination(for: Program.self) { program in
+                    ProgramDetailView(program: program, color: .accentColor)
                 }
-            }
-            .navigationTitle("Exercices")
-            // Same top bar as the Accueil page: the large title and its controls on the same line, in the page.
-            .toolbarVisibility(.hidden, for: .navigationBar)
-            .navigationDestination(for: Program.self) { program in
-                ProgramDetailView(program: program, color: ProgramPalette.color(of: program, in: programs))
-            }
-            .sheet(isPresented: $showingSettings) {
-                SettingsView()
-            }
-            // Back on this tab after visiting another one: the list of programs, not the page left open.
-            .onChange(of: router.tab) {
-                if router.tab != .program { path = [] }
-            }
+                .navigationDestination(for: LibraryExercise.self) { exercise in
+                    LibraryExerciseView(exercise: exercise)
+                }
+                .sheet(isPresented: $showingSettings) {
+                    SettingsView()
+                }
+                // Back on this tab after visiting another one: the lists, not the page left open.
+                .onChange(of: router.tab) {
+                    if router.tab != .program { path = NavigationPath() }
+                }
         }
     }
 
@@ -41,84 +39,67 @@ struct ProgramTab: View {
         }
     }
 
-    /// A group of program cards. The circle on each card selects it: followed programs make the day's session.
-    /// Swiping a card to the right follows it or not.
-    @ViewBuilder
-    private func section(_ title: LocalizedStringKey, _ list: [Program], empty: LocalizedStringKey?) -> some View {
-        Text(title)
-            .font(.title3.bold())
-            .accessibilityAddTraits(.isHeader)
-            .padding(.horizontal, 4)
-            .padding(.top, 8)
-            .pageRow()
-        if list.isEmpty, let empty {
-            Text(empty)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 4)
-                .pageRow()
-        }
-        ForEach(list) { program in
-            let color = ProgramPalette.color(of: program, in: programs)
-            Button {
-                path.append(program)
-            } label: {
-                ProgramCard(program: program, color: color)
-            }
-            .buttonStyle(.plain)
-            // The check sits in the card, in front of the name: tapping it only selects.
-            .overlay(alignment: .topLeading) {
-                Button {
-                    withAnimation(.snappy) { program.isActive.toggle() }
-                } label: {
-                    Image(systemName: program.isActive ? "checkmark.circle.fill" : "circle")
-                        .font(.title2)
-                        .foregroundStyle(program.isActive ? AnyShapeStyle(color) : AnyShapeStyle(.secondary))
-                        .frame(width: 44, height: 44)
-                        .contentShape(.rect)
-                        .contentTransition(.symbolEffect(.replace))
-                }
-                .buttonStyle(.plain)
-                .padding(.leading, 4)
-                .padding(.top, 4)
-                .accessibilityLabel(Text(program.isActive ? "Ne plus suivre \(program.title)" : "Suivre \(program.title)"))
-                .sensoryFeedback(.selection, trigger: program.isActive)
-            }
-            .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                Button(program.isActive ? "Ne plus suivre" : "Suivre",
-                       systemImage: program.isActive ? "checkmark.circle.badge.xmark" : "checkmark.circle") {
-                    withAnimation(.snappy) { program.isActive.toggle() }
-                }
-                .tint(program.isActive ? .gray : color)
-            }
-            .pageRow()
-        }
-    }
-
     private var content: some View {
-        // A list rather than a scroll view, for the system's swipe actions; it keeps the look of the cards.
         List {
             // No top margin: the header sits exactly where it does on the Accueil page.
             header.listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 7, trailing: 16))
                 .listRowSeparator(.hidden)
                 .listRowBackground(Color.clear)
 
-            WeekPlanCard(programs: programs).pageRow()
-
-            AddSessionButton().pageRow()
-
-            FreeExerciseCard().pageRow()
-
-            if programs.active.isEmpty {
-                section("Vos séances", programs, empty: nil)
-            } else {
-                section("Séances suivies", programs.active, empty: nil)
-                let others = programs.filter { !$0.isActive }
-                if !others.isEmpty {
-                    section("Autres séances", others, empty: nil)
-                }
+            AddExerciseMenu {
+                Label("Ajouter un exercice", systemImage: "plus")
+                    .font(.headline)
+                    .frame(maxWidth: .infinity, alignment: .center)
             }
+            .buttonStyle(.glassProminent)
+            .buttonBorderShape(.capsule)
+            .controlSize(.extraLarge)
+            // In a list, a menu keeps its label's width: stretch the menu itself, its text centered.
+            .frame(maxWidth: .infinity, alignment: .center)
+            .pageRow()
 
+            sectionTitle("Mes programmes")
+            ForEach(programs) { program in
+                Button { path.append(program) } label: { ProgramRow(program: program) }
+                    .buttonStyle(.plain)
+                    .swipeActions(edge: .trailing) {
+                        Button("Supprimer", systemImage: "trash", role: .destructive) { context.delete(program) }
+                    }
+                    .pageRow()
+            }
+            Button { router.newProgram() } label: {
+                Label("Créer un programme", systemImage: "plus")
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.glass)
+            .buttonBorderShape(.capsule)
+            .controlSize(.large)
+            .disabled(library.isEmpty)
+            .pageRow()
+
+            sectionTitle("Mes exercices")
+            if library.isEmpty {
+                Text("Ajoutez un exercice : filmé chez votre kiné, de Rebond, ou lu sur la feuille de votre kiné.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 4)
+                    .pageRow()
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(Array(library.enumerated()), id: \.element.id) { index, exercise in
+                        if index > 0 { Divider().padding(.leading, 74) }
+                        Button { path.append(exercise) } label: {
+                            LibraryExerciseRow(exercise: exercise)
+                                .padding(.horizontal)
+                                .padding(.vertical, 10)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 22))
+                .pageRow()
+            }
         }
         .listStyle(.plain)
         .contentMargins(.top, 0, for: .scrollContent)
@@ -129,6 +110,50 @@ struct ProgramTab: View {
                 .ignoresSafeArea()
         }
         .background(Color(.systemGroupedBackground))
+    }
+
+    private func sectionTitle(_ title: LocalizedStringKey) -> some View {
+        Text(title)
+            .font(.title3.bold())
+            .accessibilityAddTraits(.isHeader)
+            .padding(.horizontal, 4)
+            .padding(.top, 8)
+            .pageRow()
+    }
+}
+
+/// A program in the list: its name, its days, how many exercises.
+private struct ProgramRow: View {
+    let program: Program
+
+    var body: some View {
+        HStack(spacing: 14) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(program.title)
+                    .font(.headline)
+                    .multilineTextAlignment(.leading)
+                Text(program.days.isEmpty
+                     ? String(localized: "Sans jour · ^[\(program.exercises.count) exercice](inflect: true)")
+                     : "\(Self.shortDays(program.days)) · \(String(localized: "^[\(program.exercises.count) exercice](inflect: true)"))")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 8)
+            Image(systemName: "chevron.right")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.tertiary)
+        }
+        .padding()
+        .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 22))
+        .contentShape(.rect(cornerRadius: 22))
+        .accessibilityElement(children: .combine)
+    }
+
+    /// "L M V": the days, Monday first.
+    static func shortDays(_ days: [Int]) -> String {
+        ProgramSchedule.mondayFirst.filter(days.contains)
+            .map { Calendar.current.veryShortWeekdaySymbols[$0 - 1] }
+            .joined(separator: " ")
     }
 }
 
@@ -189,14 +214,7 @@ private struct DayColumn: View {
                 if planned.isEmpty {
                     Circle().fill(Color(.systemGray4)).frame(width: 6, height: 6)
                 } else {
-                    // One color per program planned that day, side by side in the same disc.
-                    HStack(spacing: 0) {
-                        ForEach(planned) { program in
-                            ProgramPalette.color(of: program, in: programs)
-                        }
-                    }
-                    .frame(width: 26, height: 26)
-                    .clipShape(.circle)
+                    Circle().fill(Color.accentColor).frame(width: 26, height: 26)
                 }
             }
             .frame(width: 26, height: 26)
@@ -210,7 +228,7 @@ private struct DayColumn: View {
         .accessibilityLabel(Text(Calendar.current.weekdaySymbols[weekday - 1]))
         .accessibilityValue(planned.isEmpty
             ? Text("Repos")
-            : Text(planned.map(\.title).formatted(.list(type: .and))))
+            : Text("^[\(planned.count) exercice](inflect: true)"))
     }
 }
 
@@ -354,6 +372,7 @@ struct AddProgramMenu: View {
 struct NoProgramView<Header: View>: View {
     @ViewBuilder let header: Header
     @Environment(AppRouter.self) private var router
+    @Query(sort: \LibraryExercise.createdAt) private var library: [LibraryExercise]
     #if DEBUG
     @Environment(\.modelContext) private var context
     #endif
@@ -363,29 +382,34 @@ struct NoProgramView<Header: View>: View {
             VStack(alignment: .leading, spacing: 14) {
                 header
 
-                SummaryCard(title: Text("Ajouter une séance"), systemImage: "plus", color: .accentColor) {
+                SummaryCard(title: Text("Pour commencer"), systemImage: "plus", color: .accentColor) {
                     EmptyView()
                 } content: {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Comment votre kiné vous a-t-il donné vos exercices ?")
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Ajoutez vos exercices, puis regroupez-les en programme avec vos jours.")
                             .font(.title3.weight(.semibold))
                             .fixedSize(horizontal: false, vertical: true)
-                            .padding(.bottom, 6)
-                        AddGroup(title: "Vidéos de mon kiné")
-                        AddRow(title: "Choisir mes vidéos", symbol: "photo.on.rectangle") { router.addProgram(from: .videos) }
-                        Divider().padding(.leading, 44)
-                        AddRow(title: "Filmer", symbol: "video") { router.addProgram(from: .film) }
-                        AddGroup(title: "Feuille ou message du kiné")
-                        AddRow(title: "Scanner la feuille", symbol: "doc.viewfinder") { router.addProgram(from: .scan) }
-                        Divider().padding(.leading, 44)
-                        AddRow(title: "Photo de la feuille", symbol: "photo") { router.addProgram(from: .photo) }
-                        Divider().padding(.leading, 44)
-                        AddRow(title: "Coller le message", symbol: "text.bubble") { router.addProgram(from: .message) }
-                        AddGroup(title: "Exercices")
-                        AddRow(title: "Choisir mes exercices", symbol: "list.bullet") { router.addProgram(from: .manual) }
+                        AddExerciseMenu {
+                            Label("Ajouter un exercice", systemImage: "plus")
+                                .font(.headline)
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.glassProminent)
+                        .buttonBorderShape(.capsule)
+                        .controlSize(.large)
+                        if !library.isEmpty {
+                            Button { router.newProgram() } label: {
+                                Text("Créer un programme")
+                                    .font(.headline)
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.glass)
+                            .buttonBorderShape(.capsule)
+                            .controlSize(.large)
+                        }
                         #if DEBUG
-                        Divider().padding(.leading, 44)
-                        AddRow(title: "Programme de démo", symbol: "sparkles") { DemoData.load(into: context) }
+                        Button("Charger le programme de démo", systemImage: "sparkles") { DemoData.load(into: context) }
+                            .font(.footnote)
                         #endif
                     }
                 }

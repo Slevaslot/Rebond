@@ -535,10 +535,17 @@ extension PlannedExercise {
 extension Program {
     /// Rough duration: about 4 s per repetition or the hold time, plus 30 s between sets.
     var estimatedMinutes: Int {
-        let seconds = exercises.reduce(0) { total, exercise in
+        exercises.estimatedMinutes
+    }
+}
+
+nonisolated extension Array where Element == PlannedExercise {
+    /// Rough duration: about 4 s per repetition or the hold time, plus 30 s between sets.
+    var estimatedMinutes: Int {
+        let seconds = reduce(0) { total, exercise in
             let perSet = exercise.holdSeconds ?? exercise.reps * 4
             return total + exercise.sets * (perSet + 30)
         }
-        return max(1, Int((Double(seconds) / 60).rounded()))
+        return Swift.max(1, Int((Double(seconds) / 60).rounded()))
     }
 }

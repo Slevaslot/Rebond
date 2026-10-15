@@ -20,12 +20,14 @@ struct ProgramEditorView: View {
     var notice: LocalizedStringKey?
     /// Symbol of the notice; by default Apple Intelligence for a sheet, the physiotherapist otherwise.
     var noticeSymbol: String?
-    var title: LocalizedStringKey = "Ma séance"
+    var title: LocalizedStringKey = "Mon programme"
     /// Shows a button to Settings under the notice (Apple Intelligence turned off).
     var opensSettings = false
     /// The patient's videos: not for a prescription, which travels by QR code.
     var allowsVideos = true
     var start: Start?
+    /// Pushed after ticking the exercises: the back button goes back to them.
+    var showsCancel = true
     let onSave: (EditableProgram) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -96,7 +98,7 @@ struct ProgramEditorView: View {
                 .onMove { program.exercises.move(fromOffsets: $0, toOffset: $1) }
             } footer: {
                 if program.exercises.isEmpty {
-                    Text("Ajoutez les exercices de votre séance.")
+                    Text("Ajoutez les exercices de votre programme.")
                 }
             }
 
@@ -107,8 +109,10 @@ struct ProgramEditorView: View {
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("Annuler", systemImage: "xmark", role: .cancel) { dismiss() }
+            if showsCancel {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Annuler", systemImage: "xmark", role: .cancel) { dismiss() }
+                }
             }
             ToolbarItem(placement: .confirmationAction) {
                 Button("Continuer") { scheduling = true }
@@ -128,9 +132,11 @@ struct ProgramEditorView: View {
             }
         }
         .sheet(isPresented: $choosingExercise) {
-            ExerciseChooser { exercise in
-                program.exercises.append(exercise)
-                withAnimation(.snappy) { expanded = exercise.id }
+            NavigationStack {
+                LibraryPickerView(nextTitle: "Ajouter") { exercises in
+                    program.exercises.append(contentsOf: exercises)
+                    choosingExercise = false
+                }
             }
         }
         .photosPicker(isPresented: $pickingVideos, selection: $pickedVideos,
@@ -183,23 +189,7 @@ struct ProgramEditorView: View {
 
     /// The same ways as when creating the séance: the physiotherapist's videos, or an exercise of the list.
     private var addMenu: some View {
-        Menu {
-            if allowsVideos {
-                Section("Vidéos de mon kiné") {
-                    Button("Choisir mes vidéos", systemImage: "photo.on.rectangle") {
-                        videoTarget = nil
-                        pickingVideos = true
-                    }
-                    Button("Filmer", systemImage: "video") {
-                        videoTarget = nil
-                        filming = true
-                    }
-                }
-            }
-            Button("Choisir dans la liste", systemImage: "list.bullet") { choosingExercise = true }
-        } label: {
-            Label("Ajouter un exercice", systemImage: "plus")
-        }
+        Button("Ajouter des exercices", systemImage: "plus") { choosingExercise = true }
     }
 
     // MARK: Videos

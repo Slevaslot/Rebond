@@ -176,15 +176,16 @@ nonisolated extension Data {
 
 extension ReportTransfer {
     /// The report of this iPhone's patient: the last 6 weeks, for the charts, and the current program.
-    static func current(sessions: [Session], program: Program?) -> ReportTransfer {
+    static func current(sessions: [Session], programs: [Program]) -> ReportTransfer {
+        let program = EditableProgram(merging: programs)
         let since = Calendar.current.date(byAdding: .weekOfYear, value: -6, to: .now) ?? .now
         let name = (UserDefaults.standard.string(forKey: PatientIdentity.nameKey) ?? "").trimmingCharacters(in: .whitespaces)
         return ReportTransfer(
             patientID: PatientIdentity.id,
             patientName: name.isEmpty ? String(localized: "Patient") : name,
-            sessionsPerWeek: program?.sessionsPerWeek ?? 3,
+            sessionsPerWeek: program.exercises.isEmpty ? 3 : program.sessionsPerWeek,
             sessions: sessions.filter { $0.date >= since }.map(\.reportData),
-            program: program.map { ProgramTransfer(EditableProgram($0), physiotherapist: nil) }
+            program: program.exercises.isEmpty ? nil : ProgramTransfer(program, physiotherapist: nil)
         )
     }
 }

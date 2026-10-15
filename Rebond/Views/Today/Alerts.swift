@@ -122,12 +122,12 @@ enum ProgramChange {
     static let prescriberKey = "programPrescriber"
     static let prescribedAtKey = "programPrescribedAt"
 
-    static func record(from old: Program?, to new: EditableProgram, by name: String?) {
+    static func record(from old: EditableProgram?, to new: EditableProgram, by name: String?) {
         let defaults = UserDefaults.standard
         let now = Date.now.timeIntervalSinceReferenceDate
         defaults.set(now, forKey: dateKey)
         defaults.set(name ?? "", forKey: byKey)
-        defaults.set(describe(from: old.map(EditableProgram.init), to: new), forKey: summaryKey)
+        defaults.set(describe(from: old, to: new), forKey: summaryKey)
         defaults.set(name ?? "", forKey: prescriberKey)
         defaults.set(now, forKey: prescribedAtKey)
     }

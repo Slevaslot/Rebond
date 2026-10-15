@@ -136,7 +136,7 @@ struct ReportView: View {
     private func share(_ report: WeeklyReport) {
         outcome = nil
         let weeks = ProgressData(sessions: data, sessionsPerWeek: sessionsPerWeek, weeks: 4)
-        let transfer = ReportTransfer.current(sessions: sessions, program: programs.current())
+        let transfer = ReportTransfer.current(sessions: sessions, programs: programs)
         sharing = [ReportPDF.render(report, progress: weeks, patientName: trimmedName), transfer.write()].compactMap { $0 }
     }
 }

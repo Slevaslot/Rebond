@@ -10,6 +10,7 @@ struct RootView: View {
     @Environment(\.modelContext) private var context
     @Environment(ProStore.self) private var store
     @Query(sort: \Program.createdAt, order: .reverse) private var programs: [Program]
+    @Query private var library: [LibraryExercise]
     @AppStorage(AppRole.key) private var role = AppRole.patient.rawValue
 
     /// The program being reviewed before it is saved: read from a photo, typed, or prescribed.
@@ -48,7 +49,7 @@ struct RootView: View {
             }
             // Without a program, Accueil already offers to add one: a second tab would be the same page.
             // "Exercices": the programs, and single exercises to do on their own.
-            if !programs.isEmpty {
+            if !programs.isEmpty || !library.isEmpty {
                 Tab("Exercices", systemImage: "figure.mixed.cardio", value: .program) {
                     ProgramTab()
                 }
@@ -62,18 +63,26 @@ struct RootView: View {
         .tabBarMinimizeBehavior(.never)
         // The last program deleted: its tab goes away, back to Accueil.
         .onChange(of: programs.isEmpty) {
-            if programs.isEmpty, router.tab == .program { router.tab = .today }
+            if programs.isEmpty, library.isEmpty, router.tab == .program { router.tab = .today }
         }
         // Turning the space off from Réglages leaves its tab.
+        // "Mes exercices" also lists the exercises of the programs saved before it existed.
+        .task {
+            LibraryExercise.addMissing(programs.flatMap(\.orderedExercises), in: context)
+            // Following a program or not is gone: a program without days is simply not in the day's session.
+            for program in programs where !program.isActive { program.isActive = true }
+        }
         .onChange(of: role) {
             if !isPhysiotherapist, router.tab == .physio { router.tab = .today }
         }
         .fullScreenCover(isPresented: $router.isWorkoutPresented) {
             if let free = router.freeExercise {
                 WorkoutView(exercises: [free], offersMoreSets: true)
-            } else if let program = router.workoutProgram.flatMap({ id in programs.first { $0.persistentModelID == id } })
-                ?? programs.current() {
+            } else if let program = router.workoutProgram.flatMap({ id in programs.first { $0.persistentModelID == id } }) {
                 WorkoutView(program: program, onlyExercise: router.workoutExerciseIndex)
+            } else {
+                // The day's session: the exercises of every program planned today (or on the next day with one).
+                WorkoutView(exercises: programs.sessionExercises().map(\.workoutExercise))
                     // The session grows out of the Commencer button.
                     .navigationTransition(.zoom(sourceID: WorkoutTransition.sourceID, in: workoutTransition))
             }
@@ -111,6 +120,12 @@ struct RootView: View {
             guard !pickedVideos.isEmpty else { return }
             draft = Draft(content: .program(EditableProgram(), notice: nil, start: .videos(pickedVideos)))
             pickedVideos = []
+        }
+        .sheet(item: $router.programCreation) { creation in
+            NewProgramFlow(preselected: creation.preselected) { program in
+                router.programCreation = nil
+                save(program)
+            }
         }
         .photosPicker(
             isPresented: Binding(
@@ -203,9 +218,10 @@ struct RootView: View {
             let previous = name.flatMap { name in
                 programs.first { $0.prescriber == name && $0.name == program.name.trimmingCharacters(in: .whitespaces) }
             }
-            ProgramChange.record(from: previous, to: program, by: name)
+            ProgramChange.record(from: previous.map(EditableProgram.init), to: program, by: name)
             if let previous {
                 previous.update(with: program, in: context)
+                LibraryExercise.addMissing(previous.orderedExercises, in: context)
             } else {
                 Program.add(program, prescriber: name, in: context)
             }

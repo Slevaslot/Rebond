@@ -109,7 +109,7 @@ private struct AboutView: View {
                     if let program = try? context.fetch(FetchDescriptor<Program>(sortBy: [SortDescriptor(\.createdAt, order: .reverse)])).first {
                         var changed = EditableProgram(program)
                         if !changed.exercises.isEmpty { changed.exercises[0].reps += 2 }
-                        ProgramChange.record(from: program, to: changed, by: "M. Martin")
+                        ProgramChange.record(from: EditableProgram(program), to: changed, by: "M. Martin")
                         program.update(with: changed, in: context)
                     }
                 }

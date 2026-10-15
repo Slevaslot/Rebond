@@ -45,9 +45,22 @@ extension Array where Element == Program {
         ProgramSchedule.days(weekdays: active.flatMap(\.days), sessionsPerWeek: 0)
     }
 
-    /// Sessions planned in a week, followed programs together.
+    /// Sessions planned in a week: the days with at least one exercise.
     var sessionsPerWeek: Int {
-        active.reduce(0) { $0 + $1.days.count }
+        allDays.count
+    }
+
+    /// The exercises of the day's session, in the order they were added.
+    func exercises(on date: Date) -> [PlannedExercise] {
+        scheduled(on: date).flatMap(\.orderedExercises)
+    }
+
+    /// The session to do: today's exercises, otherwise those of the next day with some.
+    func sessionExercises(on date: Date = .now) -> [PlannedExercise] {
+        let today = exercises(on: date)
+        if !today.isEmpty { return today }
+        guard let next = next(after: date)?.day else { return [] }
+        return exercises(on: next)
     }
 
     /// The next session of a followed program after `date`: which program, which day.

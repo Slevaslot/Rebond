@@ -116,13 +116,14 @@ extension Program {
         add(editable, in: context)
     }
 
-    /// A new program, next to the others.
+    /// A new program, next to the others. Its exercises also join "Mes exercices".
     @discardableResult
     static func add(_ editable: EditableProgram, prescriber: String? = nil, in context: ModelContext) -> Program {
         let program = Program(sessionsPerWeek: editable.sessionsPerWeek, exercises: Self.exercises(of: editable),
                               name: editable.name.trimmingCharacters(in: .whitespaces),
                               weekdays: editable.weekdays, prescriber: prescriber)
         context.insert(program)
+        LibraryExercise.addMissing(program.orderedExercises, in: context)
         // A permanent identifier right away: the session and the pages find the program by it.
         try? context.save()
         return program
@@ -147,6 +148,18 @@ extension Program {
                 holdSeconds: exercise.mode == .hold ? exercise.holdSeconds : nil,
                 order: index
             )
+        }
+    }
+}
+
+extension EditableProgram {
+    /// The exercises the patient follows, together: for the report and the widgets.
+    init(merging programs: [Program]) {
+        self.init()
+        weekdays = programs.allDays
+        exercises = programs.active.filter { !$0.days.isEmpty }.flatMap(\.orderedExercises).map {
+            Exercise(name: $0.name, catalogID: $0.catalogID, sets: $0.sets, mode: $0.holdSeconds == nil ? .reps : .hold,
+                     reps: $0.reps, holdSeconds: $0.holdSeconds ?? EditableProgram.defaultHoldSeconds)
         }
     }
 }

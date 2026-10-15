@@ -40,26 +40,14 @@ struct ProgramDetailView: View {
 
                 // Following and deleting, at the end of the page, as in Contacts.
                 VStack(spacing: 0) {
-                    Button {
-                        program.isActive.toggle()
-                    } label: {
-                        Label(program.isActive ? "Ne plus suivre cette séance" : "Suivre cette séance",
-                              systemImage: program.isActive ? "checkmark.circle.badge.xmark" : "checkmark.circle")
-                            .frame(maxWidth: .infinity, minHeight: 50, alignment: .leading)
-                            .padding(.horizontal)
-                            .contentShape(.rect)
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.tint)
-                    Divider().padding(.leading)
                     Button(role: .destructive) {
                         confirmingDelete = true
                     } label: {
                         HStack {
-                            Label("Supprimer la séance", systemImage: "trash")
+                            Label("Supprimer le programme", systemImage: "trash")
                                 // Anchored to the words: the bubble points at them, not at the middle of the row.
                                 .confirmationDialog("Supprimer « \(program.title) » ?", isPresented: $confirmingDelete, titleVisibility: .visible) {
-                        Button("Supprimer la séance", role: .destructive) {
+                        Button("Supprimer le programme", role: .destructive) {
                             dismiss()
                             context.delete(program)
                         }
@@ -95,7 +83,7 @@ struct ProgramDetailView: View {
         }
         .sheet(item: $editing) { item in
             NavigationStack {
-                ProgramEditorView(program: item.program, title: "Modifier la séance") { saved in
+                ProgramEditorView(program: item.program, title: "Modifier le programme") { saved in
                     program.update(with: saved, in: context)
                     editing = nil
                     savedEdit += 1
@@ -125,7 +113,7 @@ struct ProgramDetailView: View {
             Button {
                 router.startWorkout(program)
             } label: {
-                Text("Commencer cette séance")
+                Text("Commencer ce programme")
                     .font(.headline)
                     .frame(maxWidth: .infinity)
             }

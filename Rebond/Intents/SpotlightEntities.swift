@@ -6,7 +6,7 @@ import SwiftData
 enum AppData {
     static let container: ModelContainer = {
         do {
-            return try ModelContainer(for: Program.self, Session.self, TrackedPatient.self, ProgramTemplate.self)
+            return try ModelContainer(for: Program.self, Session.self, TrackedPatient.self, ProgramTemplate.self, LibraryExercise.self)
         } catch {
             fatalError("Could not open the data store: \(error)")
         }

@@ -23,7 +23,7 @@ struct WidgetSync: ViewModifier {
     }
 
     private var snapshot: WidgetSnapshot {
-        WidgetSnapshot(program: programs.current(), sessions: sessions)
+        WidgetSnapshot(programs: programs, sessions: sessions)
     }
 
     /// Writes the snapshot and reloads the widgets, only if something changed.
@@ -35,19 +35,21 @@ struct WidgetSync: ViewModifier {
 }
 
 extension WidgetSnapshot {
-    init(program: Program?, sessions: [Session], now: Date = .now) {
-        guard let program else {
+    /// The day's session (or the next one), and the week's sessions.
+    init(programs: [Program], sessions: [Session], now: Date = .now) {
+        let exercises = programs.sessionExercises(on: now)
+        guard !exercises.isEmpty else {
             self = .empty
             return
         }
         let oldest = Calendar.current.date(byAdding: .day, value: -Self.keptDays, to: now) ?? now
         self.init(
             hasProgram: true,
-            sessionsPerWeek: program.sessionsPerWeek,
-            exercises: program.orderedExercises.map {
+            sessionsPerWeek: programs.sessionsPerWeek,
+            exercises: exercises.map {
                 Exercise(name: $0.name, symbol: $0.symbol, sets: $0.sets, reps: $0.reps, holdSeconds: $0.holdSeconds)
             },
-            estimatedMinutes: program.estimatedMinutes,
+            estimatedMinutes: exercises.estimatedMinutes,
             sessionDates: sessions.map(\.date).filter { $0 >= oldest }.sorted(by: >)
         )
     }

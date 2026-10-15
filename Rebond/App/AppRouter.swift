@@ -43,6 +43,18 @@ final class AppRouter {
     /// A single exercise done outside any program.
     var freeExercise: WorkoutExercise?
 
+    /// "Créer un programme" in progress: the names of the exercises already ticked.
+    struct ProgramCreation: Identifiable {
+        let id = UUID()
+        let preselected: [String]
+    }
+
+    var programCreation: ProgramCreation?
+
+    func newProgram(with exercises: [String] = []) {
+        programCreation = ProgramCreation(preselected: exercises)
+    }
+
     /// Starts a session: the program of the day by default, another program, or a single exercise of one.
     /// Stays on the current tab: the session covers the screen and comes back to it.
     func startWorkout(_ program: Program? = nil, exercise: Int? = nil) {
