@@ -6,7 +6,7 @@ import SwiftUI
 struct ReportView: View {
     static let lastSentKey = "reportLastSent"
 
-    @Query(sort: \Session.date) private var sessions: [Session]
+    @Query(filter: Session.programSessions, sort: \Session.date) private var sessions: [Session]
     @Query(sort: \Program.createdAt, order: .reverse) private var programs: [Program]
     @AppStorage(PatientIdentity.nameKey) private var patientName = ""
     @AppStorage(lastSentKey) private var lastSent: Double = 0
@@ -429,7 +429,7 @@ struct ShareSheet: UIViewControllerRepresentable {
 /// Every saved session, most recent first.
 struct HistoryView: View {
     var sessionsPerWeek = 3
-    @Query(sort: \Session.date, order: .reverse) private var sessions: [Session]
+    @Query(filter: Session.programSessions, sort: \Session.date, order: .reverse) private var sessions: [Session]
 
     /// Sessions grouped by calendar week, newest first.
     private var weeks: [(start: Date, sessions: [Session])] {

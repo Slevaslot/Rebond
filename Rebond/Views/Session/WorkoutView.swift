@@ -22,6 +22,8 @@ struct WorkoutView: View {
     /// Asked from the Passer menu: the set's screen answers with what it did so far.
     @State private var skipRequest: SkipRequest?
     private let offersMoreSets: Bool
+    /// An exercise tried outside any program: saved, but not counted as a session of the program.
+    private let isTrial: Bool
 
     /// - Parameter onlyExercise: index of the single exercise to do, or nil for the whole program.
     init(program: Program, onlyExercise: Int? = nil) {
@@ -31,8 +33,9 @@ struct WorkoutView: View {
     }
 
     /// Exercises without a program, e.g. one exercise chosen on its own: its last set offers one more.
-    init(exercises: [WorkoutExercise], offersMoreSets: Bool = false) {
+    init(exercises: [WorkoutExercise], offersMoreSets: Bool = false, isTrial: Bool = false) {
         self.offersMoreSets = offersMoreSets
+        self.isTrial = isTrial
         let plan = WorkoutPlan(exercises: exercises)
         _plan = State(initialValue: plan)
         _stage = State(initialValue: .sets)
@@ -200,7 +203,7 @@ struct WorkoutView: View {
                 amplitude: tally.amplitude
             )
         }
-        let session = Session(pain: pain, duration: Date.now.timeIntervalSince(start), results: results)
+        let session = Session(pain: pain, duration: Date.now.timeIntervalSince(start), results: results, isTrial: isTrial)
         context.insert(session)
         stage = .summary(session)
     }

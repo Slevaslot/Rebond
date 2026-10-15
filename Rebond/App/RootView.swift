@@ -77,7 +77,7 @@ struct RootView: View {
         }
         .fullScreenCover(isPresented: $router.isWorkoutPresented) {
             if let free = router.freeExercise {
-                WorkoutView(exercises: [free], offersMoreSets: true)
+                WorkoutView(exercises: [free], offersMoreSets: true, isTrial: true)
             } else if let program = router.workoutProgram.flatMap({ id in programs.first { $0.persistentModelID == id } }) {
                 WorkoutView(program: program, onlyExercise: router.workoutExerciseIndex)
             } else {

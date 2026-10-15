@@ -10,13 +10,20 @@ final class Session {
     /// Seconds from the first set to the pain entry.
     var duration: TimeInterval = 0
     @Relationship(deleteRule: .cascade) var results: [ExerciseResult]
+    /// An exercise tried on its own, outside any program ("Essayer un exercice"): kept for the exercise's history,
+    /// but not a session of the program, so left out of the week, the progress and the report to the physiotherapist.
+    var isTrial: Bool = false
 
-    init(date: Date = .now, pain: Int, duration: TimeInterval = 0, results: [ExerciseResult]) {
+    init(date: Date = .now, pain: Int, duration: TimeInterval = 0, results: [ExerciseResult], isTrial: Bool = false) {
         self.date = date
         self.pain = pain
         self.duration = duration
         self.results = results
+        self.isTrial = isTrial
     }
+
+    /// The sessions of the program, without the exercises tried on their own.
+    static let programSessions = #Predicate<Session> { $0.isTrial == false }
 
     var orderedResults: [ExerciseResult] {
         results.sorted { $0.order < $1.order }

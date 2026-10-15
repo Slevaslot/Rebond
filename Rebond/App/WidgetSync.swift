@@ -8,7 +8,7 @@ import WidgetKit
 /// Applied once, at the root of the app: no view needs to call it.
 struct WidgetSync: ViewModifier {
     @Query(sort: \Program.createdAt, order: .reverse) private var programs: [Program]
-    @Query(sort: \Session.date, order: .reverse) private var sessions: [Session]
+    @Query(filter: Session.programSessions, sort: \Session.date, order: .reverse) private var sessions: [Session]
 
     func body(content: Content) -> some View {
         content

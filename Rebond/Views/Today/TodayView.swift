@@ -9,7 +9,7 @@ struct TodayView: View {
     @Environment(AppRouter.self) private var router
     @Environment(\.modelContext) private var context
     @Query(sort: \Program.createdAt, order: .reverse) private var programs: [Program]
-    @Query(sort: \Session.date, order: .reverse) private var sessions: [Session]
+    @Query(filter: Session.programSessions, sort: \Session.date, order: .reverse) private var sessions: [Session]
     @AppStorage(PatientIdentity.nameKey) private var patientName = ""
     @AppStorage(AlertsGroup.dismissedKey) private var dismissedPainAlert: Double = 0
     @State private var restoredAlert = 0

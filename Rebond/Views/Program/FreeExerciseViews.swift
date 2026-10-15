@@ -5,7 +5,7 @@ struct FreeExerciseCard: View {
     @State private var choosing = false
 
     var body: some View {
-        SummaryCard(title: Text("Faire un exercice"), systemImage: "figure.mixed.cardio", color: .accentColor) {
+        SummaryCard(title: Text("Essayer un exercice"), systemImage: "figure.mixed.cardio", color: .accentColor) {
             EmptyView()
         } content: {
             VStack(alignment: .leading, spacing: 14) {
