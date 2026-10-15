@@ -38,33 +38,110 @@ struct FreeExerciseCard: View {
     }
 }
 
-/// The exercises the camera follows, then the chosen one with its movement and how many to do.
+/// The exercises the camera follows, as Fitness shows its workouts: one large card each, its symbol in color,
+/// a play button to start at once (1 × 10), the movement and the goal below.
 private struct FreeExercisePicker: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(AppRouter.self) private var router
+    @State private var path: [CatalogExercise.ID] = []
 
     var body: some View {
-        NavigationStack {
-            List(CatalogExercise.all) { exercise in
-                NavigationLink {
-                    FreeExerciseSetup(exercise: exercise) { dismiss() }
-                } label: {
-                    Label { Text(exercise.name) } icon: { Image(systemName: exercise.symbol).foregroundStyle(.tint) }
+        NavigationStack(path: $path) {
+            ScrollView {
+                VStack(spacing: 14) {
+                    ForEach(CatalogExercise.all) { exercise in
+                        ExerciseStartCard(exercise: exercise,
+                                          onStart: { start(exercise, sets: 1, reps: 10) },
+                                          onOpen: { path.append(exercise.id) })
+                    }
                 }
+                .padding(.horizontal)
+                .padding(.bottom)
             }
-            .navigationTitle("Faire un exercice")
+            .background(Color(.systemGroupedBackground))
+            .navigationTitle("Exercice")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 Button("Fermer", systemImage: "xmark", role: .close) { dismiss() }
             }
+            .navigationDestination(for: CatalogExercise.ID.self) { id in
+                if let exercise = CatalogExercise.find(id) {
+                    FreeExerciseSetup(exercise: exercise) { sets, reps in start(exercise, sets: sets, reps: reps) }
+                }
+            }
         }
+    }
+
+    private func start(_ exercise: CatalogExercise, sets: Int, reps: Int) {
+        let workout = WorkoutExercise(name: String(localized: exercise.name), catalogID: exercise.id,
+                                      mode: .camera(catalogID: exercise.id), sets: sets, reps: reps)
+        dismiss()
+        // After the sheet is gone: the session covers the whole screen.
+        Task {
+            try? await Task.sleep(for: .seconds(0.4))
+            router.startExercise(workout)
+        }
+    }
+}
+
+/// One exercise, Fitness style: symbol and play button on top, the name in large type, two buttons below.
+private struct ExerciseStartCard: View {
+    let exercise: CatalogExercise
+    let onStart: () -> Void
+    let onOpen: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .top) {
+                Image(systemName: exercise.symbol)
+                    .font(.system(size: 44))
+                    .foregroundStyle(.tint)
+                    .frame(height: 56, alignment: .topLeading)
+                    .accessibilityHidden(true)
+                Spacer()
+                Button(action: onStart) {
+                    Image(systemName: "play.fill")
+                        .font(.title2.weight(.bold))
+                        .foregroundStyle(.black)
+                        .frame(width: 56, height: 56)
+                        .background(Color.accentColor, in: .circle)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Text("Commencer : \(exercise.name)"))
+            }
+            Text(exercise.name)
+                .font(.title.bold())
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 12) {
+                cardButton(systemImage: "figure.stand", label: "Voir le mouvement")
+                cardButton(systemImage: "target", label: "Choisir l'objectif", text: "1 × 10")
+            }
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.accentColor.opacity(0.14), in: .rect(cornerRadius: 30))
+    }
+
+    private func cardButton(systemImage: String, label: LocalizedStringKey, text: String? = nil) -> some View {
+        Button(action: onOpen) {
+            HStack(spacing: 6) {
+                Image(systemName: systemImage)
+                if let text { Text(text).monospacedDigit() }
+            }
+            .font(.headline)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, minHeight: 52)
+            .background(Color.accentColor.opacity(0.12), in: .rect(cornerRadius: 18))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text(label))
     }
 }
 
 private struct FreeExerciseSetup: View {
     let exercise: CatalogExercise
-    let onStart: () -> Void
+    let onStart: (_ sets: Int, _ reps: Int) -> Void
 
-    @Environment(AppRouter.self) private var router
     @State private var sets = 1
     @State private var reps = 10
 
@@ -82,14 +159,7 @@ private struct FreeExerciseSetup: View {
                 .font(.headline)
                 .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 26))
                 Button {
-                    let workout = WorkoutExercise(name: String(localized: exercise.name), catalogID: exercise.id,
-                                                  mode: .camera(catalogID: exercise.id), sets: sets, reps: reps)
-                    onStart()
-                    // After the sheet is gone: the session covers the whole screen.
-                    Task {
-                        try? await Task.sleep(for: .seconds(0.4))
-                        router.startExercise(workout)
-                    }
+                    onStart(sets, reps)
                 } label: {
                     Label("Commencer", systemImage: "play.fill")
                         .font(.headline)
