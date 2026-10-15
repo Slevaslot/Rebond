@@ -77,10 +77,9 @@ struct ProgramEditorView: View {
                         exercise: $exercise,
                         name: program.displayName(of: exercise),
                         analysis: analyses[exercise.id],
-                        isExpanded: expanded == exercise.id,
                         allowsVideos: allowsVideos,
                         onToggle: {
-                            withAnimation(.snappy) { expanded = expanded == exercise.id ? nil : exercise.id }
+                            expanded = exercise.id
                         },
                         onPickVideo: {
                             videoTarget = exercise.id
@@ -105,6 +104,28 @@ struct ProgramEditorView: View {
 
             Section {
                 addMenu
+            }
+        }
+        // An exercise's settings in a sheet: unfolding them inside the list made the whole row flash.
+        .sheet(isPresented: Binding(get: { expanded != nil }, set: { if !$0 { expanded = nil } })) {
+            if let index = program.exercises.firstIndex(where: { $0.id == expanded }) {
+                let exercise = program.exercises[index]
+                ExerciseSettingsView(
+                    exercise: $program.exercises[index],
+                    name: program.displayName(of: exercise),
+                    allowsVideos: allowsVideos,
+                    onPickVideo: {
+                        expanded = nil
+                        videoTarget = exercise.id
+                        pickingVideos = true
+                    },
+                    onFilm: {
+                        expanded = nil
+                        videoTarget = exercise.id
+                        filming = true
+                    }
+                )
+                .presentationDetents([.medium, .large])
             }
         }
         .navigationTitle(title)
@@ -355,7 +376,6 @@ private struct ExerciseCard: View {
     /// Its name, or the one it will get.
     let name: String
     let analysis: VideoAnalysis?
-    let isExpanded: Bool
     let allowsVideos: Bool
     let onToggle: () -> Void
     let onPickVideo: () -> Void
@@ -409,44 +429,6 @@ private struct ExerciseCard: View {
             .buttonStyle(.plain)
             .disabled(analysis.isRunning)
 
-            if isExpanded, !analysis.isRunning {
-                HStack(spacing: 0) {
-                    wheel("Séries", selection: $exercise.sets, values: Array(1...10)) { "\($0)" }
-                    if exercise.mode == .hold {
-                        wheel("Secondes", selection: $exercise.holdSeconds, values: Array(stride(from: 5, through: 300, by: 5))) { "\($0) s" }
-                    } else {
-                        wheel("Répétitions", selection: $exercise.reps, values: Array(1...50)) { "\($0)" }
-                    }
-                }
-                .onChange(of: exercise.sets) { exercise.guessed.remove(.sets) }
-                .onChange(of: exercise.reps) { exercise.guessed.remove(.reps) }
-                .onChange(of: exercise.holdSeconds) { exercise.guessed.remove(.holdSeconds) }
-                // One film or model for both sides: no need to film the other one.
-                Toggle(isOn: $exercise.bothSides) {
-                    Label {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Des deux côtés")
-                            Text("Chaque série d'un côté puis de l'autre, avec le même modèle en miroir : un seul film suffit.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    } icon: {
-                        Image(systemName: "arrow.left.and.right")
-                    }
-                }
-                .font(.subheadline)
-                TextField("Nom", text: $exercise.name, prompt: Text(name))
-                    .textFieldStyle(.roundedBorder)
-                if allowsVideos, exercise.mode == .reps {
-                    Menu {
-                        Button("Choisir une vidéo", systemImage: "photo.on.rectangle", action: onPickVideo)
-                        Button("Filmer", systemImage: "video", action: onFilm)
-                    } label: {
-                        Label(catalog?.reference == nil ? "Ajouter une vidéo" : "Remplacer la vidéo", systemImage: "video.badge.plus")
-                            .font(.subheadline.weight(.semibold))
-                    }
-                }
-            }
         }
         .padding(.vertical, 4)
     }
@@ -466,19 +448,6 @@ private struct ExerciseCard: View {
         }
     }
 
-    private func wheel(_ title: LocalizedStringKey, selection: Binding<Int>, values: [Int], label: @escaping (Int) -> String) -> some View {
-        VStack(spacing: 0) {
-            Text(title)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-            Picker(title, selection: selection) {
-                ForEach(values, id: \.self) { Text(label($0)).tag($0) }
-            }
-            .pickerStyle(.wheel)
-            .frame(height: 130)
-        }
-        .frame(maxWidth: .infinity)
-    }
 }
 
 /// Adding an exercise: the patient's own first ("Mes exercices"), then the ones the camera follows, with their symbols,
@@ -601,5 +570,89 @@ struct DayPicker: View {
             }
         }
         .sensoryFeedback(.selection, trigger: days)
+    }
+}
+
+/// One exercise's settings, in a sheet: sets, repetitions or duration, both sides, its video. No name here:
+/// an exercise is named when it is created, and renamed from its own page.
+/// Rows like Réglages, with − / + rather than wheels.
+private struct ExerciseSettingsView: View {
+    @Binding var exercise: EditableProgram.Exercise
+    /// Its name, or the one it will get.
+    let name: String
+    let allowsVideos: Bool
+    let onPickVideo: () -> Void
+    let onFilm: () -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    private var catalog: CatalogExercise? {
+        exercise.mode == .reps ? exercise.catalogID.flatMap(CatalogExercise.find) : nil
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    settingRow("Séries") {
+                        valueStepper(value: $exercise.sets, range: 1...10, step: 1) { "\($0)" }
+                    }
+                    if exercise.mode == .hold {
+                        settingRow("Durée") {
+                            valueStepper(value: $exercise.holdSeconds, range: 5...300, step: 5) { "\($0) s" }
+                        }
+                    } else {
+                        settingRow("Répétitions") {
+                            valueStepper(value: $exercise.reps, range: 1...50, step: 1) { "\($0)" }
+                        }
+                    }
+                }
+                Section {
+                    // One film or model for both sides: no need to film the other one.
+                    Toggle("Des deux côtés", isOn: $exercise.bothSides)
+                } footer: {
+                    Text("Chaque série d'un côté puis de l'autre, avec le même modèle en miroir : un seul film suffit.")
+                }
+                if allowsVideos, exercise.mode == .reps {
+                    Section {
+                        Button(catalog?.reference == nil ? "Filmer l'exercice" : "Refilmer l'exercice",
+                               systemImage: "video", action: onFilm)
+                        Button("Choisir une vidéo", systemImage: "photo.on.rectangle", action: onPickVideo)
+                    }
+                }
+            }
+            .navigationTitle(name)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                Button("OK", systemImage: "checkmark", role: .confirm) { dismiss() }
+            }
+            .onChange(of: exercise.sets) { exercise.guessed.remove(.sets) }
+            .onChange(of: exercise.reps) { exercise.guessed.remove(.reps) }
+            .onChange(of: exercise.holdSeconds) { exercise.guessed.remove(.holdSeconds) }
+        }
+    }
+
+    /// A label on the left, its control on the right, as in Réglages.
+    private func settingRow<Control: View>(_ title: LocalizedStringKey, @ViewBuilder control: () -> Control) -> some View {
+        HStack(spacing: 12) {
+            Text(title)
+            Spacer(minLength: 8)
+            control()
+        }
+        .frame(minHeight: 48)
+    }
+
+    /// The value, then − and +: large targets, holding repeats.
+    private func valueStepper(value: Binding<Int>, range: ClosedRange<Int>, step: Int,
+                              label: @escaping (Int) -> String) -> some View {
+        HStack(spacing: 12) {
+            Text(label(value.wrappedValue))
+                .font(.body.weight(.semibold))
+                .monospacedDigit()
+                .foregroundStyle(.tint)
+                .contentTransition(.numericText(value: Double(value.wrappedValue)))
+                .animation(.snappy, value: value.wrappedValue)
+            Stepper("", value: value, in: range, step: step)
+                .labelsHidden()
+        }
     }
 }
