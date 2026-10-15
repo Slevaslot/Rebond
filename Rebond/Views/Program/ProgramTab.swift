@@ -18,7 +18,7 @@ struct ProgramTab: View {
                 // Same top bar as the Accueil page: the large title and its controls on the same line, in the page.
                 .toolbarVisibility(.hidden, for: .navigationBar)
                 .navigationDestination(for: Program.self) { program in
-                    ProgramDetailView(program: program, color: .accentColor)
+                    ProgramDetailView(program: program, color: ProgramPalette.color(of: program, in: programs))
                 }
                 .navigationDestination(for: LibraryExercise.self) { exercise in
                     LibraryExerciseView(exercise: exercise)
@@ -46,6 +46,10 @@ struct ProgramTab: View {
                 .listRowSeparator(.hidden)
                 .listRowBackground(Color.clear)
 
+            if !programs.isEmpty {
+                WeekPlanCard(programs: programs).pageRow()
+            }
+
             AddExerciseMenu {
                 Text("Ajouter un exercice")
                     .font(.headline)
@@ -60,7 +64,9 @@ struct ProgramTab: View {
 
             sectionTitle("Mes programmes")
             ForEach(programs) { program in
-                Button { path.append(program) } label: { ProgramRow(program: program) }
+                Button { path.append(program) } label: {
+                    ProgramRow(program: program, color: ProgramPalette.color(of: program, in: programs))
+                }
                     .buttonStyle(.plain)
                     .swipeActions(edge: .trailing) {
                         Button("Supprimer", systemImage: "trash", role: .destructive) { context.delete(program) }
@@ -125,9 +131,15 @@ struct ProgramTab: View {
 /// A program in the list: its name, its days, how many exercises.
 private struct ProgramRow: View {
     let program: Program
+    /// Its color in the week.
+    let color: Color
 
     var body: some View {
         HStack(spacing: 14) {
+            Circle()
+                .fill(color)
+                .frame(width: 12, height: 12)
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
                 Text(program.title)
                     .font(.headline)
@@ -214,7 +226,14 @@ private struct DayColumn: View {
                 if planned.isEmpty {
                     Circle().fill(Color(.systemGray4)).frame(width: 6, height: 6)
                 } else {
-                    Circle().fill(Color.accentColor).frame(width: 26, height: 26)
+                    // One color per program planned that day, side by side in the same disc.
+                    HStack(spacing: 0) {
+                        ForEach(planned) { program in
+                            ProgramPalette.color(of: program, in: programs)
+                        }
+                    }
+                    .frame(width: 26, height: 26)
+                    .clipShape(.circle)
                 }
             }
             .frame(width: 26, height: 26)
@@ -228,7 +247,7 @@ private struct DayColumn: View {
         .accessibilityLabel(Text(Calendar.current.weekdaySymbols[weekday - 1]))
         .accessibilityValue(planned.isEmpty
             ? Text("Repos")
-            : Text("^[\(planned.count) exercice](inflect: true)"))
+            : Text(planned.map(\.title).formatted(.list(type: .and))))
     }
 }
 
