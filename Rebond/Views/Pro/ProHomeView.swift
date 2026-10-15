@@ -120,7 +120,7 @@ struct ProHomeView: View {
                 PatientDestination(patientID: id) { stopFollowing($0) }
             }
             .sheet(item: $prescribing) { item in
-                PrescribeFlow(program: item.program)
+                PrescribeFlow(program: item.program, startsWithTemplates: true)
             }
             .sheet(isPresented: $showingPaywall) { ProPaywall() }
             .sheet(isPresented: $showingSettings) { ProSettingsView() }

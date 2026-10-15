@@ -8,6 +8,13 @@ struct ProgramTab: View {
     @Query(sort: \Program.createdAt) private var programs: [Program]
     @Environment(\.modelContext) private var context
     @State private var showingSettings = false
+    @State private var editing: EditedProgram?
+
+    private struct EditedProgram: Identifiable {
+        let id = UUID()
+        let program: Program
+        let draft: EditableProgram
+    }
     @State private var path: [Program] = []
 
     var body: some View {
@@ -27,6 +34,15 @@ struct ProgramTab: View {
             }
             .sheet(isPresented: $showingSettings) {
                 SettingsView()
+            }
+            .sheet(item: $editing) { item in
+                NavigationStack {
+                    ProgramEditorView(program: item.draft, title: "Modifier le programme") { saved in
+                        item.program.update(with: saved, in: context)
+                        editing = nil
+                    }
+                }
+                .interactiveDismissDisabled()
             }
             // Back on this tab after visiting another one: the list of programs, not the page left open.
             .onChange(of: router.tab) {
@@ -89,6 +105,10 @@ struct ProgramTab: View {
                 Button("Supprimer", systemImage: "trash", role: .destructive) {
                     withAnimation { context.delete(program) }
                 }
+                Button("Modifier", systemImage: "pencil") {
+                    editing = EditedProgram(program: program, draft: EditableProgram(program))
+                }
+                .tint(.accentColor)
             }
             .swipeActions(edge: .leading, allowsFullSwipe: true) {
                 Button(program.isActive ? "Ne plus suivre" : "Suivre",

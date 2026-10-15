@@ -1,4 +1,5 @@
 import CoreImage.CIFilterBuiltins
+import SwiftData
 import SwiftUI
 
 /// The QR code of a prescribed program, to show to the patient or send as a link. Nothing goes through a server:
@@ -6,7 +7,10 @@ import SwiftUI
 struct PrescriptionView: View {
     let transfer: ProgramTransfer
     var patientName: String?
+    /// Keeps this program to prescribe it again; nil when it already is a template.
+    var onSaveAsTemplate: (() -> Void)?
     @Environment(\.dismiss) private var dismiss
+    @State private var savedAsTemplate = false
 
     private var instruction: Text {
         if let patientName {
@@ -51,6 +55,23 @@ struct PrescriptionView: View {
                     .padding(18)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 24))
+
+                    if let onSaveAsTemplate {
+                        Button {
+                            onSaveAsTemplate()
+                            withAnimation { savedAsTemplate = true }
+                        } label: {
+                            Label(savedAsTemplate ? "Enregistré dans vos modèles" : "Enregistrer comme modèle",
+                                  systemImage: savedAsTemplate ? "checkmark" : "square.and.arrow.down.on.square")
+                                .font(.headline)
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.glass)
+                        .buttonBorderShape(.capsule)
+                        .controlSize(.large)
+                        .disabled(savedAsTemplate)
+                        .sensoryFeedback(.success, trigger: savedAsTemplate)
+                    }
                 }
                 .padding()
             }
@@ -101,25 +122,106 @@ struct QRCodeView: View {
     }
 }
 
-/// Composing a program, then its QR code, in a single sheet.
+/// Prescribing, in a single sheet: start from scratch or from a template, adjust the program, show its QR code,
+/// and keep it as a template to prescribe it again.
 struct PrescribeFlow: View {
     let program: EditableProgram
     var title: LocalizedStringKey = "Nouveau programme"
     var patientName: String?
+    /// Offer the templates first (a new prescription); an adjustment starts from the patient's program.
+    var startsWithTemplates = false
 
+    @Environment(\.modelContext) private var context
     @AppStorage(PatientIdentity.physiotherapistNameKey) private var physiotherapistName = ""
-    @State private var transfer: ProgramTransfer?
+    @State private var chosen: EditableProgram?
+    @State private var fromTemplate = false
+    @State private var prescribed: EditableProgram?
 
     var body: some View {
-        if let transfer {
-            PrescriptionView(transfer: transfer, patientName: patientName)
+        if let prescribed {
+            PrescriptionView(
+                transfer: ProgramTransfer(prescribed, physiotherapist: physiotherapistName),
+                patientName: patientName,
+                onSaveAsTemplate: fromTemplate ? nil : {
+                    let name = prescribed.name.trimmingCharacters(in: .whitespaces)
+                    context.insert(ProgramTemplate(name: name.isEmpty ? prescribed.suggestedName : name, program: prescribed))
+                }
+            )
+        } else if startsWithTemplates, chosen == nil {
+            TemplatePicker { program, isTemplate in
+                fromTemplate = isTemplate
+                withAnimation { chosen = program }
+            }
         } else {
             NavigationStack {
-                ProgramEditorView(program: program, title: title) { program in
-                    withAnimation { transfer = ProgramTransfer(program, physiotherapist: physiotherapistName) }
+                ProgramEditorView(program: chosen ?? program, title: title) { program in
+                    withAnimation { prescribed = program }
                 }
             }
             .interactiveDismissDisabled()
         }
+    }
+}
+
+/// The first step of a prescription: a new program, one of the physiotherapist's templates, or one of Rebond's.
+private struct TemplatePicker: View {
+    let onChoose: (_ program: EditableProgram, _ isTemplate: Bool) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var context
+    @Query(sort: \ProgramTemplate.createdAt, order: .reverse) private var templates: [ProgramTemplate]
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    Button { onChoose(EditableProgram(), false) } label: {
+                        Label("Nouveau programme", systemImage: "plus")
+                            .font(.headline)
+                    }
+                }
+                if !templates.isEmpty {
+                    Section("Mes modèles") {
+                        ForEach(templates) { template in
+                            Button { onChoose(template.program, true) } label: {
+                                TemplateRow(name: template.name, program: template.program)
+                            }
+                            .swipeActions {
+                                Button("Supprimer", systemImage: "trash", role: .destructive) { context.delete(template) }
+                            }
+                        }
+                    }
+                }
+                Section("Modèles Rebond") {
+                    ForEach(BuiltInTemplate.all) { item in
+                        Button { onChoose(item.program, false) } label: {
+                            TemplateRow(name: item.name, program: item.program)
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Prescrire")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                Button("Fermer", systemImage: "xmark", role: .close) { dismiss() }
+            }
+        }
+    }
+}
+
+private struct TemplateRow: View {
+    let name: String
+    let program: EditableProgram
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(name)
+                .font(.body.weight(.semibold))
+                .foregroundStyle(.primary)
+            Text("^[\(program.exercises.count) exercice](inflect: true) · \(ProgramSchedule.describe(program.weekdays))")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 2)
     }
 }

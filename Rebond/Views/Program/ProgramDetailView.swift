@@ -38,6 +38,33 @@ struct ProgramDetailView: View {
                 }
                 .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 26))
 
+                // Following and deleting, at the end of the page, as in Contacts.
+                VStack(spacing: 0) {
+                    Button {
+                        program.isActive.toggle()
+                    } label: {
+                        Label(program.isActive ? "Ne plus suivre ce programme" : "Suivre ce programme",
+                              systemImage: program.isActive ? "checkmark.circle.badge.xmark" : "checkmark.circle")
+                            .frame(maxWidth: .infinity, minHeight: 50, alignment: .leading)
+                            .padding(.horizontal)
+                            .contentShape(.rect)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.tint)
+                    Divider().padding(.leading)
+                    Button(role: .destructive) {
+                        confirmingDelete = true
+                    } label: {
+                        Label("Supprimer le programme", systemImage: "trash")
+                            .frame(maxWidth: .infinity, minHeight: 50, alignment: .leading)
+                            .padding(.horizontal)
+                            .contentShape(.rect)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.red)
+                }
+                .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 26))
+                .padding(.top, 10)
             }
             .padding(.horizontal)
             .padding(.bottom)
@@ -52,15 +79,7 @@ struct ProgramDetailView: View {
         .navigationBarTitleDisplayMode(.large)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Menu("Options", systemImage: "ellipsis") {
-                    // Followed programs make the day's session; the check on the Programmes page does the same.
-                    Button(program.isActive ? "Ne plus suivre" : "Suivre ce programme",
-                           systemImage: program.isActive ? "checkmark.circle.badge.xmark" : "checkmark.circle") {
-                        program.isActive.toggle()
-                    }
-                    Button("Modifier", systemImage: "pencil") { editing = EditingItem(program: EditableProgram(program)) }
-                    Button("Supprimer", systemImage: "trash", role: .destructive) { confirmingDelete = true }
-                }
+                Button("Modifier") { editing = EditingItem(program: EditableProgram(program)) }
             }
         }
         .confirmationDialog("Supprimer « \(program.title) » ?", isPresented: $confirmingDelete, titleVisibility: .visible) {

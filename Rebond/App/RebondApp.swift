@@ -17,6 +17,6 @@ import SwiftUI
                     if DeepLink.isSession(url) { router.startWorkoutIfProgram() }
                 }
         }
-        .modelContainer(for: [Program.self, Session.self, TrackedPatient.self])
+        .modelContainer(for: [Program.self, Session.self, TrackedPatient.self, ProgramTemplate.self])
     }
 }
