@@ -234,17 +234,20 @@ nonisolated enum CaptureQuality {
         if Double(withBody.count) / Double(max(frameCount, samples.count)) < 0.5 {
             return "Le corps n'est visible que par moments. Filmez de face, sans rien devant le patient."
         }
-        func presence(_ keys: [KeyPath<PoseMeasure, CGPoint?>]) -> Double {
-            let seen = withBody.filter { sample in keys.allSatisfy { sample.measure![keyPath: $0] != nil } }
+        /// Share of the frames where one side at least shows all these joints (seen from the side, the other is hidden).
+        func presence(_ left: [KeyPath<PoseMeasure, CGPoint?>], _ right: [KeyPath<PoseMeasure, CGPoint?>]) -> Double {
+            let seen = withBody.filter { sample in
+                left.allSatisfy { sample.measure![keyPath: $0] != nil } || right.allSatisfy { sample.measure![keyPath: $0] != nil }
+            }
             return Double(seen.count) / Double(withBody.count)
         }
-        if presence([\.leftAnkle, \.rightAnkle]) < minimumPresence {
+        if presence([\.leftAnkle], [\.rightAnkle]) < minimumPresence {
             return "Les pieds sortent de l'image. Reculez l'iPhone pour voir le corps entier, pieds compris."
         }
-        if presence([\.leftKnee, \.rightKnee, \.leftHip, \.rightHip]) < minimumPresence {
+        if presence([\.leftHip, \.leftKnee], [\.rightHip, \.rightKnee]) < minimumPresence {
             return "Les jambes sont mal visibles. Filmez de face, avec une tenue qui se distingue du fond."
         }
-        if presence([\.leftWrist, \.rightWrist, \.leftElbow, \.rightElbow]) < minimumPresence {
+        if presence([\.leftShoulder, \.leftElbow, \.leftWrist], [\.rightShoulder, \.rightElbow, \.rightWrist]) < minimumPresence {
             return "Les bras sont mal visibles. Filmez de face, le corps entier dans l'image, sans contre-jour."
         }
         // Joints at the very edge of the picture: the body is cut.
