@@ -74,6 +74,11 @@ extension Correction {
         case .useBothLegs: [.neck, .root, .leftHip, .rightHip, .leftKnee, .rightKnee]
         case .raiseLegHigher, .keepLegStraight, .keepStandingLegStraight, .raiseKneeHigher: [.leftHip, .rightHip, .leftKnee, .rightKnee, .leftAnkle, .rightAnkle]
         case .slowDown, .followReference: []
+        case .matchLeftArm: [.leftShoulder, .leftElbow, .leftWrist]
+        case .matchRightArm: [.rightShoulder, .rightElbow, .rightWrist]
+        case .matchLeftLeg: [.leftHip, .leftKnee, .leftAnkle]
+        case .matchRightLeg: [.rightHip, .rightKnee, .rightAnkle]
+        case .matchTrunk: [.neck, .root, .leftShoulder, .rightShoulder, .leftHip, .rightHip]
         }
     }
 }

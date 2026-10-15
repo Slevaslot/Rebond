@@ -343,12 +343,20 @@ struct ExerciseBadge: View {
     let size: Double
 
     var body: some View {
-        Image(systemName: exercise.figureSymbol)
-            .font(.system(size: size * 0.45))
-        .accessibilityHidden(true)
-        .foregroundStyle(.tint)
-        .frame(width: size, height: size)
-        .background(Color(.tertiarySystemGroupedBackground), in: .circle)
+        if let reference = exercise.catalogExercise?.reference {
+            // Filmed at the physiotherapist's: the patient recognizes themselves, at the end of the movement.
+            ReferenceFramesView(movement: reference, progress: 1)
+                .frame(width: size, height: size)
+                .clipShape(.circle)
+                .accessibilityHidden(true)
+        } else {
+            Image(systemName: exercise.figureSymbol)
+                .font(.system(size: size * 0.45))
+                .accessibilityHidden(true)
+                .foregroundStyle(.tint)
+                .frame(width: size, height: size)
+                .background(Color(.tertiarySystemGroupedBackground), in: .circle)
+        }
     }
 }
 

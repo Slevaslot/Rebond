@@ -33,6 +33,12 @@ nonisolated enum Correction: Sendable {
     case keepElbowUp
     /// A filmed movement: the repetition stopped short of the one in the video.
     case followReference
+    /// A filmed movement: this body part isn't placed as in the video.
+    case matchLeftArm
+    case matchRightArm
+    case matchLeftLeg
+    case matchRightLeg
+    case matchTrunk
 
     var message: LocalizedStringResource {
         switch self {
@@ -57,7 +63,23 @@ nonisolated enum Correction: Sendable {
         case .turnForearmFurther: "Basculez l'avant-bras un peu plus loin"
         case .keepElbowUp: "Gardez le coude à hauteur d'épaule"
         case .followReference: "Allez un peu plus loin, comme sur la vidéo"
+        case .matchLeftArm, .matchRightArm: "Placez ce bras comme sur la vidéo"
+        case .matchLeftLeg, .matchRightLeg: "Placez cette jambe comme sur la vidéo"
+        case .matchTrunk: "Gardez le buste comme sur la vidéo"
         case .keepStandingLegStraight: "Gardez la jambe d'appui tendue"
+        }
+    }
+}
+
+nonisolated extension Correction {
+    /// The same body part on the other side.
+    var otherSide: Correction {
+        switch self {
+        case .matchLeftArm: .matchRightArm
+        case .matchRightArm: .matchLeftArm
+        case .matchLeftLeg: .matchRightLeg
+        case .matchRightLeg: .matchLeftLeg
+        default: self
         }
     }
 }

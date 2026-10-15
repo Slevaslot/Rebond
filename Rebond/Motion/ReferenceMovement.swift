@@ -102,6 +102,17 @@ nonisolated enum MovementFeatures {
         return result
     }
 
+    /// The body part a measure belongs to, to point at it on the skeleton.
+    static func bodyPart(of index: Int) -> Correction {
+        switch index {
+        case 0, 2, 11: .matchLeftArm
+        case 1, 3, 12: .matchRightArm
+        case 4, 6, 14: .matchLeftLeg
+        case 5, 7, 15: .matchRightLeg
+        default: .matchTrunk
+        }
+    }
+
     static func dot(_ a: [Double], _ b: [Double]) -> Double {
         zip(a, b).reduce(0) { $0 + $1.0 * $1.1 }
     }
@@ -378,9 +389,22 @@ nonisolated struct ReferenceCounter: MovementCounter {
     private var recent: [(features: [Double?], torso: Double)] = []
     private var trajectory: [[Double]] = []
     private let stillFrames = 10
+    /// The film's way there, from rest to the end of the movement: what the body should look like at each moment.
+    private let wayThere: [[Double]]
+    /// The body part that differs from the film, and for how many frames in a row.
+    private var mismatch: (fault: Correction, frames: Int)?
+    /// Said once per repetition at most.
+    private var saidThisRepetition = false
+    /// A difference must last this many frames (0.3 s) to be shown: Vision is sometimes wrong on a frame.
+    private let mismatchFrames = 5
+    /// About 25° of a joint, or a quarter of the torso length: a visible difference, not detection noise.
+    private let mismatchThreshold = 0.42
 
     init(movement: ReferenceMovement) {
         self.movement = movement
+        let along = movement.template.map { MovementFeatures.dot($0, movement.axis) }
+        let peak = along.indices.max { along[$0] < along[$1] } ?? 0
+        wayThere = Array(movement.template.prefix(peak + 1))
         let target = movement.target
         cycle = RepCycle(start: target * ReferenceAnalyzer.startFraction, target: target,
                          back: target * ReferenceAnalyzer.backFraction, reversalMargin: target * 0.1,
@@ -410,11 +434,33 @@ nonisolated struct ReferenceCounter: MovementCounter {
 
         let features = MovementFeatures.vector(measure, torso: torso).enumerated().map { $1 ?? rest[$0] }
         let deviation = zip(features, rest).map { $0 - $1 }
-        let value = max(MovementFeatures.dot(deviation, movement.axis),
-                        MovementFeatures.dot(MovementFeatures.swapped(deviation), movement.axis))
+        let direct = MovementFeatures.dot(deviation, movement.axis)
+        let mirrored = MovementFeatures.dot(MovementFeatures.swapped(deviation), movement.axis)
+        let value = max(direct, mirrored)
 
         let wasInRepetition = cycle.isInRepetition
-        let (event, posture) = cycle.advance(value, fault: nil, at: time)
+        var (event, posture) = cycle.advance(value, fault: nil, at: time)
+
+        // Compared with the film at the same moment of the movement: the body part that differs the most.
+        if cycle.isInRepetition, value >= movement.target * 0.3,
+           let fault = difference(mirrored > direct ? MovementFeatures.swapped(deviation) : deviation, value: value,
+                                  sidesSwapped: mirrored > direct) {
+            let frames = mismatch?.fault == fault ? mismatch!.frames + 1 : 1
+            mismatch = (fault, frames)
+            if frames >= mismatchFrames {
+                posture = fault
+                if !saidThisRepetition, event == nil {
+                    saidThisRepetition = true
+                    event = .correction(fault)
+                }
+            }
+        } else {
+            mismatch = nil
+        }
+        if !cycle.isInRepetition {
+            saidThisRepetition = false
+            mismatch = nil
+        }
         if cycle.isInRepetition || wasInRepetition { trajectory.append(deviation) }
         if !cycle.isInRepetition, !wasInRepetition { trajectory = [] }
 
@@ -431,6 +477,19 @@ nonisolated struct ReferenceCounter: MovementCounter {
         }
         if calibratedNow, case .none = result { result = .calibrated }
         return CounterUpdate(progress: min(1, max(0, value / movement.target)), event: result, posture: posture)
+    }
+
+    /// The body part furthest from the film's body at the same point of the movement, if far enough to show.
+    private func difference(_ deviation: [Double], value: Double, sidesSwapped: Bool) -> Correction? {
+        guard !wayThere.isEmpty else { return nil }
+        let reference = wayThere.min {
+            abs(MovementFeatures.dot($0, movement.axis) - value) < abs(MovementFeatures.dot($1, movement.axis) - value)
+        }!
+        let errors = zip(deviation, reference).map { abs($0 - $1) }
+        guard let worst = errors.indices.max(by: { errors[$0] < errors[$1] }), errors[worst] >= mismatchThreshold
+        else { return nil }
+        let part = MovementFeatures.bodyPart(of: worst)
+        return sidesSwapped ? part.otherSide : part
     }
 
     /// The mean measures of the last frames, when the body barely moved over them.
