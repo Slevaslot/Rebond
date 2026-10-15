@@ -173,8 +173,11 @@ private struct ExerciseEditRow: View {
                 .onChange(of: exercise.sets) { exercise.guessed.remove(.sets) }
                 .onChange(of: exercise.reps) { exercise.guessed.remove(.reps) }
                 .onChange(of: exercise.holdSeconds) { exercise.guessed.remove(.holdSeconds) }
-                TextField("Nom", text: $exercise.name, prompt: Text(name))
-                    .textFieldStyle(.roundedBorder)
+                // Only an exercise Rebond doesn't know needs a name: the others carry their own.
+                if exercise.catalogID.flatMap(CatalogExercise.find) == nil || exercise.mode == .hold {
+                    TextField("Nom", text: $exercise.name, prompt: Text(name))
+                        .textFieldStyle(.roundedBorder)
+                }
             }
         }
         .padding(.vertical, 4)
@@ -199,6 +202,9 @@ private struct ExerciseEditRow: View {
 private struct ExerciseChooser: View {
     let onChoose: (EditableProgram.Exercise) -> Void
     @Environment(\.dismiss) private var dismiss
+    /// An exercise Rebond doesn't know, waiting for its name.
+    @State private var naming: EditableProgram.Exercise?
+    @State private var name = ""
 
     var body: some View {
         NavigationStack {
@@ -215,8 +221,8 @@ private struct ExerciseChooser: View {
                 }
                 Section("Autres") {
                     Button {
-                        choose(EditableProgram.Exercise(name: "", catalogID: nil,
-                                                        sets: EditableProgram.defaultSets, reps: EditableProgram.defaultReps))
+                        askName(EditableProgram.Exercise(name: "", catalogID: nil,
+                                                         sets: EditableProgram.defaultSets, reps: EditableProgram.defaultReps))
                     } label: {
                         Label { Text("Autre exercice, compté à la main").foregroundStyle(.primary) } icon: { Image(systemName: "hand.tap") }
                     }
@@ -224,7 +230,7 @@ private struct ExerciseChooser: View {
                         var exercise = EditableProgram.Exercise(name: "", catalogID: nil, sets: EditableProgram.defaultSets,
                                                                 reps: EditableProgram.defaultReps)
                         exercise.mode = .hold
-                        choose(exercise)
+                        askName(exercise)
                     } label: {
                         Label { Text("Position tenue (gainage, étirement…)").foregroundStyle(.primary) } icon: { Image(systemName: "timer") }
                     }
@@ -232,10 +238,27 @@ private struct ExerciseChooser: View {
             }
             .navigationTitle("Ajouter un exercice")
             .navigationBarTitleDisplayMode(.inline)
+            .alert("Nom de l'exercice", isPresented: Binding(get: { naming != nil }, set: { if !$0 { naming = nil } })) {
+                TextField(naming?.mode == .hold ? "Ex. : Gainage" : "Ex. : Pont fessier", text: $name)
+                    .textInputAutocapitalization(.sentences)
+                Button("Ajouter") {
+                    if var exercise = naming {
+                        exercise.name = name.trimmingCharacters(in: .whitespaces)
+                        naming = nil
+                        choose(exercise)
+                    }
+                }
+                Button("Annuler", role: .cancel) { naming = nil }
+            }
             .toolbar {
                 Button("Fermer", systemImage: "xmark", role: .close) { dismiss() }
             }
         }
+    }
+
+    private func askName(_ exercise: EditableProgram.Exercise) {
+        name = ""
+        naming = exercise
     }
 
     private func choose(_ exercise: EditableProgram.Exercise) {
