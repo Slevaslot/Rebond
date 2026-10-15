@@ -68,11 +68,6 @@ struct ProHomeView: View {
 
                     OfferCard(patientCount: patients.count, hasPro: store.hasPro) { showingPaywall = true }
 
-                    Label("Les bilans restent sur cet iPhone : rien n'est envoyé à un serveur.", systemImage: "lock.shield")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 4)
-                        .padding(.top, 4)
                 }
                 .padding(.horizontal)
                 .padding(.bottom)

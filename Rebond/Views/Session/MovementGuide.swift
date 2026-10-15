@@ -17,6 +17,10 @@ struct MovementGuide: View, Animatable {
     var isCompact = false
     /// Line thickness, in points.
     var lineWidth: Double?
+    /// Line color of the demonstration; white over the camera by default.
+    var tint: Color = .white
+    /// The dark edge under the line keeps it readable over the camera; useless on a plain background.
+    var hasEdge = true
     var onPlacement: (GuidePlacement) -> Void = { _ in }
 
     /// The line follows the figure's size change instead of jumping from one thickness to the other.
@@ -40,7 +44,7 @@ struct MovementGuide: View, Animatable {
                 Canvas { context, _ in
                     let progress = isDemonstrating && !reduceMotion ? Self.progress(since: demonstrationStart, at: timeline.date) : 0
                     let figure = Self.outline(exercise.guideRest, exercise.guideTarget, armStyle: exercise.armStyle, progress: progress, in: box)
-                    let color: Color = if isDemonstrating { .white } else {
+                    let color: Color = if isDemonstrating { tint } else {
                         switch placement {
                         case .aligned: .green
                         case .almost: .yellow
@@ -49,7 +53,9 @@ struct MovementGuide: View, Animatable {
                     }
                     // A dark edge under the line keeps it visible on a bright room.
                     let line = lineWidth ?? (isCompact ? 3.0 : 6.0)
-                    context.stroke(figure, with: .color(.black.opacity(0.35)), style: StrokeStyle(lineWidth: line * 1.8, lineJoin: .round))
+                    if hasEdge {
+                        context.stroke(figure, with: .color(.black.opacity(0.35)), style: StrokeStyle(lineWidth: line * 1.8, lineJoin: .round))
+                    }
                     context.stroke(figure, with: .color(color), style: StrokeStyle(lineWidth: line, lineJoin: .round))
                 }
             }

@@ -38,10 +38,6 @@ struct ProgramDetailView: View {
                 }
                 .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 26))
 
-                Text("Touchez un exercice pour voir le mouvement ou le faire seul.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 4)
             }
             .padding(.horizontal)
             .padding(.bottom)

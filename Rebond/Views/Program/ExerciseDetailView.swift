@@ -9,7 +9,6 @@ struct ExerciseDetailView: View {
 
     @Environment(AppRouter.self) private var router
     @Query(sort: \Session.date, order: .reverse) private var sessions: [Session]
-    @State private var demonstrationStart = Date.now
 
     private var exercise: PlannedExercise? {
         let exercises = program.orderedExercises
@@ -31,7 +30,8 @@ struct ExerciseDetailView: View {
         if let exercise {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
-                    movement(exercise)
+                    MovementCard(catalog: exercise.catalogExercise, symbol: exercise.figureSymbol)
+                        .accessibilityLabel(Text("Mouvement : \(exercise.name)"))
 
                     VStack(alignment: .leading, spacing: 10) {
                         Text(exercise.prescriptionDetail)
@@ -74,27 +74,6 @@ struct ExerciseDetailView: View {
         }
     }
 
-    /// The camera's exercises show their pictogram doing the movement; the others, their symbol.
-    @ViewBuilder
-    private func movement(_ exercise: PlannedExercise) -> some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 26)
-                .fill(Color.accentColor.gradient)
-            if let catalog = exercise.catalogExercise {
-                MovementGuide(exercise: catalog, skeleton: nil, isDemonstrating: true,
-                              demonstrationStart: demonstrationStart, isCompact: true, lineWidth: 5)
-                    .padding(24)
-            } else {
-                Image(systemName: exercise.figureSymbol)
-                    .font(.system(size: 96))
-                    .foregroundStyle(.white)
-            }
-        }
-        .frame(height: 260)
-        .accessibilityElement()
-        .accessibilityLabel(Text("Mouvement : \(exercise.name)"))
-    }
-
     private func howItIsFollowed(_ exercise: PlannedExercise) -> LocalizedStringKey {
         if exercise.catalogExercise != nil {
             return "La caméra compte vos répétitions et vous conseille pendant le mouvement. Posez l'iPhone debout, à 2 ou 3 mètres, et placez-vous face à lui."
@@ -121,5 +100,31 @@ struct ExerciseDetailView: View {
                 }
             }
         }
+    }
+}
+
+/// The movement on a blue card: the camera's exercises show their pictogram doing it in a loop, in white
+/// without the dark edge used over the camera; the others, their workout symbol.
+struct MovementCard: View {
+    let catalog: CatalogExercise?
+    let symbol: String
+    @State private var start = Date.now
+
+    var body: some View {
+        Group {
+            if let catalog {
+                MovementGuide(exercise: catalog, skeleton: nil, isDemonstrating: true, demonstrationStart: start,
+                              isCompact: true, lineWidth: 5, hasEdge: false)
+                    .padding(24)
+            } else {
+                Image(systemName: symbol)
+                    .font(.system(size: 96))
+                    .foregroundStyle(.white)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 260)
+        .background(Color.accentColor.gradient, in: .rect(cornerRadius: 26))
+        .accessibilityElement()
     }
 }

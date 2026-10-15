@@ -58,7 +58,9 @@ struct RootView: View {
             if !isPhysiotherapist, router.tab == .physio { router.tab = .today }
         }
         .fullScreenCover(isPresented: $router.isWorkoutPresented) {
-            if let program = router.workoutProgram.flatMap({ id in programs.first { $0.persistentModelID == id } })
+            if let free = router.freeExercise {
+                WorkoutView(exercises: [free])
+            } else if let program = router.workoutProgram.flatMap({ id in programs.first { $0.persistentModelID == id } })
                 ?? programs.current() {
                 WorkoutView(program: program, onlyExercise: router.workoutExerciseIndex)
                     // The session grows out of the Commencer button.

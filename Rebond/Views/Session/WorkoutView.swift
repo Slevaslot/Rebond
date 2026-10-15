@@ -24,7 +24,12 @@ struct WorkoutView: View {
     init(program: Program, onlyExercise: Int? = nil) {
         var exercises = program.orderedExercises
         if let onlyExercise, exercises.indices.contains(onlyExercise) { exercises = [exercises[onlyExercise]] }
-        let plan = WorkoutPlan(exercises: exercises.map(\.workoutExercise))
+        self.init(exercises: exercises.map(\.workoutExercise))
+    }
+
+    /// Exercises without a program, e.g. one exercise chosen on its own.
+    init(exercises: [WorkoutExercise]) {
+        let plan = WorkoutPlan(exercises: exercises)
         _plan = State(initialValue: plan)
         _stage = State(initialValue: .sets)
     }

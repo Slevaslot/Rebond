@@ -36,11 +36,21 @@ final class AppRouter {
     /// Set to do only this exercise of the program (its index in the program's order).
     var workoutExerciseIndex: Int?
 
+    /// A single exercise done outside any program.
+    var freeExercise: WorkoutExercise?
+
     /// Starts a session: the program of the day by default, another program, or a single exercise of one.
     /// Stays on the current tab: the session covers the screen and comes back to it.
     func startWorkout(_ program: Program? = nil, exercise: Int? = nil) {
+        freeExercise = nil
         workoutProgram = program?.persistentModelID
         workoutExerciseIndex = exercise
+        isWorkoutPresented = true
+    }
+
+    /// One exercise, without a program.
+    func startExercise(_ exercise: WorkoutExercise) {
+        freeExercise = exercise
         isWorkoutPresented = true
     }
 

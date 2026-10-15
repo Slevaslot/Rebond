@@ -28,6 +28,10 @@ struct ProgramTab: View {
             .sheet(isPresented: $showingSettings) {
                 SettingsView()
             }
+            // Back on this tab after visiting another one: the list of programs, not the page left open.
+            .onChange(of: router.tab) {
+                if router.tab != .program { path = [] }
+            }
         }
     }
 
@@ -107,19 +111,18 @@ struct ProgramTab: View {
 
             WeekPlanCard(programs: programs).pageRow()
 
-            section("Programmes suivis", programs.active,
-                    empty: "Aucun programme suivi. Cochez celui que vous voulez faire.")
-            let others = programs.filter { !$0.isActive }
-            if !others.isEmpty {
-                section("Autres programmes", others, empty: nil)
+            FreeExerciseCard().pageRow()
+
+            if programs.active.isEmpty {
+                section("Vos programmes", programs, empty: nil)
+            } else {
+                section("Programmes suivis", programs.active, empty: nil)
+                let others = programs.filter { !$0.isActive }
+                if !others.isEmpty {
+                    section("Autres programmes", others, empty: nil)
+                }
             }
 
-            Text("Seul votre kiné décide de votre programme. Ajoutez ici ce qu'il vous a prescrit. Glissez une carte vers la gauche pour la supprimer.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 4)
-                .padding(.top, 4)
-                .pageRow()
         }
         .listStyle(.plain)
         .contentMargins(.top, 0, for: .scrollContent)
@@ -313,8 +316,8 @@ struct AddProgramMenu: View {
     }
 }
 
-/// No program yet: it always comes from the physiotherapist, so the page says so and offers the ways to add it.
-/// The page's own header stays on top, so the patient knows where they are.
+/// No program yet, in the same cards as the other pages: how to add the physiotherapist's program,
+/// and one exercise to do right away. The page's own header stays on top.
 struct NoProgramView<Header: View>: View {
     @ViewBuilder let header: Header
     @Environment(AppRouter.self) private var router
@@ -324,32 +327,77 @@ struct NoProgramView<Header: View>: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 14) {
                 header
-                ContentUnavailableView {
-                    Label("Votre programme vient de votre kiné", systemImage: "stethoscope")
-                } description: {
-                    Text("Collez le message où il vous décrit vos exercices, ou scannez sa feuille.")
-                } actions: {
-                    Button("Coller son message", systemImage: "text.bubble") { router.addProgram(from: .message) }
+
+                SummaryCard(title: Text("Votre programme"), systemImage: "stethoscope", color: .accentColor) {
+                    EmptyView()
+                } content: {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Ajoutez les exercices donnés par votre kiné.")
+                            .font(.title3.weight(.semibold))
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.bottom, 8)
+                        Button {
+                            router.addProgram(from: .message)
+                        } label: {
+                            Label("Coller son message", systemImage: "text.bubble")
+                                .font(.headline)
+                                .frame(maxWidth: .infinity)
+                        }
                         .buttonStyle(.glassProminent)
+                        .buttonBorderShape(.capsule)
                         .controlSize(.large)
-                    Button("Scanner sa feuille", systemImage: "doc.viewfinder") { router.addProgram(from: .scan) }
-                        .buttonStyle(.glass)
-                        .controlSize(.large)
-                    Button("Saisir à la main") { router.addProgram(from: .manual) }
-                        .frame(minHeight: 44)
-                    #if DEBUG
-                    Button("Programme de démo") { DemoData.load(into: context) }
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .frame(minHeight: 44)
-                    #endif
+                        .padding(.bottom, 6)
+                        AddRow(title: "Scanner sa feuille", symbol: "doc.viewfinder") { router.addProgram(from: .scan) }
+                        Divider().padding(.leading, 44)
+                        AddRow(title: "Choisir une photo", symbol: "photo") { router.addProgram(from: .photo) }
+                        Divider().padding(.leading, 44)
+                        AddRow(title: "Saisir à la main", symbol: "square.and.pencil") { router.addProgram(from: .manual) }
+                        #if DEBUG
+                        Divider().padding(.leading, 44)
+                        AddRow(title: "Programme de démo", symbol: "sparkles") { DemoData.load(into: context) }
+                        #endif
+                    }
                 }
-                .containerRelativeFrame(.vertical) { height, _ in height * 0.8 }
+
+                FreeExerciseCard()
             }
             .padding(.horizontal)
+            .padding(.bottom)
+        }
+        .background(alignment: .top) {
+            LinearGradient(colors: [Color.accentColor.opacity(0.45), .clear], startPoint: .top, endPoint: .bottom)
+                .frame(height: 340)
+                .ignoresSafeArea()
         }
         .background(Color(.systemGroupedBackground))
+    }
+}
+
+/// A way to add the program, as a row of the card.
+private struct AddRow: View {
+    let title: LocalizedStringKey
+    let symbol: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: symbol)
+                    .font(.title3)
+                    .foregroundStyle(.tint)
+                    .frame(width: 32)
+                Text(title)
+                    .font(.body)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .frame(minHeight: 48)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
     }
 }

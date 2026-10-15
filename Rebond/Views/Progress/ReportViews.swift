@@ -42,11 +42,6 @@ struct ReportView: View {
                     ReportExercisesCard(report: report)
                 }
                 ReportPainCard(report: report)
-                Label("Le bilan reste sur votre iPhone tant que vous ne l'envoyez pas. Vous choisissez à qui l'envoyer : rien ne part sans votre accord.",
-                      systemImage: "lock.fill")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 4)
             }
             .padding(.horizontal)
             .padding(.bottom)
