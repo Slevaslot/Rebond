@@ -14,7 +14,18 @@ enum DemoData {
             .init(name: "Gainage", catalogID: nil, sets: 2, mode: .hold, reps: 10, holdSeconds: 30),
             .init(name: "Pont fessier", catalogID: nil, sets: 2, reps: 12),
         ]
-        Program.replaceAll(with: program, in: context)
+        try? context.delete(model: Program.self)
+        Program.add(program, prescriber: "M. Martin", in: context)
+
+        // A second program on the other days, to show several programs side by side.
+        var stretching = EditableProgram()
+        stretching.name = String(localized: "Souplesse")
+        stretching.weekdays = [3, 5]
+        stretching.exercises = [
+            .init(name: "Étirement des ischio-jambiers", catalogID: nil, sets: 2, mode: .hold, reps: 10, holdSeconds: 30),
+            .init(name: "Élévation de la jambe tendue", catalogID: CatalogExercise.legRaise.id, sets: 2, reps: 10),
+        ]
+        Program.add(stretching, in: context)
 
         // Three weeks: more regular, amplitude improving, pain going down, with one painful session.
         let days: [(daysAgo: Int, pain: Int, squats: Int, incomplete: Int, squatAmplitude: Double, raises: Int, raiseAmplitude: Double, plank: Int)] = [

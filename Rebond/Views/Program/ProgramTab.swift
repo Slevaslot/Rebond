@@ -1,45 +1,30 @@
 import SwiftData
 import SwiftUI
 
-/// The program at a glance, in the same Health-style cards as the Accueil page: who prescribed it and when,
-/// how often, then each exercise with what to do and how it is followed. Liquid Glass stays on the controls.
+/// The patient's programs, laid out like the Accueil page: the week at a glance (which program on which day),
+/// then one card per program. A card opens the program: its exercises, start it, change it, or do one exercise.
 struct ProgramTab: View {
     @Environment(AppRouter.self) private var router
-    @Environment(\.modelContext) private var context
-    @Query(sort: \Program.createdAt, order: .reverse) private var programs: [Program]
-    @Query(sort: \Session.date, order: .reverse) private var sessions: [Session]
-    @AppStorage(ProgramChange.prescriberKey) private var prescriberName = ""
-    @AppStorage(ProgramChange.prescribedAtKey) private var prescribedAt: Double = 0
+    @Query(sort: \Program.createdAt) private var programs: [Program]
     @AppStorage(PatientIdentity.nameKey) private var patientName = ""
-    @State private var editing: EditableProgram?
-    @State private var savedEdit = 0
     @State private var showingSettings = false
+    @State private var path: [Program] = []
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             Group {
-                if let program = programs.first {
-                    content(program)
-                } else {
+                if programs.isEmpty {
                     NoProgramView { header }
+                } else {
+                    content
                 }
             }
-            .navigationTitle("Programme")
-            // Same top bar as the Accueil page: the large title and its control on the same line, in the page.
+            .navigationTitle("Programmes")
+            // Same top bar as the Accueil page: the large title and its controls on the same line, in the page.
             .toolbarVisibility(.hidden, for: .navigationBar)
-            .sheet(isPresented: Binding(get: { editing != nil }, set: { if !$0 { editing = nil } })) {
-                if let editing {
-                    NavigationStack {
-                        ProgramEditorView(program: editing, title: "Modifier le programme") { saved in
-                            Program.replaceAll(with: saved, in: context)
-                            self.editing = nil
-                            savedEdit += 1
-                        }
-                    }
-                    .interactiveDismissDisabled()
-                }
+            .navigationDestination(for: Program.self) { program in
+                ProgramDetailView(program: program, color: ProgramPalette.color(of: program, in: programs))
             }
-            .sensoryFeedback(.success, trigger: savedEdit)
             .sheet(isPresented: $showingSettings) {
                 SettingsView()
             }
@@ -47,8 +32,8 @@ struct ProgramTab: View {
     }
 
     private var header: some View {
-        HStack(alignment: .center) {
-            Text("Programme")
+        HStack(alignment: .center, spacing: 10) {
+            Text("Programmes")
                 .font(.largeTitle.bold())
                 .accessibilityAddTraits(.isHeader)
             Spacer()
@@ -66,52 +51,25 @@ struct ProgramTab: View {
         .padding(.bottom, 4)
     }
 
-    private func content(_ program: Program) -> some View {
-        let prescriber = ProgramChange.prescriber(of: program, prescribedAt: prescribedAt, name: prescriberName)
-
-        return ScrollView {
+    private var content: some View {
+        ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 header
 
-                PrescriptionCard(
-                    program: program,
-                    prescriber: prescriber,
-                    week: WeekProgress(sessions: sessions, sessionsPerWeek: program.sessionsPerWeek)
-                )
+                WeekPlanCard(programs: programs)
 
-                HStack(alignment: .firstTextBaseline) {
-                    Text("Exercices")
-                        .font(.title2.bold())
-                        .accessibilityAddTraits(.isHeader)
-                    Spacer()
-                    Text("Environ \(program.estimatedMinutes) min par séance")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.trailing)
-                }
-                .padding(.horizontal, 4)
-                .padding(.top, 10)
-
-                ForEach(program.orderedExercises) { exercise in
-                    ProgramExerciseCard(exercise: exercise)
+                ForEach(programs) { program in
+                    NavigationLink(value: program) {
+                        ProgramCard(program: program, color: ProgramPalette.color(of: program, in: programs))
+                    }
+                    .buttonStyle(.plain)
                 }
 
-                Button {
-                    editing = EditableProgram(program)
-                } label: {
-                    Label("Modifier le programme", systemImage: "pencil")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.glass)
-                .buttonBorderShape(.capsule)
-                .controlSize(.large)
-                .padding(.top, 6)
-
-                Text("Seul votre kiné décide de votre programme. Modifiez-le pour recopier ce qu'il vous a prescrit.")
+                Text("Seul votre kiné décide de votre programme. Ajoutez ici ce qu'il vous a prescrit.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 4)
+                    .padding(.top, 4)
             }
             .padding(.horizontal)
             .padding(.bottom)
@@ -126,88 +84,140 @@ struct ProgramTab: View {
     }
 }
 
-/// Who prescribed the program and when, and how often: the planned days of this week.
-private struct PrescriptionCard: View {
-    let program: Program
-    /// The physiotherapist's name (empty when unknown), or nil when the patient added the program.
-    let prescriber: String?
-    let week: WeekProgress
+/// One color per program, in the order they were added, to tell them apart in the week. Always with its name:
+/// the color never carries the information alone.
+enum ProgramPalette {
+    static let colors: [Color] = [.accentColor, .orange, .purple, .green, .pink, .teal]
 
-    private var title: Text {
-        guard let prescriber else { return Text("Programme de votre kiné") }
-        return prescriber.isEmpty ? Text("Prescrit par votre kiné") : Text("Prescrit par \(prescriber)")
+    static func color(of program: Program, in programs: [Program]) -> Color {
+        let index = programs.firstIndex { $0.persistentModelID == program.persistentModelID } ?? 0
+        return colors[index % colors.count]
     }
+}
 
-    private var date: Text {
-        let date = program.createdAt.formatted(.dateTime.day().month(.wide).year())
-        return prescriber == nil ? Text("Enregistré le \(date)") : Text("Le \(date)")
-    }
-
-    /// "Lundi, mercredi et vendredi", from the same days as the reminders and the Accueil page.
-    private var days: Text {
-        let count = program.sessionsPerWeek
-        if count >= 7 { return Text("Tous les jours") }
-        let symbols = Calendar.current.weekdaySymbols
-        let names = ReminderScheduler.sessionDays(count: count).map { symbols[$0 - 1] }
-        return Text("Jours prévus : \(names.formatted(.list(type: .and)))")
-    }
+/// The seven days, Monday first, with the programs of each day: what to do when, at a glance.
+private struct WeekPlanCard: View {
+    let programs: [Program]
 
     var body: some View {
-        SummaryCard(title: title, systemImage: "stethoscope", color: .accentColor) {
+        SummaryCard(title: Text("Votre semaine"), systemImage: "calendar", color: .accentColor) {
             EmptyView()
         } content: {
-            VStack(alignment: .leading, spacing: 12) {
-                date
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .padding(.top, -8)
-                BigValue(value: "\(program.sessionsPerWeek)",
-                         unit: program.sessionsPerWeek == 1 ? "séance par semaine" : "séances par semaine")
-                    .accessibilityElement(children: .combine)
-                Divider()
-                WeekDots(week: week)
-                days
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .top, spacing: 0) {
+                    ForEach(ProgramSchedule.mondayFirst, id: \.self) { weekday in
+                        DayColumn(weekday: weekday, programs: programs)
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+                if programs.count > 1 {
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(programs) { program in
+                            Label {
+                                Text(program.title).font(.subheadline)
+                            } icon: {
+                                Circle().fill(ProgramPalette.color(of: program, in: programs)).frame(width: 10, height: 10)
+                            }
+                        }
+                    }
+                }
             }
         }
     }
 }
 
-/// One exercise as a card: its pictogram, what to do in large type, and how it is followed.
-private struct ProgramExerciseCard: View {
-    let exercise: PlannedExercise
+private struct DayColumn: View {
+    let weekday: Int
+    let programs: [Program]
 
-    private var amount: String {
-        if let holdSeconds = exercise.holdSeconds { return "\(exercise.sets) × \(holdSeconds) s" }
-        return "\(exercise.sets) × \(exercise.reps)"
-    }
+    private var isToday: Bool { Calendar.current.component(.weekday, from: .now) == weekday }
+
+    private var planned: [Program] { programs.filter { $0.days.contains(weekday) } }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 14) {
-            ExerciseBadge(exercise: exercise, size: 52)
-            VStack(alignment: .leading, spacing: 6) {
-                Text(exercise.name)
-                    .font(.headline)
-                    .fixedSize(horizontal: false, vertical: true)
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text(amount)
-                        .font(.system(.title, design: .rounded).weight(.semibold))
-                        .monospacedDigit()
-                    Text(exercise.holdSeconds == nil ? "répétitions" : "de maintien")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.secondary)
+        VStack(spacing: 8) {
+            Text(Calendar.current.veryShortWeekdaySymbols[weekday - 1])
+                .font(.caption.weight(isToday ? .bold : .medium))
+                .foregroundStyle(isToday ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.secondary))
+            VStack(spacing: 3) {
+                if planned.isEmpty {
+                    Circle().fill(Color(.systemGray4)).frame(width: 5, height: 5).frame(height: 22)
+                } else {
+                    ForEach(planned) { program in
+                        Capsule()
+                            .fill(ProgramPalette.color(of: program, in: programs))
+                            .frame(width: 22, height: planned.count > 1 ? 10 : 22)
+                    }
                 }
-                TrackingBadge(exercise: exercise)
             }
-            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 6)
+        .background(isToday ? Color.accentColor.opacity(0.12) : .clear, in: .rect(cornerRadius: 12))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(Calendar.current.weekdaySymbols[weekday - 1]))
+        .accessibilityValue(planned.isEmpty
+            ? Text("Repos")
+            : Text(planned.map(\.title).formatted(.list(type: .and))))
+    }
+}
+
+/// A program as a card: its name, its days, its exercises' pictograms, how long it takes.
+private struct ProgramCard: View {
+    let program: Program
+    let color: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                Circle().fill(color).frame(width: 10, height: 10)
+                Text(program.title)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                    .multilineTextAlignment(.leading)
+                Spacer()
+                if program.isScheduled(on: .now) {
+                    Text("Aujourd'hui")
+                        .font(.caption.weight(.semibold))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(color.opacity(0.18), in: .capsule)
+                        .foregroundStyle(color)
+                }
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            Text(ProgramSchedule.describe(program.days).capitalizedFirst)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            HStack(alignment: .center) {
+                HStack(spacing: -6) {
+                    ForEach(program.orderedExercises.prefix(5)) { exercise in
+                        ExerciseBadge(exercise: exercise, size: 36)
+                            .overlay(Circle().stroke(Color(.secondarySystemGroupedBackground), lineWidth: 2))
+                    }
+                }
+                Spacer()
+                Text("^[\(program.exercises.count) exercice](inflect: true) · \(program.estimatedMinutes) min")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
         }
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 26))
+        .contentShape(.rect(cornerRadius: 26))
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(exercise.name))
-        .accessibilityValue(Text("\(Text(exercise.prescriptionDetail)), \(exercise.trackingLabel)"))
+        .accessibilityLabel(Text(program.title))
+        .accessibilityValue(Text("\(ProgramSchedule.describe(program.days)), ^[\(program.exercises.count) exercice](inflect: true), \(program.estimatedMinutes) minutes"))
+        .accessibilityHint(Text("Ouvre le programme"))
+    }
+}
+
+extension String {
+    /// "Lundi et jeudi" from "lundi et jeudi".
+    var capitalizedFirst: String {
+        prefix(1).uppercased() + dropFirst()
     }
 }
 
@@ -217,17 +227,13 @@ struct TrackingBadge: View {
 
     var body: some View {
         let followed = exercise.catalogExercise != nil
-        Label {
-            exercise.trackingLabel
-        } icon: {
-            Image(systemName: exercise.trackingSymbol)
-        }
-        .font(.caption.weight(.semibold))
-        .foregroundStyle(followed ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
-        .padding(.horizontal, 10)
-        .padding(.vertical, 5)
-        .background(followed ? AnyShapeStyle(Color.accentColor.opacity(0.14)) : AnyShapeStyle(Color(.tertiarySystemFill)),
-                    in: .capsule)
+        Label { exercise.trackingLabel } icon: { Image(systemName: exercise.trackingSymbol) }
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(followed ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.secondary))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(followed ? AnyShapeStyle(Color.accentColor.opacity(0.14)) : AnyShapeStyle(Color(.tertiarySystemFill)),
+                        in: .capsule)
     }
 }
 

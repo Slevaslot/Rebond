@@ -20,8 +20,11 @@ struct WorkoutView: View {
     /// Asked from the Passer menu: the set's screen answers with what it did so far.
     @State private var skipRequest: SkipRequest?
 
-    init(program: Program) {
-        let plan = WorkoutPlan(exercises: program.orderedExercises.map(\.workoutExercise))
+    /// - Parameter onlyExercise: index of the single exercise to do, or nil for the whole program.
+    init(program: Program, onlyExercise: Int? = nil) {
+        var exercises = program.orderedExercises
+        if let onlyExercise, exercises.indices.contains(onlyExercise) { exercises = [exercises[onlyExercise]] }
+        let plan = WorkoutPlan(exercises: exercises.map(\.workoutExercise))
         _plan = State(initialValue: plan)
         _stage = State(initialValue: .sets)
     }

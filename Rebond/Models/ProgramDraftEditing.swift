@@ -30,9 +30,18 @@ nonisolated struct EditableProgram {
     static let defaultReps = 10
     static let defaultHoldSeconds = 30
 
-    var sessionsPerWeek = defaultSessionsPerWeek
+    /// Optional: without a name, the program is named after its physiotherapist or its date.
+    var name = ""
+    /// Calendar weekdays (1 is Sunday), Monday first.
+    var weekdays = ReminderScheduler.sessionDays(count: defaultSessionsPerWeek)
     var sessionsPerWeekGuessed = false
     var exercises: [Exercise] = []
+
+    /// How many days a week. Setting it spreads that many days over the week, as a sheet only gives a count.
+    var sessionsPerWeek: Int {
+        get { weekdays.count }
+        set { weekdays = ReminderScheduler.sessionDays(count: newValue) }
+    }
 
     init() {}
 
@@ -60,7 +69,8 @@ nonisolated struct EditableProgram {
     }
 
     init(_ program: Program) {
-        sessionsPerWeek = program.sessionsPerWeek
+        name = program.name
+        weekdays = program.days
         exercises = program.orderedExercises.map {
             Exercise(
                 name: $0.name,
@@ -74,7 +84,7 @@ nonisolated struct EditableProgram {
     }
 
     var isValid: Bool {
-        !exercises.isEmpty && exercises.allSatisfy { !$0.name.trimmingCharacters(in: .whitespaces).isEmpty }
+        !weekdays.isEmpty && !exercises.isEmpty && exercises.allSatisfy { !$0.name.trimmingCharacters(in: .whitespaces).isEmpty }
     }
 
     var hasGuesses: Bool {
@@ -83,11 +93,35 @@ nonisolated struct EditableProgram {
 }
 
 extension Program {
-    /// The patient follows one program at a time: saving a new one replaces the previous.
-    /// Past sessions are kept for the history and the report.
+    /// Replaces every program with this one (demo data). Past sessions are kept for the history and the report.
     static func replaceAll(with editable: EditableProgram, in context: ModelContext) {
         try? context.delete(model: Program.self)
-        let exercises = editable.exercises.enumerated().map { index, exercise in
+        add(editable, in: context)
+    }
+
+    /// A new program, next to the others.
+    @discardableResult
+    static func add(_ editable: EditableProgram, prescriber: String? = nil, in context: ModelContext) -> Program {
+        let program = Program(sessionsPerWeek: editable.sessionsPerWeek, exercises: Self.exercises(of: editable),
+                              name: editable.name.trimmingCharacters(in: .whitespaces),
+                              weekdays: editable.weekdays, prescriber: prescriber)
+        context.insert(program)
+        // A permanent identifier right away: the session and the pages find the program by it.
+        try? context.save()
+        return program
+    }
+
+    /// Changes this program in place: its sessions and its place among the others stay.
+    func update(with editable: EditableProgram, in context: ModelContext) {
+        for exercise in exercises { context.delete(exercise) }
+        exercises = Self.exercises(of: editable)
+        name = editable.name.trimmingCharacters(in: .whitespaces)
+        weekdays = editable.weekdays
+        sessionsPerWeek = editable.sessionsPerWeek
+    }
+
+    private static func exercises(of editable: EditableProgram) -> [PlannedExercise] {
+        editable.exercises.enumerated().map { index, exercise in
             PlannedExercise(
                 catalogID: exercise.mode == .reps ? exercise.catalogID : nil,
                 name: exercise.name.trimmingCharacters(in: .whitespaces),
@@ -97,6 +131,5 @@ extension Program {
                 order: index
             )
         }
-        context.insert(Program(sessionsPerWeek: editable.sessionsPerWeek, exercises: exercises))
     }
 }

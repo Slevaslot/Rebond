@@ -84,7 +84,7 @@ struct HoldSetView: View {
     @State private var phase = Phase.ready
     @State private var elapsed: TimeInterval = 0
     @State private var coach = Coach()
-    @State private var muted = false
+    @AppStorage(Coach.mutedKey) private var muted = false
     @Environment(\.skipRequest) private var skipRequest
     @Environment(\.reportSetActivity) private var reportSetActivity
 

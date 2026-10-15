@@ -224,7 +224,7 @@ struct WeekDots: View {
 
     var body: some View {
         let calendar = Calendar.current
-        let planned = Set(ReminderScheduler.sessionDays(count: week.planned))
+        let planned = week.plannedDays
         HStack(spacing: 0) {
             ForEach(week.days, id: \.date) { day in
                 let isToday = calendar.isDateInToday(day.date)

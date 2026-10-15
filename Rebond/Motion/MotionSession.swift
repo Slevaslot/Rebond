@@ -79,8 +79,12 @@ final class MotionSession {
     private(set) var demonstrationStart = Date.now
     /// Fault to show in red on the body: the live posture problem, or the last rejected movement for a moment.
     private(set) var faultToHighlight: Correction?
-    var isMuted = false {
-        didSet { coach.isMuted = isMuted }
+    /// Remembered from one set (and one session) to the next.
+    var isMuted = UserDefaults.standard.bool(forKey: Coach.mutedKey) {
+        didSet {
+            coach.isMuted = isMuted
+            UserDefaults.standard.set(isMuted, forKey: Coach.mutedKey)
+        }
     }
 
     @ObservationIgnored private let captureSession = AVCaptureSession()
@@ -125,6 +129,8 @@ final class MotionSession {
         self.exercise = exercise
         self.targetReps = targetReps
         self.showsDemonstration = showsDemonstration
+        // A later set of the same exercise: the patient is already in place, no outline to fit again.
+        isInPlace = !showsDemonstration
         processor = FrameProcessor(exercise: exercise)
         processor.onImage = { [weak self] image in
             Task { @MainActor [self] in self?.liveFrame.image = image }

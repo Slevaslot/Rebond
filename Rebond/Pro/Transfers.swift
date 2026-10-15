@@ -26,9 +26,16 @@ nonisolated struct ProgramTransfer: Codable, Equatable, Sendable {
     var e: [Exercise]
     /// Physiotherapist's name, shown to the patient.
     var k: String?
+    /// Session days (Calendar weekdays, 1 is Sunday). Absent from older links: spread from `f`.
+    var w: [Int]?
+    /// Program name, when the physiotherapist gave one.
+    var t: String?
 
     init(_ program: EditableProgram, physiotherapist: String?) {
         f = program.sessionsPerWeek
+        w = program.weekdays
+        let title = program.name.trimmingCharacters(in: .whitespaces)
+        t = title.isEmpty ? nil : title
         e = program.exercises.map {
             Exercise(n: $0.name, c: $0.mode == .reps ? $0.catalogID : nil, s: $0.sets, r: $0.reps, h: $0.mode == .hold ? $0.holdSeconds : nil)
         }
@@ -56,7 +63,9 @@ nonisolated struct ProgramTransfer: Codable, Equatable, Sendable {
 
     var editableProgram: EditableProgram {
         var program = EditableProgram()
-        program.sessionsPerWeek = min(max(f, 1), 14)
+        program.sessionsPerWeek = min(max(f, 1), 7)
+        if let w, !w.isEmpty { program.weekdays = ProgramSchedule.days(weekdays: w.filter { (1...7).contains($0) }, sessionsPerWeek: f) }
+        program.name = t ?? ""
         program.exercises = e.map { exercise in
             var item = EditableProgram.Exercise(name: exercise.n, catalogID: exercise.c.flatMap { CatalogExercise.find($0)?.id }, sets: exercise.s, reps: exercise.r)
             if let hold = exercise.h {

@@ -1,17 +1,46 @@
 import Foundation
 import SwiftData
 
-/// The exercise program given by the physiotherapist.
+/// An exercise program given by the physiotherapist. The patient may follow several, each on its own days
+/// (the knee on Monday, Wednesday and Friday, the back on Tuesday and Thursday).
 @Model
 final class Program {
     var createdAt: Date
     var sessionsPerWeek: Int
     @Relationship(deleteRule: .cascade) var exercises: [PlannedExercise]
+    /// Given by the patient, or empty: the program is then named after its physiotherapist or its date.
+    var name: String = ""
+    /// Calendar weekdays (1 is Sunday) of the program's sessions. Empty for programs saved before the days
+    /// existed: they are then spread over the week from `sessionsPerWeek`.
+    var weekdays: [Int] = []
+    /// The physiotherapist who prescribed it, when it came from them.
+    var prescriber: String? = nil
 
-    init(createdAt: Date = .now, sessionsPerWeek: Int, exercises: [PlannedExercise]) {
+    init(createdAt: Date = .now, sessionsPerWeek: Int, exercises: [PlannedExercise], name: String = "",
+         weekdays: [Int] = [], prescriber: String? = nil) {
         self.createdAt = createdAt
         self.sessionsPerWeek = sessionsPerWeek
         self.exercises = exercises
+        self.name = name
+        self.weekdays = weekdays
+        self.prescriber = prescriber
+    }
+
+    /// The days of its sessions, Monday first.
+    var days: [Int] {
+        ProgramSchedule.days(weekdays: weekdays, sessionsPerWeek: sessionsPerWeek)
+    }
+
+    func isScheduled(on date: Date) -> Bool {
+        days.contains(Calendar.current.component(.weekday, from: date))
+    }
+
+    /// Its name, or one made up so the patient never has to type it.
+    var title: String {
+        let trimmed = name.trimmingCharacters(in: .whitespaces)
+        if !trimmed.isEmpty { return trimmed }
+        if let prescriber, !prescriber.isEmpty { return String(localized: "Programme de \(prescriber)") }
+        return String(localized: "Programme du \(createdAt.formatted(.dateTime.day().month(.wide)))")
     }
 
     var orderedExercises: [PlannedExercise] {

@@ -19,8 +19,8 @@ struct TodayView: View {
     var body: some View {
         NavigationStack {
             Group {
-                if let program = programs.first {
-                    today(program)
+                if !programs.isEmpty {
+                    today
                 } else {
                     NoProgramView { header }
                 }
@@ -32,9 +32,9 @@ struct TodayView: View {
                 SettingsView()
             }
             // Reminders follow the program's frequency, whichever way it was saved.
-            .task(id: programs.first?.sessionsPerWeek) {
-                if let sessionsPerWeek = programs.first?.sessionsPerWeek {
-                    await ReminderScheduler.refreshIfEnabled(sessionsPerWeek: sessionsPerWeek)
+            .task(id: programs.allDays) {
+                if !programs.isEmpty {
+                    await ReminderScheduler.refreshIfEnabled(days: programs.allDays)
                 }
             }
             .sheet(isPresented: $showingReport) {
@@ -66,17 +66,27 @@ struct TodayView: View {
         .padding(.bottom, 4)
     }
 
-    private func today(_ program: Program) -> some View {
-        let week = WeekProgress(sessions: sessions, sessionsPerWeek: program.sessionsPerWeek)
+    private var today: some View {
+        let week = WeekProgress(sessions: sessions, sessionsPerWeek: programs.sessionsPerWeek, plannedDays: programs.allDays)
+        let todays = programs.scheduled(on: .now)
 
         return ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 header
                 AlertsGroup(sessions: sessions, onReport: { showingReport = true }, onShowProgram: { router.tab = .program })
 
-                SessionCard(program: program) { router.startWorkout() }
+                if todays.isEmpty {
+                    RestDayCard(programs: programs)
+                } else {
+                    ForEach(todays) { program in
+                        // With several programs, the card says which one it is.
+                        SessionCard(program: program, title: programs.count > 1 ? program.title : nil) {
+                            router.startWorkout(program)
+                        }
+                    }
+                }
 
-                FollowUpSection(sessions: sessions, sessionsPerWeek: program.sessionsPerWeek, week: week)
+                FollowUpSection(sessions: sessions, sessionsPerWeek: programs.sessionsPerWeek, week: week)
             }
             .padding(.horizontal)
             .padding(.bottom)
@@ -128,7 +138,7 @@ struct SummaryCard<Content: View, Trailing: View>: View {
                     title
                 } icon: {
                     if let icon {
-                        ExerciseIcon(exercise: icon).frame(width: 20, height: 20)
+                        Image(systemName: icon.symbol)
                     } else if let systemImage {
                         Image(systemName: systemImage)
                     }
@@ -172,6 +182,8 @@ struct BigValue: View {
 /// Today's session: how long it takes and how many exercises.
 private struct SessionCard: View {
     let program: Program
+    /// The program's name, shown when the patient follows several.
+    var title: String?
     let onStart: () -> Void
     @Environment(\.workoutTransition) private var workoutTransition
 
@@ -187,6 +199,11 @@ private struct SessionCard: View {
                 .accessibilityHidden(true)
         } content: {
             VStack(alignment: .leading, spacing: 14) {
+                if let title {
+                    Text(title)
+                        .font(.headline)
+                        .padding(.top, -6)
+                }
                 HStack(alignment: .bottom) {
                     BigValue(value: "\(program.estimatedMinutes)", unit: "min")
                     Spacer()
@@ -251,6 +268,53 @@ private struct SessionCard: View {
     }
 }
 
+/// No program planned today: rest, the next session, and a session anyway for those who want one.
+private struct RestDayCard: View {
+    let programs: [Program]
+    @Environment(AppRouter.self) private var router
+
+    private var next: (program: Program, day: Date)? {
+        programs.compactMap { program in ProgramSchedule.nextDay(after: .now, in: program.days).map { (program, $0) } }
+            .min { $0.1 < $1.1 }
+    }
+
+    private var anywayLabel: some View {
+        Text("Faire une séance quand même")
+            .font(.headline)
+            .frame(maxWidth: .infinity)
+    }
+
+    var body: some View {
+        SummaryCard(title: Text("Séance du jour"), systemImage: nil, color: .accentColor, sectionHeader: true) {
+            EmptyView()
+        } content: {
+            VStack(alignment: .leading, spacing: 14) {
+                Label("Repos aujourd'hui", systemImage: "moon.zzz.fill")
+                    .font(.title2.bold())
+                if let next {
+                    Text("Prochaine séance \(next.day.formatted(.dateTime.weekday(.wide))) : \(next.program.title)")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                Group {
+                    if programs.count == 1 {
+                        Button { router.startWorkout(programs[0]) } label: { anywayLabel }
+                    } else {
+                        Menu {
+                            ForEach(programs) { program in
+                                Button(program.title) { router.startWorkout(program) }
+                            }
+                        } label: { anywayLabel }
+                    }
+                }
+                .buttonStyle(.glass)
+                .buttonBorderShape(.capsule)
+                .controlSize(.large)
+            }
+        }
+    }
+}
+
 /// Marks the Commencer button as the start of the zoom into the session.
 private struct WorkoutSource: ViewModifier {
     let namespace: Namespace.ID?
@@ -266,20 +330,14 @@ private struct WorkoutSource: ViewModifier {
     }
 }
 
-/// An exercise's pictogram in a tinted circle: the drawn pictogram for the camera's exercises,
-/// a `figure.*` symbol for the others.
+/// An exercise's symbol in a tinted circle: the same `figure.*` workout symbols as Apple's Fitness app.
 struct ExerciseBadge: View {
     let exercise: PlannedExercise
     let size: Double
 
     var body: some View {
-        Group {
-            if let catalog = exercise.catalogExercise {
-                ExerciseIcon(exercise: catalog).padding(size * 0.2)
-            } else {
-                Image(systemName: exercise.figureSymbol).font(.system(size: size * 0.45))
-            }
-        }
+        Image(systemName: exercise.figureSymbol)
+            .font(.system(size: size * 0.45))
         .accessibilityHidden(true)
         .foregroundStyle(.tint)
         .frame(width: size, height: size)
@@ -326,10 +384,13 @@ struct ProfileBadge: View {
 struct WeekProgress {
     let done: Int
     let planned: Int
+    /// Calendar weekdays with a planned session.
+    let plannedDays: Set<Int>
     /// The days of this week, with whether a session was done that day.
     let days: [(date: Date, done: Bool)]
 
-    init(sessions: [Session], sessionsPerWeek: Int, now: Date = .now) {
+    init(sessions: [Session], sessionsPerWeek: Int, plannedDays: [Int]? = nil, now: Date = .now) {
+        self.plannedDays = Set(plannedDays ?? ReminderScheduler.sessionDays(count: sessionsPerWeek))
         let calendar = Calendar.current
         let week = calendar.dateInterval(of: .weekOfYear, for: now)
         done = sessions.filter { week?.contains($0.date) ?? false }.count

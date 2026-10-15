@@ -76,6 +76,9 @@ struct SessionView: View {
                         : "Aucune caméra avant n'est disponible. Vous pouvez terminer la série.")
                 } else if motion.isPaused {
                     EmptyView()
+                } else if motion.phase == .calibrating, !motion.showsDemonstration {
+                    topCard(title: "Mettez-vous en position de départ",
+                            detail: "La série reprend dès que vous êtes immobile")
                 } else if motion.phase == .calibrating, placement == .notVisible {
                     topCard(title: "Posez votre iPhone debout",
                             detail: "Calez-le à hauteur de hanche, puis reculez à 2 ou 3 mètres pour voir tout votre corps.")
@@ -266,8 +269,9 @@ struct SessionView: View {
 
     /// Before the set: the large guide, to get in place.
     /// Before the set, and during it when the camera lost the patient.
+    /// Only before the first set of an exercise: later sets start where the patient already stands.
     private var showsPlacementGuide: Bool {
-        motion.phase == .calibrating || motion.isLost
+        (motion.phase == .calibrating && motion.showsDemonstration) || motion.isLost
     }
 
     /// From the demonstration on: one guide that moves between large (demonstrating) and its card.

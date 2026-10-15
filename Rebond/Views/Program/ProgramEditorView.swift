@@ -41,13 +41,24 @@ struct ProgramEditorView: View {
                 }
             }
 
-            Section("Fréquence") {
-                Stepper(value: $program.sessionsPerWeek, in: 1...14) {
-                    GuessedValue(guessed: program.sessionsPerWeekGuessed) {
-                        Text("\(program.sessionsPerWeek) séances par semaine")
-                    }
+            Section {
+                DayPicker(days: $program.weekdays)
+                    .listRowInsets(EdgeInsets(top: 12, leading: 12, bottom: 12, trailing: 12))
+                    .onChange(of: program.weekdays) { program.sessionsPerWeekGuessed = false }
+            } header: {
+                Text("Jours")
+            } footer: {
+                GuessedValue(guessed: program.sessionsPerWeekGuessed) {
+                    Text(program.weekdays.isEmpty
+                         ? "Choisissez au moins un jour."
+                         : "^[\(program.weekdays.count) séance](inflect: true) par semaine : \(ProgramSchedule.describe(program.weekdays)).")
                 }
-                .onChange(of: program.sessionsPerWeek) { program.sessionsPerWeekGuessed = false }
+            }
+
+            Section {
+                TextField("Nom (facultatif)", text: $program.name, prompt: Text("Ex. : Genou, Dos…"))
+            } footer: {
+                Text("Sans nom, le programme porte le nom de votre kiné ou sa date.")
             }
 
             Section {
@@ -219,5 +230,32 @@ private struct GuessedValue<Content: View>: View {
                     .foregroundStyle(.orange)
             }
         }
+    }
+}
+
+/// The seven days, Monday first: tap a day to plan the program on it.
+struct DayPicker: View {
+    @Binding var days: [Int]
+
+    var body: some View {
+        HStack(spacing: 6) {
+            ForEach(ProgramSchedule.mondayFirst, id: \.self) { weekday in
+                let selected = days.contains(weekday)
+                Button {
+                    days = ProgramSchedule.days(weekdays: selected ? days.filter { $0 != weekday } : days + [weekday],
+                                                sessionsPerWeek: 0)
+                } label: {
+                    Text(Calendar.current.veryShortWeekdaySymbols[weekday - 1])
+                        .font(.headline)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .foregroundStyle(selected ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
+                        .background(selected ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(Color(.tertiarySystemFill)), in: .circle)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Text(Calendar.current.weekdaySymbols[weekday - 1]))
+                .accessibilityAddTraits(selected ? .isSelected : [])
+            }
+        }
+        .sensoryFeedback(.selection, trigger: days)
     }
 }

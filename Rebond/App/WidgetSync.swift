@@ -18,7 +18,7 @@ struct WidgetSync: ViewModifier {
     }
 
     private var snapshot: WidgetSnapshot {
-        WidgetSnapshot(program: programs.first, sessions: sessions)
+        WidgetSnapshot(program: programs.current(), sessions: sessions)
     }
 
     /// Writes the snapshot and reloads the widgets, only if something changed.

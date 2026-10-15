@@ -113,7 +113,7 @@ struct WorkoutSummaryView: View {
                     Button("Activer les rappels") {
                         hasOfferedReminders = true
                         Task {
-                            remindersEnabled = await ReminderScheduler.enable(sessionsPerWeek: programs.first?.sessionsPerWeek ?? 3)
+                            remindersEnabled = await ReminderScheduler.enable(days: programs.isEmpty ? ReminderScheduler.sessionDays(count: 3) : programs.allDays)
                         }
                     }
                     Button("Plus tard") { hasOfferedReminders = true }

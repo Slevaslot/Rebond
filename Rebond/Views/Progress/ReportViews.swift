@@ -27,7 +27,7 @@ struct ReportView: View {
     }
 
     private var data: [WeeklyReport.SessionData] { sessions.map(\.reportData) }
-    private var sessionsPerWeek: Int { programs.first?.sessionsPerWeek ?? 3 }
+    private var sessionsPerWeek: Int { programs.isEmpty ? 3 : programs.sessionsPerWeek }
     private var trimmedName: String { patientName.trimmingCharacters(in: .whitespaces) }
 
     var body: some View {
@@ -139,7 +139,7 @@ struct ReportView: View {
     private func share(_ report: WeeklyReport) {
         outcome = nil
         let weeks = ProgressData(sessions: data, sessionsPerWeek: sessionsPerWeek, weeks: 4)
-        let transfer = ReportTransfer.current(sessions: sessions, program: programs.first)
+        let transfer = ReportTransfer.current(sessions: sessions, program: programs.current())
         sharing = [ReportPDF.render(report, progress: weeks, patientName: trimmedName), transfer.write()].compactMap { $0 }
     }
 }

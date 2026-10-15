@@ -15,32 +15,33 @@ enum ReminderScheduler {
     private static let reportID = "weekly-report"
 
     /// Asks for permission, then schedules the reminders. Returns whether they are on.
-    static func enable(sessionsPerWeek: Int, hour: Int = ReminderSettings.defaultHour) async -> Bool {
+    /// - Parameter days: Calendar weekdays with a session, all programs together.
+    static func enable(days: [Int], hour: Int = ReminderSettings.defaultHour) async -> Bool {
         let center = UNUserNotificationCenter.current()
         let granted = (try? await center.requestAuthorization(options: [.alert, .sound])) ?? false
         guard granted else { return false }
-        await schedule(sessionsPerWeek: sessionsPerWeek, hour: hour)
+        await schedule(days: days, hour: hour)
         return true
     }
 
-    /// Moves the session reminders to the new frequency after the program changed, when they are on.
+    /// Moves the session reminders to the new days after a program changed, when they are on.
     /// Asks nothing: without the setting turned on, nothing is scheduled.
-    static func refreshIfEnabled(sessionsPerWeek: Int) async {
+    static func refreshIfEnabled(days: [Int]) async {
         let defaults = UserDefaults.standard
         guard defaults.bool(forKey: ReminderSettings.enabledKey) else { return }
         let hour = defaults.object(forKey: ReminderSettings.hourKey) as? Int ?? ReminderSettings.defaultHour
-        await schedule(sessionsPerWeek: sessionsPerWeek, hour: hour)
+        await schedule(days: days, hour: hour)
     }
 
     static func disable() {
         UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
     }
 
-    static func schedule(sessionsPerWeek: Int, hour: Int) async {
+    static func schedule(days: [Int], hour: Int) async {
         let center = UNUserNotificationCenter.current()
         center.removeAllPendingNotificationRequests()
 
-        for weekday in sessionDays(count: sessionsPerWeek) {
+        for weekday in Set(days) {
             let content = UNMutableNotificationContent()
             content.title = String(localized: "C'est l'heure de votre séance")
             content.body = String(localized: "Quelques minutes d'exercices, guidés par Rebond.")

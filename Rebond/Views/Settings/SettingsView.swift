@@ -12,7 +12,7 @@ struct SettingsView: View {
     @AppStorage(ReminderSettings.enabledKey) private var remindersEnabled = false
     @AppStorage(ReminderSettings.hourKey) private var reminderHour = ReminderSettings.defaultHour
 
-    private var sessionsPerWeek: Int { programs.first?.sessionsPerWeek ?? 3 }
+    private var days: [Int] { programs.isEmpty ? ReminderScheduler.sessionDays(count: 3) : programs.allDays }
 
     var body: some View {
         NavigationStack {
@@ -30,7 +30,7 @@ struct SettingsView: View {
                         set: { on in
                             Task {
                                 if on {
-                                    remindersEnabled = await ReminderScheduler.enable(sessionsPerWeek: sessionsPerWeek, hour: reminderHour)
+                                    remindersEnabled = await ReminderScheduler.enable(days: days, hour: reminderHour)
                                 } else {
                                     ReminderScheduler.disable()
                                     remindersEnabled = false
@@ -46,7 +46,7 @@ struct SettingsView: View {
                             }
                         }
                         .onChange(of: reminderHour) {
-                            Task { await ReminderScheduler.schedule(sessionsPerWeek: sessionsPerWeek, hour: reminderHour) }
+                            Task { await ReminderScheduler.schedule(days: days, hour: reminderHour) }
                         }
                     }
                 }
@@ -110,7 +110,7 @@ private struct AboutView: View {
                         var changed = EditableProgram(program)
                         if !changed.exercises.isEmpty { changed.exercises[0].reps += 2 }
                         ProgramChange.record(from: program, to: changed, by: "M. Martin")
-                        Program.replaceAll(with: changed, in: context)
+                        program.update(with: changed, in: context)
                     }
                 }
                 Button("Charger les données de démo") { confirmingDemo = true }

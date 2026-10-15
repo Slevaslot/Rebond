@@ -58,8 +58,9 @@ struct RootView: View {
             if !isPhysiotherapist, router.tab == .physio { router.tab = .today }
         }
         .fullScreenCover(isPresented: $router.isWorkoutPresented) {
-            if let program = programs.first {
-                WorkoutView(program: program)
+            if let program = router.workoutProgram.flatMap({ id in programs.first { $0.persistentModelID == id } })
+                ?? programs.current() {
+                WorkoutView(program: program, onlyExercise: router.workoutExerciseIndex)
                     // The session grows out of the Commencer button.
                     .navigationTransition(.zoom(sourceID: WorkoutTransition.sourceID, in: workoutTransition))
             }
@@ -157,16 +158,27 @@ struct RootView: View {
         }
     }
 
+    /// A new program joins the others. A physiotherapist's new prescription replaces their previous one
+    /// (same physiotherapist, same name), and the Accueil page says what changed.
     private func save(_ program: EditableProgram) {
-        // A program prescribed by the physiotherapist shows what changed on the Accueil page.
         if let prescriber {
-            ProgramChange.record(from: programs.first, to: program, by: prescriber.isEmpty ? nil : prescriber)
+            let name = prescriber.isEmpty ? nil : prescriber
+            let previous = name.flatMap { name in
+                programs.first { $0.prescriber == name && $0.name == program.name.trimmingCharacters(in: .whitespaces) }
+            }
+            ProgramChange.record(from: previous, to: program, by: name)
+            if let previous {
+                previous.update(with: program, in: context)
+            } else {
+                Program.add(program, prescriber: name, in: context)
+            }
             self.prescriber = nil
+        } else {
+            Program.add(program, in: context)
         }
-        Program.replaceAll(with: program, in: context)
         draft = nil
         savedProgram += 1
-        router.tab = .today
+        router.tab = .program
     }
 }
 

@@ -1,4 +1,5 @@
 import Observation
+import SwiftData
 import SwiftUI
 
 /// Where the app is: the selected tab, the session in progress, adding a program, and the patient opened in the
@@ -30,8 +31,16 @@ final class AppRouter {
     /// A followed patient to show in the physiotherapist space, after their report was opened.
     var openedPatient: UUID?
 
-    func startWorkout() {
-        tab = .today
+    /// The program of the session to start; nil for the program of the day.
+    var workoutProgram: PersistentIdentifier?
+    /// Set to do only this exercise of the program (its index in the program's order).
+    var workoutExerciseIndex: Int?
+
+    /// Starts a session: the program of the day by default, another program, or a single exercise of one.
+    /// Stays on the current tab: the session covers the screen and comes back to it.
+    func startWorkout(_ program: Program? = nil, exercise: Int? = nil) {
+        workoutProgram = program?.persistentModelID
+        workoutExerciseIndex = exercise
         isWorkoutPresented = true
     }
 

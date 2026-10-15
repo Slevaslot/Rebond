@@ -2,7 +2,10 @@ import AVFoundation
 
 /// Spoken instructions: the patient stands 2–3 m away and can't always read the screen.
 final class Coach {
-    var isMuted = false
+    /// The voice turned off by the patient stays off, for every set and session.
+    static let mutedKey = "coachMuted"
+
+    var isMuted = UserDefaults.standard.bool(forKey: Coach.mutedKey)
 
     private let synthesizer = AVSpeechSynthesizer()
     private let voice = Coach.bestVoice()
