@@ -150,7 +150,7 @@ struct HoldSetView: View {
         case .running:
             Button {
                 phase = .paused
-                coach.say("Pause")
+                coach.say("Pause", urgency: .immediate)
             } label: {
                 Label("Pause", systemImage: "pause.fill").font(.headline).frame(maxWidth: .infinity)
             }
@@ -160,7 +160,7 @@ struct HoldSetView: View {
                 VStack(spacing: 12) {
                     Button {
                         phase = .running
-                        coach.say("On reprend")
+                        coach.say("On reprend", urgency: .immediate)
                     } label: {
                         Label("Reprendre", systemImage: "play.fill").font(.headline).frame(maxWidth: .infinity)
                     }

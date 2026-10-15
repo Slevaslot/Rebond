@@ -114,17 +114,25 @@ final class MotionSession {
     @ObservationIgnored private var isInPlace = false
     @ObservationIgnored private var intro: Task<Void, Never>?
     @ObservationIgnored private var demonstration: Task<Void, Never>?
-    /// A spoken correction waits this long after the previous one; the screen still shows each.
+    /// A correction is spoken only when the same fault comes back, and long after the previous one;
+    /// the screen still shows each.
     @ObservationIgnored private var lastSpokenCorrection = Date.distantPast
-    private let correctionSpeechInterval = 8.0
-    /// The return cue ("Remontez") is said on the first repetitions only, then the patient knows it.
-    private let returnCueRepetitions = 2
+    @ObservationIgnored private var lastCorrection: Correction?
+    private let correctionSpeechInterval = 15.0
+    /// The return cue ("Remontez") is said on the first repetition only, then the patient knows it.
+    private let returnCueRepetitions = 1
     @ObservationIgnored private var lastAnnouncement = ""
     @ObservationIgnored private var lastAnnouncementDate = Date.distantPast
+    /// The placement hint waiting for the patient to settle, so moving into place doesn't trigger a stream of hints.
+    @ObservationIgnored private var pendingAnnouncement = ""
+    @ObservationIgnored private var announcementDelay: Task<Void, Never>?
+    private let announcementSettleDelay = 1.2
+    private let announcementInterval = 5.0
     @ObservationIgnored private var heldFault: Correction?
     @ObservationIgnored private var heldFaultRelease: Task<Void, Never>?
-    /// "Plus lentement" is said at most once every few repetitions, so it doesn't become noise.
+    /// "Prenez votre temps" is shown at most once every few repetitions, and said once per set.
     @ObservationIgnored private var lastTempoReminder = -10
+    @ObservationIgnored private var hasSaidTempoReminder = false
     private let tempoReminderInterval = 3
 
     init(exercise: CatalogExercise, targetReps: Int, showsDemonstration: Bool = true) {
@@ -207,7 +215,7 @@ final class MotionSession {
             if phase == .active { guideDisplay = .corner }
             lostDelay?.cancel()
         }
-        coach.say(isPaused ? "Pause" : "On reprend")
+        coach.say(isPaused ? "Pause" : "On reprend", urgency: .immediate)
         if !isPaused { startDemonstrationIfReady() }
     }
 
@@ -246,16 +254,21 @@ final class MotionSession {
         )
     }
 
-    /// Says a placement instruction, without talking over itself: the same message is not repeated,
-    /// and a new one waits a few seconds after the previous.
+    /// Says a placement instruction once the patient has settled: the hint must stay the same for a moment,
+    /// is not repeated, and waits a few seconds after the previous one.
     func announce(_ message: LocalizedStringResource) {
         let text = String(localized: message)
-        guard phase == .calibrating || isLost, !isPaused, text != lastAnnouncement,
-              Date.now.timeIntervalSince(lastAnnouncementDate) > 3
-        else { return }
-        lastAnnouncement = text
-        lastAnnouncementDate = .now
-        coach.say(text)
+        guard text != pendingAnnouncement else { return }
+        pendingAnnouncement = text
+        announcementDelay?.cancel()
+        let wait = max(announcementSettleDelay, announcementInterval - Date.now.timeIntervalSince(lastAnnouncementDate))
+        announcementDelay = Task {
+            try? await Task.sleep(for: .seconds(wait))
+            guard !Task.isCancelled, phase == .calibrating || isLost, !isPaused, text != lastAnnouncement else { return }
+            lastAnnouncement = text
+            lastAnnouncementDate = .now
+            coach.say(text)
+        }
     }
 
     /// Where the patient stands compared with the guide outline, reported by the screen.
@@ -283,7 +296,7 @@ final class MotionSession {
         phase = .demonstrating
         guideDisplay = .large
         demonstrationStart = .now
-        coach.say("Voici le mouvement. Faites-le avec le modèle")
+        coach.say("Voici le mouvement, faites-le avec le modèle")
         intro = Task {
             try? await Task.sleep(for: .seconds(Self.demonstrationDuration))
             guard !Task.isCancelled else { return }
@@ -298,7 +311,7 @@ final class MotionSession {
         phase = .active
         guideDisplay = .corner
         demonstrationStart = .now
-        if announce { coach.say("À vous !") }
+        if announce { coach.say("À vous") }
     }
 
     /// The patient opens the model large, in front of them, to follow it while doing the movement.
@@ -308,7 +321,7 @@ final class MotionSession {
         guideDisplay = .large
         depthProgress = 0
         demonstrationStart = .now
-        coach.say("Regardez le mouvement")
+        coach.say("Regardez le mouvement", urgency: .immediate)
     }
 
     func shrinkModel() {
@@ -316,7 +329,7 @@ final class MotionSession {
         demonstration?.cancel()
         guideDisplay = .corner
         demonstrationStart = .now
-        coach.say("À vous")
+        coach.say("À vous", urgency: .immediate)
     }
 
     /// The body has been missing for nearly a second: one more second, then the outline comes back.
@@ -328,6 +341,7 @@ final class MotionSession {
             isLost = true
             depthProgress = 0
             lastAnnouncement = ""
+            pendingAnnouncement = ""
             announce(GuidePlacement.notVisible.message)
         }
     }
@@ -353,8 +367,12 @@ final class MotionSession {
         heldFault = nil
         faultToHighlight = nil
         lastTempoReminder = -10
+        hasSaidTempoReminder = false
+        lastCorrection = nil
         lastAnnouncement = ""
-        coach.say("Posez votre téléphone debout, reculez, puis placez-vous dans la silhouette")
+        pendingAnnouncement = ""
+        announcementDelay?.cancel()
+        coach.say("Posez votre téléphone debout, reculez, puis placez-vous dans la silhouette", urgency: .immediate)
     }
 
     private func apply(_ skeleton: PoseSkeleton?, _ update: CounterUpdate, isFollowed: Bool) {
@@ -413,6 +431,9 @@ final class MotionSession {
                 if repCount - lastTempoReminder >= tempoReminderInterval {
                     lastTempoReminder = repCount
                     show(Feedback(message: Correction.slowDown.message, isPositive: false))
+                }
+                if !hasSaidTempoReminder, repCount == lastTempoReminder {
+                    hasSaidTempoReminder = true
                     coach.say("\(repCount). \(String(localized: Correction.slowDown.message))")
                 } else {
                     coach.say("\(repCount)")
@@ -431,13 +452,17 @@ final class MotionSession {
         case .repIncomplete:
             incompleteCount += 1
         case .bottomReached:
-            if repCount < returnCueRepetitions { coach.say(exercise.returnCue) }
+            if repCount < returnCueRepetitions { coach.say(exercise.returnCue, urgency: .optional) }
         case .correction(let correction):
             show(Feedback(message: correction.message, isPositive: false))
             hold(correction)
-            if Date.now.timeIntervalSince(lastSpokenCorrection) >= correctionSpeechInterval {
+            // A one-off fault isn't worth talking over the patient: only one that comes back is said.
+            if correction == lastCorrection, Date.now.timeIntervalSince(lastSpokenCorrection) >= correctionSpeechInterval {
                 lastSpokenCorrection = .now
-                coach.say(correction.message)
+                lastCorrection = nil
+                coach.say(correction.message, urgency: .optional)
+            } else {
+                lastCorrection = correction
             }
         case nil:
             break
