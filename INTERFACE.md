@@ -27,7 +27,7 @@ Deux onglets, plus Kiné si l'espace kiné est activé (HIG *Tab bars* : les ong
 | Onglet | Symbole | Contenu |
 |---|---|---|
 | **Accueil** | `house` | Séance du jour (les exercices de tous les programmes prévus ce jour-là, ou un jour de repos avec la prochaine séance), bouton « Commencer », puis « Suivi » : régularité de la semaine, amplitude, douleur et « Envoyer à mon kiné ». |
-| **Exercices** (dès qu'un programme ou un exercice est enregistré) | `figure.mixed.cardio` | La semaine (une couleur par programme), « Créer un exercice », « Mes exercices », puis « Mes programmes » et « Créer un programme ». |
+| **Exercices** (dès qu'un programme ou un exercice est enregistré) | `figure.mixed.cardio` | La semaine (une couleur par programme), « Mes programmes » et « Créer un programme », puis « Mes exercices » et « Créer un exercice ». |
 | **Kiné** (seulement si l'espace kiné est activé) | `stethoscope` | Espace de travail du kiné, voir « Deux rôles ». Onglet affiché au lancement quand il est activé. |
 
 ### Vocabulaire : l'exercice d'abord
@@ -56,7 +56,7 @@ Le QR code prescrit depuis l'espace Kiné n'a pas besoin de bouton : le patient 
 
 ### Avec programme
 
-- Onglet Exercices : « Créer un exercice » en premier, « Mes exercices », puis « Mes programmes » et « Créer un programme » (menu : composer moi-même, coller le message, scanner la feuille, photo de la feuille, comme sur l'Accueil vide).
+- Onglet Exercices : « Mes programmes » et « Créer un programme » en premier (pour les gérer sans faire défiler tous les exercices), puis « Mes exercices » et « Créer un exercice » (menu : composer moi-même, coller le message, scanner la feuille, photo de la feuille, comme sur l'Accueil vide).
 - Page d'un exercice : le faire maintenant, les programmes qui l'utilisent, « Ajouter à un programme », renommer, supprimer.
 - Réglages (profil, rappels, avertissement médical, espace kiné, données de démo) derrière le bouton profil en haut à droite, pas dans un onglet.
 
