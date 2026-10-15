@@ -53,12 +53,15 @@ struct ProHomeView: View {
                         .accessibilityLabel("Ajouter")
                         ProfileButton { showingPatientSettings = true }
                     }
-                    .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 4, trailing: 16))
+                    // The list's own margin already insets the rows: none more, so the title sits as on the other tabs.
+                    .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 6, trailing: 0))
                     .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
 
                     SearchField(text: $search)
-                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 8, trailing: 16))
+                        .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 10, trailing: 0))
                         .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
                 }
                 .listSectionSeparator(.hidden)
 
