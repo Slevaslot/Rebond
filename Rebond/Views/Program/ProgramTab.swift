@@ -257,6 +257,8 @@ private struct ProgramCard: View {
                     .foregroundStyle(.secondary)
             }
         }
+        // A program not followed stays readable but steps back.
+        .opacity(program.isActive ? 1 : 0.55)
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 26))
@@ -297,24 +299,39 @@ private struct AddSessionButton: View {
     @State private var choosing = false
 
     var body: some View {
-        // A plain button, centered like the others; the ways to add it come up from the bottom.
-        Button {
-            choosing = true
-        } label: {
-            Text("Ajouter une séance")
-                .font(.headline)
-                .frame(maxWidth: .infinity)
+        VStack(spacing: 10) {
+            Button {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { choosing.toggle() }
+            } label: {
+                Text("Ajouter une séance")
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.glassProminent)
+            .buttonBorderShape(.capsule)
+            .controlSize(.extraLarge)
+
+            // The ways to add it unfold right here: no window, nothing darkens the page.
+            if choosing {
+                VStack(spacing: 0) {
+                    AddRow(title: "Coller le message du kiné", symbol: "text.bubble") { add(.message) }
+                    Divider().padding(.leading, 44)
+                    AddRow(title: "Scanner sa feuille", symbol: "doc.viewfinder") { add(.scan) }
+                    Divider().padding(.leading, 44)
+                    AddRow(title: "Choisir une photo", symbol: "photo") { add(.photo) }
+                    Divider().padding(.leading, 44)
+                    AddRow(title: "Saisir à la main", symbol: "square.and.pencil") { add(.manual) }
+                }
+                .padding(.horizontal)
+                .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 26))
+                .transition(.opacity.combined(with: .scale(scale: 0.97, anchor: .top)))
+            }
         }
-        .buttonStyle(.glassProminent)
-        .buttonBorderShape(.capsule)
-        .controlSize(.extraLarge)
-        .confirmationDialog("Ajouter une séance", isPresented: $choosing) {
-            Button("Coller le message du kiné") { router.addProgram(from: .message) }
-            Button("Scanner sa feuille") { router.addProgram(from: .scan) }
-            Button("Choisir une photo") { router.addProgram(from: .photo) }
-            Button("Saisir à la main") { router.addProgram(from: .manual) }
-            Button("Annuler", role: .cancel) {}
-        }
+    }
+
+    private func add(_ source: AppRouter.ImportSource) {
+        withAnimation { choosing = false }
+        router.addProgram(from: source)
     }
 }
 
