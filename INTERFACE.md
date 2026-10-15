@@ -22,22 +22,38 @@ Un titre clair (pas le logo), une action principale évidente, une suite visible
 
 ## Structure de l'app patient
 
-Trois onglets, pas plus (HIG *Tab bars* : les onglets servent à naviguer, jamais à lancer une action).
+Deux onglets, plus Kiné si l'espace kiné est activé (HIG *Tab bars* : les onglets servent à naviguer, jamais à lancer une action).
 
 | Onglet | Symbole | Contenu |
 |---|---|---|
-| **Accueil** (page « Aujourd'hui ») | `house` | Séance du jour, bouton principal « Commencer la séance », progression de la semaine (séances faites / prévues). |
-| **Programme** | `list.bullet.clipboard` | Exercices du kiné, modification, « Nouvelle feuille » (scan) dans la barre d'outils. |
-| **Progrès** | `chart.line.uptrend.xyaxis` | Graphiques (amplitude, douleur, régularité), historique, bouton « Envoyer à mon kiné ». |
+| **Accueil** | `house` | Séance du jour (les exercices de tous les programmes prévus ce jour-là, ou un jour de repos avec la prochaine séance), bouton « Commencer », puis « Suivi » : régularité de la semaine, amplitude, douleur et « Envoyer à mon kiné ». |
+| **Exercices** (dès qu'un programme ou un exercice est enregistré) | `figure.mixed.cardio` | La semaine (une couleur par programme), « Ajouter un exercice », « Mes programmes » et « Créer un programme », « Mes exercices ». |
 | **Kiné** (seulement si l'espace kiné est activé) | `stethoscope` | Espace de travail du kiné, voir « Deux rôles ». Onglet affiché au lancement quand il est activé. |
 
-- Pas de programme enregistré : l'onglet Aujourd'hui affiche un état vide avec une seule suite claire, « Photographier ma feuille », et « Saisir à la main » en secondaire (HIG *Writing* : donner une suite claire sur tout écran vide).
-- Réglages et « À propos » (avertissement médical, données de démo) dans un menu de la barre d'outils, pas dans un onglet.
+**Vocabulaire côté patient :** un *programme* regroupe des exercices sur des jours de la semaine (le patient peut en avoir plusieurs : le genou lundi, mercredi et vendredi, le dos mardi et jeudi). La *séance* est ce qu'on fait un jour donné : les exercices de tous les programmes de ce jour. *Mes exercices* rassemble les exercices connus du patient (filmés chez le kiné, exercices Rebond, lus sur une feuille).
+
+### Sans programme
+
+La fonctionnalité principale : **filmer les exercices chez le kiné**. Rebond apprend chaque mouvement sur la vidéo, puis le suit à la caméra à la maison. C'est la seule action mise en avant (HIG *Writing* : une seule suite claire sur un écran vide). Pas d'onglet Exercices tant que rien n'est enregistré : l'Accueil suffit.
+
+1. Carte « Votre programme » : « Filmez vos exercices chez votre kiné. » et une phrase qui dit ce que Rebond en fait.
+   - bouton principal **« Filmer chez le kiné »** ;
+   - bouton secondaire « Autres façons », un menu : vidéos déjà filmées, scanner ou photographier la feuille, coller le message, composer moi-même ;
+   - « Créer un programme avec mes exercices » si des exercices ont déjà été ajoutés seuls ;
+   - « Charger le programme de démo », dans les builds de développement seulement.
+2. Carte « Faire un exercice » : essayer tout de suite un exercice suivi par la caméra, sans programme.
+
+Le QR code prescrit depuis l'espace Kiné n'a pas besoin de bouton : le patient le vise avec l'appareil photo de l'iPhone, le lien `rebond://programme` ouvre l'écran de vérification.
+
+### Avec programme
+
+- « Ajouter un exercice » (onglet Exercices) : filmer ou choisir une vidéo, exercice Rebond, et en raccourci la feuille ou le message du kiné (qui font un programme entier).
+- Réglages (profil, rappels, avertissement médical, espace kiné, données de démo) derrière le bouton profil en haut à droite, pas dans un onglet.
 
 ## Premier lancement (HIG *Launching*, *Onboarding*, *Privacy*)
 
 - Écran de lancement de la couleur de fond du premier écran, sans logo ni texte.
-- Accueil en **deux écrans maximum** : ce que fait Rebond en une phrase, puis l'avertissement « Rebond ne remplace pas l'avis d'un professionnel de santé. Seul votre kiné décide de votre programme. » Bouton « Continuer », possibilité de passer.
+- **Pas d'écran d'accueil ni de tutoriel** (décision dans `CLAUDE.md`) : l'app s'ouvre sur l'Accueil sans programme décrit plus haut, et la séance guide le patient à la voix. L'avertissement « Rebond ne remplace pas l'avis d'un professionnel de santé » est dans Réglages et dans le bilan PDF.
 - **Aucune autorisation demandée au lancement.** La caméra est demandée au premier scan ou à la première séance, après un écran d'explication à **un seul bouton** qui ouvre l'alerte système.
 - Les notifications sont proposées après la première séance réussie, quand le patient comprend leur intérêt.
 

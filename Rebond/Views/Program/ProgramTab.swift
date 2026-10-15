@@ -391,8 +391,10 @@ struct AddProgramMenu: View {
     }
 }
 
-/// No program yet, in the same cards as the other pages: how to add the physiotherapist's program,
-/// and one exercise to do right away. The page's own header stays on top.
+/// No program yet, in the same cards as the other pages. The program comes from the physiotherapist: the exercises
+/// are filmed at the practice, and Rebond learns each movement (one clear next step, HIG *Writing*). The other ways
+/// (videos already filmed, sheet, message, typed by hand) wait in a menu. Below, one exercise to do right away.
+/// The page's own header stays on top.
 struct NoProgramView<Header: View>: View {
     @ViewBuilder let header: Header
     @Environment(AppRouter.self) private var router
@@ -406,24 +408,50 @@ struct NoProgramView<Header: View>: View {
             VStack(alignment: .leading, spacing: 14) {
                 header
 
-                SummaryCard(title: Text("Pour commencer"), systemImage: "figure.mixed.cardio", color: .accentColor) {
+                SummaryCard(title: Text("Votre programme"), systemImage: "video", color: .accentColor) {
                     EmptyView()
                 } content: {
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Ajoutez vos exercices, puis regroupez-les en programme avec vos jours.")
+                        Text("Filmez vos exercices chez votre kiné.")
                             .font(.title3.weight(.semibold))
                             .fixedSize(horizontal: false, vertical: true)
-                        AddExerciseMenu {
-                            Text("Ajouter un exercice")
+                        Text("Rebond apprend chaque mouvement, puis vous guide et compte vos répétitions à la maison.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Button { router.addProgram(from: .film) } label: {
+                            Text("Filmer chez le kiné")
                                 .font(.headline)
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.glassProminent)
                         .buttonBorderShape(.capsule)
                         .controlSize(.large)
+                        .padding(.top, 4)
+
+                        Menu {
+                            Button("Choisir des vidéos déjà filmées", systemImage: "photo.on.rectangle") {
+                                router.addProgram(from: .videos)
+                            }
+                            Section("Feuille ou message du kiné") {
+                                Button("Scanner la feuille", systemImage: "doc.viewfinder") { router.addProgram(from: .scan) }
+                                Button("Photo de la feuille", systemImage: "photo") { router.addProgram(from: .photo) }
+                                Button("Coller le message", systemImage: "text.bubble") { router.addProgram(from: .message) }
+                            }
+                            Button("Composer moi-même", systemImage: "square.and.pencil") { router.addProgram(from: .manual) }
+                        } label: {
+                            Text("Autres façons")
+                                .font(.headline)
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.glass)
+                        .buttonBorderShape(.capsule)
+                        .controlSize(.large)
+
+                        // Exercises already added on their own: they can be grouped into a program.
                         if !library.isEmpty {
                             Button { router.newProgram() } label: {
-                                Text("Créer un programme")
+                                Text("Créer un programme avec mes exercices")
                                     .font(.headline)
                                     .frame(maxWidth: .infinity)
                             }
