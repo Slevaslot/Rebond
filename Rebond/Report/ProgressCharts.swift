@@ -103,12 +103,21 @@ struct PainChart: View {
             ForEach(data.pain) { point in
                 LineMark(x: .value("Date", point.date, unit: .day), y: .value("Douleur", point.value))
                     .interpolationMethod(.monotone)
+                    .foregroundStyle(.orange)
                 PointMark(x: .value("Date", point.date, unit: .day), y: .value("Douleur", point.value))
-                    .foregroundStyle(point.value >= Double(WeeklyReport.highPain) ? Color.orange : Color.accentColor)
+                    .foregroundStyle(.orange)
+                    // A high-pain session stands out by its shape too, not only its colour.
+                    .symbol(point.value >= Double(WeeklyReport.highPain) ? .triangle : .circle)
+                    .symbolSize(point.value >= Double(WeeklyReport.highPain) ? 90 : 40)
             }
             RuleMark(y: .value("Douleur forte", WeeklyReport.highPain))
                 .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
-                .foregroundStyle(.orange)
+                .foregroundStyle(.orange.opacity(0.6))
+                .annotation(position: .top, alignment: .leading) {
+                    Text("Douleur forte (\(WeeklyReport.highPain))")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
         }
         .chartYScale(domain: 0...10)
         .accessibilityLabel("Douleur après chaque séance, sur 10")

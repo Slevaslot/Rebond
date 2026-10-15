@@ -97,7 +97,7 @@ struct PatientDetailView: View {
                     }
                 }
 
-                SummaryCard(title: Text("Douleur"), systemImage: "bandage.fill", color: .accentColor) {
+                SummaryCard(title: Text("Douleur"), systemImage: "bandage.fill", color: .orange) {
                     Text("Après chaque séance")
                 } content: {
                     VStack(alignment: .leading, spacing: 12) {
@@ -179,11 +179,11 @@ private struct ExerciseLineView: View {
             }
             if let first = line.firstAmplitude {
                 if let last = line.lastAmplitude {
-                    Text("Amplitude : \(Int(first.rounded())) % puis \(Int(last.rounded())) %")
+                    Text("Amplitude : \(min(Int(first.rounded()), 100)) % puis \(min(Int(last.rounded()), 100)) %")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 } else {
-                    Text("Amplitude : \(Int(first.rounded())) %")
+                    Text("Amplitude : \(min(Int(first.rounded()), 100)) %")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }

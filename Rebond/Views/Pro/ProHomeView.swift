@@ -18,7 +18,6 @@ struct ProHomeView: View {
     @State private var importing = false
     @State private var importError = false
     @State private var removing: TrackedPatient?
-    @State private var showingPatientSettings = false
     @State private var search = ""
 
     /// The patients with what the last report says, those needing attention first.
@@ -43,7 +42,6 @@ struct ProHomeView: View {
                         Button { showingSettings = true } label: { HeaderIcon(systemImage: "gearshape") }
                             .buttonStyle(.plain)
                             .accessibilityLabel("Réglages de l'espace kiné")
-                        ProfileButton { showingPatientSettings = true }
                     }
                     // The list's own margin already insets the rows: none more, so the title sits as on the other tabs.
                     .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 6, trailing: 0))
@@ -85,7 +83,9 @@ struct ProHomeView: View {
                         VStack(alignment: .leading, spacing: 10) {
                             Text("Aucun patient pour l'instant")
                                 .font(.headline)
-                            Button("Importer un bilan", systemImage: "square.and.arrow.down") { importing = true }
+                            Text("Importez le bilan qu'un patient vous a envoyé, ou essayez avec des patients de démo.")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
                             Button("Essayer avec des patients de démo", systemImage: "person.2") {
                                 DemoData.loadPatients(into: context)
                             }
@@ -129,7 +129,7 @@ struct ProHomeView: View {
                         showingPaywall = true
                     } label: {
                         Text(store.hasPro ? "Rebond Pro · patients illimités"
-                                          : "\(min(patients.count, ProStore.freePatientLimit)) / \(ProStore.freePatientLimit) patients gratuits")
+                                          : "\(min(patients.count { !$0.isDemo }, ProStore.freePatientLimit)) / \(ProStore.freePatientLimit) patients gratuits")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity)
@@ -152,7 +152,6 @@ struct ProHomeView: View {
             .navigationTitle("Espace kiné")
             // Same top bar as the other tabs: the large title and its buttons in the page.
             .toolbarVisibility(.hidden, for: .navigationBar)
-            .sheet(isPresented: $showingPatientSettings) { SettingsView() }
             .navigationDestination(for: UUID.self) { id in
                 PatientDestination(patientID: id) { stopFollowing($0) }
             }
@@ -291,9 +290,9 @@ private struct PatientRow: View {
             }
             Spacer(minLength: 8)
             if overview?.attention == .highPain {
-                Circle()
-                    .fill(.orange)
-                    .frame(width: 10, height: 10)
+                // A symbol next to "douleur 8/10" in the row: never the colour alone, and the name keeps its room.
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
                     .accessibilityLabel(Text("Douleur forte"))
             }
         }

@@ -22,6 +22,16 @@ final class TrackedPatient {
         try? ReportTransfer.decode(report)
     }
 
+    /// One of the demo patients: shown for the presentation, never counted in the free offer.
+    var isDemo: Bool {
+        DemoData.patientIDs.contains(patientID)
+    }
+
+    /// Patients counted in the free offer: the real ones.
+    static func countedPatients(in context: ModelContext) -> Int {
+        ((try? context.fetch(FetchDescriptor<TrackedPatient>())) ?? []).count { !$0.isDemo }
+    }
+
     enum Reception {
         case added(TrackedPatient)
         case updated(TrackedPatient)
@@ -78,6 +88,6 @@ final class TrackedPatient {
 
     /// Whether one more patient can be followed: always with Rebond Pro, up to the limit without.
     static func canAddNew(in context: ModelContext, hasPro: Bool) -> Bool {
-        hasPro || ((try? context.fetchCount(FetchDescriptor<TrackedPatient>())) ?? 0) < ProStore.freePatientLimit
+        hasPro || countedPatients(in: context) < ProStore.freePatientLimit
     }
 }

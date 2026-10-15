@@ -36,7 +36,7 @@ struct ProSettingsView: View {
                             Button("Gérer l'abonnement") { managingSubscription = true }
                         }
                     } else {
-                        Label("Offre gratuite : \(min(patients.count, ProStore.freePatientLimit)) patients suivis sur \(ProStore.freePatientLimit)",
+                        Label("Offre gratuite : \(min(patients.count { !$0.isDemo }, ProStore.freePatientLimit)) patients suivis sur \(ProStore.freePatientLimit)",
                               systemImage: "person.2")
                         Button("Découvrir Rebond Pro") { showingPaywall = true }
                     }

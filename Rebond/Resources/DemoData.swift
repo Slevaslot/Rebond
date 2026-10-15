@@ -3,6 +3,13 @@ import SwiftData
 
 /// A program and three weeks of sessions, to show the progress and the report during the demo.
 enum DemoData {
+    /// The demo patients' fixed identifiers: loading them again updates them, and they don't use up the free offer.
+    nonisolated static let patientIDs: Set<UUID> = Set([
+        "D3A0F6C2-2B7E-4C51-9C1E-6F0A1B2C3D01",
+        "D3A0F6C2-2B7E-4C51-9C1E-6F0A1B2C3D02",
+        "D3A0F6C2-2B7E-4C51-9C1E-6F0A1B2C3D03",
+    ].compactMap(UUID.init(uuidString:)))
+
     static func load(into context: ModelContext) {
         try? context.delete(model: Session.self)
 
