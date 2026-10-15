@@ -69,7 +69,12 @@ struct ProgramTab: View {
                 }
                     .buttonStyle(.plain)
                     .swipeActions(edge: .trailing) {
-                        Button("Supprimer", systemImage: "trash", role: .destructive) { context.delete(program) }
+                        // No destructive role: with it, the list removes the row itself, then once more when the
+                        // program leaves the query, and the next row (the other program) vanished from the screen.
+                        Button("Supprimer", systemImage: "trash") {
+                            withAnimation { context.delete(program) }
+                        }
+                        .tint(.red)
                     }
                     .pageRow()
             }

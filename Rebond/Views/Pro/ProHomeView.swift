@@ -98,7 +98,9 @@ struct ProHomeView: View {
                                 PatientRow(name: item.patient.name, overview: item.overview)
                             }
                             .swipeActions(edge: .trailing) {
-                                Button("Arrêter le suivi", systemImage: "person.badge.minus", role: .destructive) { removing = item.patient }
+                                // No destructive role: the list would hide the row before the confirmation, even if cancelled.
+                                Button("Arrêter le suivi", systemImage: "person.badge.minus") { removing = item.patient }
+                                    .tint(.red)
                             }
                         }
                     }

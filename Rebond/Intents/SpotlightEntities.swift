@@ -4,8 +4,9 @@ import SwiftData
 
 /// The data store of the app, shared with the App Intents so they find the programs.
 enum AppData {
+    static let schema = Schema([Program.self, Session.self, TrackedPatient.self, ProgramTemplate.self, LibraryExercise.self])
+
     static let container: ModelContainer = {
-        let schema = Schema([Program.self, Session.self, TrackedPatient.self, ProgramTemplate.self, LibraryExercise.self])
         if let container = try? ModelContainer(for: schema) { return container }
         // A store SwiftData can't migrate (a build installed before a model change) must not stop the app
         // from launching: it is set aside, not deleted, and the app starts from an empty store.

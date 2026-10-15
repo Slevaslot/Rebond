@@ -187,7 +187,9 @@ private struct TemplatePicker: View {
                                 TemplateRow(name: template.name, program: template.program)
                             }
                             .swipeActions {
-                                Button("Supprimer", systemImage: "trash", role: .destructive) { context.delete(template) }
+                                // No destructive role: the list would remove a second row once the template is gone.
+                                Button("Supprimer", systemImage: "trash") { withAnimation { context.delete(template) } }
+                                    .tint(.red)
                             }
                         }
                     }
