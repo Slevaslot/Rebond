@@ -15,7 +15,7 @@ struct StartSessionIntent: AppIntent {
 
 extension AppRouter {
     /// Starts the session from outside the app (widget, Shortcuts, Spotlight). Without a program yet,
-    /// shows the Aujourd'hui page, which explains how to add one, rather than an empty session.
+    /// shows the Accueil page, which explains how to add one, rather than an empty session.
     func startWorkoutIfProgram() {
         if WidgetSnapshot.load()?.hasProgram == false {
             tab = .today

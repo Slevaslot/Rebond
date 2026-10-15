@@ -158,7 +158,7 @@ struct RootView: View {
     }
 
     private func save(_ program: EditableProgram) {
-        // A program prescribed by the physiotherapist shows what changed on the Aujourd'hui page.
+        // A program prescribed by the physiotherapist shows what changed on the Accueil page.
         if let prescriber {
             ProgramChange.record(from: programs.first, to: program, by: prescriber.isEmpty ? nil : prescriber)
             self.prescriber = nil

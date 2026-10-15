@@ -48,7 +48,7 @@ struct TodaySessionView: View {
 
 // MARK: - Home Screen
 
-/// Tinted top fading into the background, like the Aujourd'hui page. Removed by the system in tinted
+/// Tinted top fading into the background, like the Accueil page. Removed by the system in tinted
 /// and clear modes.
 private struct WidgetBackground: View {
     var body: some View {

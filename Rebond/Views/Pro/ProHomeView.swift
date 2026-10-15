@@ -2,7 +2,7 @@ import SwiftData
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// The Kiné tab: the physiotherapist's workspace, laid out like the Aujourd'hui page (Health-style cards).
+/// The Kiné tab: the physiotherapist's workspace, laid out like the Accueil page (Health-style cards).
 /// The week at a glance, prescribing a program by QR code, and the patients followed from the reports they send.
 /// Free for up to `ProStore.freePatientLimit` patients; Rebond Pro follows as many as needed. Everything stays on this iPhone.
 struct ProHomeView: View {
@@ -71,7 +71,7 @@ struct ProHomeView: View {
                 .padding(.bottom)
             }
             .background(alignment: .top) {
-                // Tinted top, fading into the page, like the Aujourd'hui page.
+                // Tinted top, fading into the page, like the Accueil page.
                 LinearGradient(colors: [Color.accentColor.opacity(0.35), .clear], startPoint: .top, endPoint: .bottom)
                     .frame(height: 340)
                     .ignoresSafeArea()

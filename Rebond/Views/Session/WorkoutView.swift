@@ -29,6 +29,7 @@ struct WorkoutView: View {
     var body: some View {
         NavigationStack {
             content
+                .onDisappear { WorkoutLiveActivity.shared.end() }
                 .toolbar {
                     if case .summary = stage {} else {
                         ToolbarItem(placement: .topBarLeading) {
@@ -87,6 +88,8 @@ struct WorkoutView: View {
                     .environment(\.skipRequest, skipRequest)
                     // A fresh screen (and camera analysis) for every set.
                     .id(plan.currentIndex)
+                    .onChange(of: plan.currentIndex, initial: true) { showOnLockScreen(step) }
+                    .onDisappear { if plan.isFinished { WorkoutLiveActivity.shared.end() } }
             }
         case .pain:
             PainView(nothingDone: plan.nothingDone, onSave: save, onDiscard: { dismiss() })
@@ -115,6 +118,20 @@ struct WorkoutView: View {
         case .hold(let seconds):
             HoldSetView(name: step.exercise.name, targetSeconds: seconds, setTitle: title, onFinish: finish)
         }
+    }
+
+    /// The set in progress on the Lock Screen and in the Dynamic Island.
+    private func showOnLockScreen(_ step: WorkoutStep) {
+        let catalog = step.exercise.catalogID.flatMap(CatalogExercise.find)
+        let seconds: Int? = if case .hold(let seconds) = step.exercise.mode { seconds } else { nil }
+        WorkoutLiveActivity.shared.start(
+            exercise: step.exercise.name,
+            symbol: catalog?.symbol ?? "figure.cooldown",
+            set: step.set,
+            totalSets: step.exercise.sets,
+            targetReps: seconds ?? step.exercise.reps,
+            isHold: seconds != nil
+        )
     }
 
     /// What comes after this set, for the end-of-set card.

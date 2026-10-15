@@ -189,6 +189,8 @@ struct SessionView: View {
         }
         .onDisappear { motion.stop() }
         .onChange(of: motion.repCount + motion.incompleteCount) { reportSetActivity() }
+        .onChange(of: motion.repCount) { WorkoutLiveActivity.shared.update(count: motion.repCount) }
+        .onChange(of: motion.isPaused) { WorkoutLiveActivity.shared.setPaused(motion.isPaused) }
         .sensoryFeedback(.success, trigger: motion.repCount)
         .sensoryFeedback(.warning, trigger: motion.incompleteCount)
         .animation(.default, value: motion.phase)

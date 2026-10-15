@@ -2,7 +2,7 @@ import AppIntents
 import Foundation
 
 /// "Combien de séances cette semaine ?": answers with one sentence, without opening the app.
-/// Reads the snapshot the app shares with its widgets, so it answers like the Aujourd'hui page.
+/// Reads the snapshot the app shares with its widgets, so it answers like the Accueil page.
 struct WeekProgressIntent: AppIntent {
     static let title: LocalizedStringResource = "Séances de la semaine"
     static let description = IntentDescription("Indique combien de séances vous avez faites cette semaine, et si celle du jour est faite.")

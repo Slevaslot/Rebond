@@ -60,7 +60,10 @@ struct ManualSetView: View {
             .padding(.horizontal)
         }
         .animation(.default, value: count)
-        .onChange(of: count) { if count > 0 { reportSetActivity() } }
+        .onChange(of: count) {
+            if count > 0 { reportSetActivity() }
+            WorkoutLiveActivity.shared.update(count: count)
+        }
         .onChange(of: skipRequest) { if skipRequest != nil { onFinish(SetResult(completedReps: count)) } }
         .sensoryFeedback(.increase, trigger: count)
         .navigationTitle(name)
@@ -112,6 +115,8 @@ struct HoldSetView: View {
         .animation(.default, value: remaining)
         .animation(.default, value: phase)
         .onChange(of: skipRequest) { if skipRequest != nil { onFinish(SetResult(heldSeconds: Int(elapsed))) } }
+        .onChange(of: Int(elapsed)) { WorkoutLiveActivity.shared.update(count: Int(elapsed)) }
+        .onChange(of: phase) { WorkoutLiveActivity.shared.setPaused(phase == .paused) }
         .navigationTitle(name)
         .navigationSubtitle(Text(setTitle))
         .navigationBarTitleDisplayMode(.inline)

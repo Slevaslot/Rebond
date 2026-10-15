@@ -253,3 +253,15 @@ Corrections :
 - Que la séance reprend seule quand on revient, même les pieds hors champ.
 - Que « Gardez les pieds en place » ne se déclenche plus sans pas réel.
 
+
+## Retours du 15 octobre : kiné, programme, widgets, séance
+
+Fait en parallèle par trois agents (worktrees) puis fusionné sur `technique`.
+
+- **Espace kiné** : la version connectée de démo est supprimée (`DemoServer`, `Server/`, réseau local). Le mode kiné s'active dans Réglages (« Je suis kiné ») ou en ouvrant un bilan `.rebond` ; il ajoute un onglet **Kiné** (stéthoscope), sélectionné à chaque lancement tant que le mode est actif. Espace refait façon accueil : chiffres de la semaine, prescrire par QR code, liste des patients (douleur forte, bilan ancien signalés), fiche patient, patients de démo, offre gratuite 3 patients / Rebond Pro.
+- **Onglets** : « Aujourd'hui » devient **Accueil** (`house`), Programme (`list.bullet.clipboard`).
+- **Programme** refait dans le style de l'accueil (fréquence, jours prévus, cartes d'exercices avec badge Suivi caméra / Comptage manuel). **Envoyer à mon kiné** refait (aperçu de ce qui part, partage, confirmation).
+- **Widgets** (accueil petit/moyen, écran verrouillé), **raccourcis Siri / Spotlight** (« Commencer ma séance », progression de la semaine) et **Live Activity** de la série (exercice, répétitions, série, pause), via un instantané partagé par App Group.
+- **Séance** : plus d'étoiles ; démonstration seulement à la première série d'un exercice, et les répétitions faites pendant la démonstration comptent (le modèle se range dès que le patient bouge) ; menu **Passer** (série suivante, passer l'exercice, terminer la séance) ; reprise automatique 20 s après une série ; **pouce levé** = série suivante, rappel des signes à l'écran ; pause possible à tout moment, même avant le début ; trop près, « Reculez » d'abord, la silhouette n'apparaît qu'une fois le corps entier visible.
+
+À vérifier sur iPhone : le pouce levé (Vision hand pose), la Live Activity et les widgets (App Group et signature de l'extension), la démonstration qui se range quand on bouge.
