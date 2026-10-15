@@ -34,10 +34,10 @@ Deux onglets, plus Kiné si l'espace kiné est activé (HIG *Tab bars* : les ong
 
 ### Sans programme
 
-La fonctionnalité principale : **filmer les exercices chez le kiné**. Rebond apprend chaque mouvement sur la vidéo, puis le suit à la caméra à la maison. C'est la seule action mise en avant (HIG *Writing* : une seule suite claire sur un écran vide). Pas d'onglet Exercices tant que rien n'est enregistré : l'Accueil suffit.
+La fonctionnalité principale : **filmer le mouvement modèle**, l'exercice bien fait une fois (chez le kiné ou ailleurs). Rebond apprend le mouvement sur cette vidéo de référence, puis le suit à la caméra. C'est la seule action mise en avant (HIG *Writing* : une seule suite claire sur un écran vide). Pas d'onglet Exercices tant que rien n'est enregistré : l'Accueil suffit.
 
-1. Carte « Votre programme » : « Filmez vos exercices chez votre kiné. » et une phrase qui dit ce que Rebond en fait.
-   - bouton principal **« Filmer chez le kiné »** ;
+1. Carte « Votre programme » : « Filmez le mouvement modèle. » et une phrase qui dit ce que Rebond en fait.
+   - bouton principal **« Filmer le mouvement modèle »** ;
    - bouton secondaire « Autres façons », un menu : vidéos déjà filmées, scanner ou photographier la feuille, coller le message, composer moi-même ;
    - « Créer un programme avec mes exercices » si des exercices ont déjà été ajoutés seuls ;
    - « Charger le programme de démo », dans les builds de développement seulement.

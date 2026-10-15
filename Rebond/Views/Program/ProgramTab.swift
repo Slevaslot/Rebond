@@ -392,7 +392,7 @@ struct AddProgramMenu: View {
 }
 
 /// No program yet, in the same cards as the other pages. The program comes from the physiotherapist: the exercises
-/// are filmed at the practice, and Rebond learns each movement (one clear next step, HIG *Writing*). The other ways
+/// are filmed done right once, and Rebond learns each movement from that model (one clear next step, HIG *Writing*). The other ways
 /// (videos already filmed, sheet, message, typed by hand) wait in a menu. Below, one exercise to do right away.
 /// The page's own header stays on top.
 struct NoProgramView<Header: View>: View {
@@ -412,15 +412,15 @@ struct NoProgramView<Header: View>: View {
                     EmptyView()
                 } content: {
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Filmez vos exercices chez votre kiné.")
+                        Text("Filmez le mouvement modèle.")
                             .font(.title3.weight(.semibold))
                             .fixedSize(horizontal: false, vertical: true)
-                        Text("Rebond apprend chaque mouvement, puis vous guide et compte vos répétitions à la maison.")
+                        Text("Filmez une fois l'exercice bien fait : Rebond s'en sert de référence pour vous guider et compter vos répétitions.")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                         Button { router.addProgram(from: .film) } label: {
-                            Text("Filmer chez le kiné")
+                            Text("Filmer le mouvement modèle")
                                 .font(.headline)
                                 .frame(maxWidth: .infinity)
                         }
