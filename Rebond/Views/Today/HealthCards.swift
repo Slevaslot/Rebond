@@ -135,6 +135,8 @@ private struct LegendValue: View {
             .minimumScaleFactor(0.7)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        // "Dernière séance, 2 sur 10" in one go.
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -252,7 +254,16 @@ struct WeekDots: View {
                 .frame(maxWidth: .infinity)
             }
         }
-        .accessibilityHidden(true)
+        // The week in words: which days were done.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("Séances faites cette semaine"))
+        .accessibilityValue(Text(doneDays.isEmpty ? String(localized: "Aucune") : doneDays))
+    }
+
+    private var doneDays: String {
+        week.days.filter(\.done)
+            .map { $0.date.formatted(.dateTime.weekday(.wide)) }
+            .formatted(.list(type: .and))
     }
 }
 

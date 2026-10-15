@@ -469,6 +469,8 @@ struct NoProgramView<Header: View>: View {
                 }
 
                 FreeExerciseCard()
+
+                MedicalDisclaimer()
             }
             .padding(.horizontal)
             .padding(.bottom)
