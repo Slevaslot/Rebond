@@ -433,11 +433,6 @@ struct MetricDetailView: View {
                     .padding(.top, 8)
                 }
                 .padding(.vertical, 6)
-            } footer: {
-                // What the chart shows, kept as a small note under it rather than a section of its own.
-                Text(metric == .amplitude
-                     ? "Meilleure répétition de chaque séance ; 100 % = l'objectif du mouvement. À titre indicatif."
-                     : "Douleur indiquée en fin de séance. À partir de 7, la séance est signalée à votre kiné.")
             }
         }
         .navigationTitle(metric == .amplitude ? "Amplitude" : "Douleur")
