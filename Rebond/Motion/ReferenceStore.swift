@@ -105,17 +105,27 @@ nonisolated enum ReferenceStore {
         try FileManager.default.copyItem(at: video, to: videoURL(id))
 
         let movement = ReferenceMovement(
-            id: id, name: name.isEmpty ? ReferenceAnalyzer.suggestedName(moving: analysis.highlightedJoints) : name,
+            id: id, name: name.isEmpty ? suggestedName(for: analysis) : name,
             createdAt: .now,
             axis: analysis.axis, target: analysis.target, template: analysis.template,
             minDuration: analysis.minDuration, repCount: analysis.repCount,
             highlightedJoints: analysis.highlightedJoints,
+            recognizedID: analysis.recognizedID,
+            rest: analysis.rest,
             restPose: analysis.restPose,
             targetPose: analysis.targetPose,
             frameCount: index, peakFrame: min(peakFrame, max(index - 1, 0))
         )
         try save(movement)
         return movement
+    }
+
+    /// The catalog exercise's name when it was recognized ("Squat"), otherwise from what moves ("Jambes").
+    private static func suggestedName(for analysis: ReferenceAnalysis) -> String {
+        if let recognized = analysis.recognizedID.flatMap(CatalogExercise.find) {
+            return String(localized: recognized.name)
+        }
+        return ReferenceAnalyzer.suggestedName(moving: analysis.highlightedJoints)
     }
 
     private static func imageGenerator(for asset: AVAsset, maximumSide: Double) -> AVAssetImageGenerator {
@@ -158,7 +168,7 @@ nonisolated extension ReferenceMovement {
         return CatalogExercise(
             id: catalogID,
             name: LocalizedStringResource(stringLiteral: name),
-            symbol: Self.symbol,
+            symbol: recognizedID.flatMap(CatalogExercise.find)?.symbol ?? Self.symbol,
             analysis: .recorded(self),
             highlightedJoints: Set(highlightedJoints.map { VNHumanBodyPoseObservation.JointName(rawValue: VNRecognizedPointKey(rawValue: $0)) }),
             returnCue: "Revenez doucement",

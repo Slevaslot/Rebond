@@ -366,6 +366,7 @@ nonisolated extension CatalogExercise {
     var fillsGaugeUpward: Bool {
         switch analysis {
         case .squat, .forwardLunge: false
+        case .recorded(let movement): movement.recognizedID.flatMap(CatalogExercise.find)?.fillsGaugeUpward ?? true
         default: true
         }
     }

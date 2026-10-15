@@ -25,6 +25,11 @@ nonisolated struct ReferenceMovement: Codable, Sendable, Identifiable {
     let repCount: Int
     /// Raw names of the joints that move, highlighted on the skeleton.
     let highlightedJoints: [String]
+    /// The catalog exercise it was recognized as (a squat filmed at the physiotherapist's): its counter, tested on
+    /// many videos, counts the repetitions; the film still gives the example and the comparison.
+    var recognizedID: String? = nil
+    /// The measures of the body at rest in the film: at home, the starting position is only measured close to it.
+    var rest: [Double]? = nil
     /// The patient's own body at rest and at the end of the movement, in the guide's unit box.
     let restPose: [String: CGPoint]
     let targetPose: [String: CGPoint]
@@ -46,6 +51,8 @@ nonisolated enum MovementFeatures {
     static let count = 16
     /// Left and right measures, swapped when the patient does the movement on the other side.
     static let sidePairs = [(0, 1), (2, 3), (4, 5), (6, 7), (11, 12), (14, 15)]
+    /// Measures that don't depend on where the body stands in the picture: angles and heights from the hips.
+    static let bodyRelative = [0, 1, 2, 3, 4, 5, 6, 7, 10, 11, 12, 14, 15]
     /// Sideways positions, reversed with the side.
     static let sidewaysIndices = [9, 10]
 
@@ -181,6 +188,9 @@ nonisolated struct ReferenceAnalysis: Sendable {
     let bestStart: Double
     let bestPeak: Double
     let bestEnd: Double
+    /// The catalog exercise it was recognized as, which then counts the repetitions.
+    var recognizedID: String? = nil
+    var rest: [Double] = []
 }
 
 nonisolated enum ReferenceAnalyzer {
@@ -189,8 +199,74 @@ nonisolated enum ReferenceAnalyzer {
     static let startFraction = 0.2
     static let backFraction = 0.12
 
+    /// Learns the movement of a video. A video often shows it from the front, then from the side: each view is
+    /// analyzed apart, and the front one is kept, as the patient faces the iPhone at home. When the movement is
+    /// one of the catalog's, it is recognized.
     static func analyze(_ samples: [ReferenceSample]) throws(ReferenceError) -> ReferenceAnalysis {
         let valid = samples.filter { $0.measure != nil }
+        guard valid.count >= 20 else { throw .noBody }
+        var results: [(analysis: ReferenceAnalysis, samples: [ReferenceSample], facing: Bool)] = []
+        var lastError = ReferenceError.noRepetition
+        for view in views(of: valid) {
+            do {
+                results.append((try analyzeView(view.samples), view.samples, view.facing))
+            } catch {
+                lastError = error
+            }
+        }
+        // Facing the camera first, then the most repetitions.
+        guard var best = results.max(by: { ($0.facing ? 1 : 0, $0.analysis.repCount) < ($1.facing ? 1 : 0, $1.analysis.repCount) })
+        else { throw lastError }
+        best.analysis.recognizedID = recognize(best.samples, repetitions: best.analysis.repCount)
+        return best.analysis
+    }
+
+    /// The parts of the video seen from one side: from the front (both shoulders apart) or from the side.
+    /// A change of view must last a second and a half to count, so turning a little doesn't split it.
+    static func views(of samples: [ReferenceSample]) -> [(samples: [ReferenceSample], facing: Bool)] {
+        let widths = samples.map { sample -> Double in
+            guard let m = sample.measure, let l = m.leftShoulder, let r = m.rightShoulder, m.torsoLength > 0 else { return 0.5 }
+            return abs(Double(l.x - r.x)) / m.torsoLength
+        }
+        let facing = widths.indices.map { i -> Bool in
+            let window = widths[max(0, i - 7)...min(widths.count - 1, i + 7)]
+            return median(Array(window)) > 0.45
+        }
+        var runs: [(range: Range<Int>, facing: Bool)] = []
+        var start = 0
+        for i in 1...facing.count where i == facing.count || facing[i] != facing[start] {
+            runs.append((start..<i, facing[start]))
+            start = i
+        }
+        // Short runs join the run before them.
+        var merged: [(range: Range<Int>, facing: Bool)] = []
+        for run in runs {
+            let seconds = samples[run.range.upperBound - 1].time - samples[run.range.lowerBound].time
+            if let last = merged.last, seconds < 1.5 || last.facing == run.facing {
+                merged[merged.count - 1].range = last.range.lowerBound..<run.range.upperBound
+            } else {
+                merged.append(run)
+            }
+        }
+        return merged.map { (Array(samples[$0.range]), $0.facing) }
+    }
+
+    /// The catalog exercise whose counter finds about the same repetitions in the video, if one does.
+    static func recognize(_ samples: [ReferenceSample], repetitions: Int) -> String? {
+        var best: (id: String, count: Int)?
+        for exercise in CatalogExercise.all {
+            var counter = exercise.makeCounter()
+            var count = 0
+            for sample in samples {
+                if case .repCompleted = counter.process(sample.measure, at: sample.time).event { count += 1 }
+            }
+            guard count >= 2, count >= repetitions - 1, count <= repetitions + 1 else { continue }
+            if best == nil || abs(count - repetitions) < abs(best!.count - repetitions) { best = (exercise.id, count) }
+        }
+        return best?.id
+    }
+
+    private static func analyzeView(_ valid: [ReferenceSample]) throws(ReferenceError) -> ReferenceAnalysis {
         guard valid.count >= 20 else { throw .noBody }
 
         let torso = median(valid.map { $0.measure!.torsoLength })
@@ -274,7 +350,8 @@ nonisolated enum ReferenceAnalyzer {
             targetPose: poses.target,
             bestStart: valid[reps[best].start].time,
             bestPeak: peakFrame.time,
-            bestEnd: valid[reps[best].end].time
+            bestEnd: valid[reps[best].end].time,
+            rest: rest
         )
     }
 
@@ -388,6 +465,9 @@ nonisolated struct ReferenceCounter: MovementCounter {
     /// Recent frames, to find a still moment.
     private var recent: [(features: [Double?], torso: Double)] = []
     private var trajectory: [[Double]] = []
+    private var collecting = false
+    /// The last repetition cut like the film's, and when it ended.
+    private var finished: (points: [[Double]], time: Double)?
     private let stillFrames = 10
     /// The film's way there, from rest to the end of the movement: what the body should look like at each moment.
     private let wayThere: [[Double]]
@@ -400,6 +480,9 @@ nonisolated struct ReferenceCounter: MovementCounter {
     /// About 25° of a joint, or a quarter of the torso length: a visible difference, not detection noise.
     private let mismatchThreshold = 0.42
 
+    /// The recognized catalog exercise's counter, which then counts: tested on many videos, with its own advice.
+    private var driver: (any MovementCounter)?
+
     init(movement: ReferenceMovement) {
         self.movement = movement
         let along = movement.template.map { MovementFeatures.dot($0, movement.axis) }
@@ -409,20 +492,28 @@ nonisolated struct ReferenceCounter: MovementCounter {
         cycle = RepCycle(start: target * ReferenceAnalyzer.startFraction, target: target,
                          back: target * ReferenceAnalyzer.backFraction, reversalMargin: target * 0.1,
                          noise: target * 0.4, minDuration: movement.minDuration, shortfall: .followReference)
+        driver = movement.recognizedID.flatMap(CatalogExercise.find)?.makeCounter()
     }
 
     mutating func process(_ measure: PoseMeasure?, at time: Double) -> CounterUpdate {
+        var driven: CounterUpdate?
+        if var counter = driver {
+            driven = counter.process(measure, at: time)
+            driver = counter
+        }
         guard let measure else {
             cycle.abandon()
             trajectory = []
+            collecting = false
             recent = []
-            return CounterUpdate(progress: 0, event: nil)
+            return driven ?? CounterUpdate(progress: 0, event: nil)
         }
 
         var calibratedNow = false
         recent.append((MovementFeatures.vector(measure, torso: torso > 0 ? torso : measure.torsoLength), measure.torsoLength))
         if recent.count > stillFrames { recent.removeFirst() }
-        if !cycle.isInRepetition, let still = stillPosition() {
+        let wasInRepetition = isInRepetition(driven)
+        if !wasInRepetition, let still = stillPosition(), looksLikeFilmRest(still.features) {
             if rest == nil { calibratedNow = true }
             // Again at each still moment at rest: the patient may have moved a little in the room.
             if rest == nil || abs(deviationValue(still.features)) < movement.target * 0.15 {
@@ -430,7 +521,7 @@ nonisolated struct ReferenceCounter: MovementCounter {
                 torso = still.torso
             }
         }
-        guard let rest else { return CounterUpdate(progress: 0, event: nil) }
+        guard let rest else { return driven ?? CounterUpdate(progress: 0, event: nil) }
 
         let features = MovementFeatures.vector(measure, torso: torso).enumerated().map { $1 ?? rest[$0] }
         let deviation = zip(features, rest).map { $0 - $1 }
@@ -438,11 +529,19 @@ nonisolated struct ReferenceCounter: MovementCounter {
         let mirrored = MovementFeatures.dot(MovementFeatures.swapped(deviation), movement.axis)
         let value = max(direct, mirrored)
 
-        let wasInRepetition = cycle.isInRepetition
-        var (event, posture) = cycle.advance(value, fault: nil, at: time)
+        var event: RepEvent?
+        var posture: Correction?
+        let progress: Double
+        if let driven {
+            (event, posture, progress) = (driven.event, driven.posture, driven.progress)
+        } else {
+            (event, posture) = cycle.advance(value, fault: nil, at: time)
+            progress = min(1, max(0, value / movement.target))
+        }
+        let inRepetition = isInRepetition(driven)
 
         // Compared with the film at the same moment of the movement: the body part that differs the most.
-        if cycle.isInRepetition, value >= movement.target * 0.3,
+        if inRepetition, progress >= 0.3, posture == nil,
            let fault = difference(mirrored > direct ? MovementFeatures.swapped(deviation) : deviation, value: value,
                                   sidesSwapped: mirrored > direct) {
             let frames = mismatch?.fault == fault ? mismatch!.frames + 1 : 1
@@ -457,26 +556,41 @@ nonisolated struct ReferenceCounter: MovementCounter {
         } else {
             mismatch = nil
         }
-        if !cycle.isInRepetition {
+        if !inRepetition {
             saidThisRepetition = false
             mismatch = nil
         }
-        if cycle.isInRepetition || wasInRepetition { trajectory.append(deviation) }
-        if !cycle.isInRepetition, !wasInRepetition { trajectory = [] }
+        // The repetition as the film's were cut: from 20% of the movement to the return under 12%.
+        if collecting {
+            trajectory.append(deviation)
+            if value <= movement.target * ReferenceAnalyzer.backFraction {
+                collecting = false
+                finished = (trajectory, time)
+                trajectory = []
+            }
+        } else if value >= movement.target * ReferenceAnalyzer.startFraction {
+            collecting = true
+            trajectory = [deviation]
+        }
 
         var result = event
-        switch event {
-        case .repCompleted(let rep):
-            let score = MovementFeatures.resemblance(trajectory, to: movement.template)
-            result = .repCompleted(RepResult(amplitude: score, tooFast: rep.tooFast))
-            trajectory = []
-        case .repIncomplete:
-            trajectory = []
-        default:
-            break
+        if case .repCompleted(let rep) = event {
+            // How close to the film, whoever counted it: the repetition just ended, or the one going on.
+            let points = finished.flatMap { time - $0.time < 1.5 ? $0.points : nil } ?? trajectory
+            let score = points.count >= 3 ? MovementFeatures.resemblance(points, to: movement.template) : rep.amplitude
+            // Too fast compared with the film's own pace (15 measures per second).
+            let tooFast = points.count >= 3 ? Double(points.count) / 15 < movement.minDuration : rep.tooFast
+            result = .repCompleted(RepResult(amplitude: score, tooFast: tooFast))
+            finished = nil
         }
-        if calibratedNow, case .none = result { result = .calibrated }
-        return CounterUpdate(progress: min(1, max(0, value / movement.target)), event: result, posture: posture)
+        if calibratedNow, driver == nil, case .none = result { result = .calibrated }
+        return CounterUpdate(progress: progress, event: result, posture: posture)
+    }
+
+    /// In a repetition: by the film's own cycle, or by the recognized exercise's progress.
+    private func isInRepetition(_ driven: CounterUpdate?) -> Bool {
+        if let driven { return driven.progress > 0.12 }
+        return cycle.isInRepetition
     }
 
     /// The body part furthest from the film's body at the same point of the movement, if far enough to show.
@@ -490,6 +604,13 @@ nonisolated struct ReferenceCounter: MovementCounter {
         else { return nil }
         let part = MovementFeatures.bodyPart(of: worst)
         return sidesSwapped ? part.otherSide : part
+    }
+
+    /// Standing as in the film's resting position: a pause at the end of the movement isn't the start.
+    private func looksLikeFilmRest(_ features: [Double]) -> Bool {
+        guard let filmRest = movement.rest, filmRest.count == features.count else { return true }
+        let gap = MovementFeatures.bodyRelative.map { features[$0] - filmRest[$0] }
+        return MovementFeatures.norm(gap) < 0.6
     }
 
     /// The mean measures of the last frames, when the body barely moved over them.
