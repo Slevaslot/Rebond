@@ -54,6 +54,8 @@ struct ReportView: View {
         .background(Color(.systemGroupedBackground))
         .navigationTitle("Envoyer à mon kiné")
         .navigationBarTitleDisplayMode(.inline)
+        // A soft fade under the button: the hard edge drew a rectangle that ignored the sheet's rounded corners.
+        .scrollEdgeEffectStyle(.soft, for: .bottom)
         .safeAreaBar(edge: .bottom) {
             bottomBar(report)
         }
