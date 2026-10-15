@@ -70,8 +70,7 @@ struct ProgramDetailView: View {
             .padding(.bottom)
         }
         .background(alignment: .top) {
-            LinearGradient(colors: [color.opacity(0.4), .clear], startPoint: .top, endPoint: .bottom)
-                .frame(height: 300)
+            PageTint(color: color, opacity: 0.4)
                 .ignoresSafeArea()
         }
         .background(Color(.systemGroupedBackground))

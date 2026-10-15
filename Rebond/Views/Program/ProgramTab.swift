@@ -125,8 +125,7 @@ struct ProgramTab: View {
         .scrollContentBackground(.hidden)
         .background(alignment: .top) {
             // Tinted top, fading into the page, like the Accueil page.
-            LinearGradient(colors: [Color.accentColor.opacity(0.45), .clear], startPoint: .top, endPoint: .bottom)
-                .frame(height: 340)
+            PageTint(color: Color.accentColor, opacity: 0.45)
                 .ignoresSafeArea()
         }
         .background(Color(.systemGroupedBackground))
@@ -390,8 +389,7 @@ struct NoProgramView<Header: View>: View {
             .padding(.bottom)
         }
         .background(alignment: .top) {
-            LinearGradient(colors: [Color.accentColor.opacity(0.45), .clear], startPoint: .top, endPoint: .bottom)
-                .frame(height: 340)
+            PageTint(color: Color.accentColor, opacity: 0.45)
                 .ignoresSafeArea()
         }
         .background(Color(.systemGroupedBackground))

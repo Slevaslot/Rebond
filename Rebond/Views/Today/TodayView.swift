@@ -92,8 +92,7 @@ struct TodayView: View {
         .sensoryFeedback(.success, trigger: restoredAlert)
         .background(alignment: .top) {
             // Tinted top, fading into the page, like Health's Summary.
-            LinearGradient(colors: [Color.accentColor.opacity(0.45), .clear], startPoint: .top, endPoint: .bottom)
-                .frame(height: 340)
+            PageTint(color: Color.accentColor, opacity: 0.45)
                 .ignoresSafeArea()
         }
         .background(Color(.systemGroupedBackground))
@@ -354,6 +353,25 @@ struct ExerciseBadge: View {
 }
 
 
+
+/// The tint at the top of the pages, fading into the grey background along an eased curve and over a long
+/// distance, so no edge shows where it ends.
+struct PageTint: View {
+    var color: Color = .accentColor
+    var opacity: Double = 0.45
+
+    var body: some View {
+        LinearGradient(stops: [
+            .init(color: color.opacity(opacity), location: 0),
+            .init(color: color.opacity(opacity * 0.82), location: 0.2),
+            .init(color: color.opacity(opacity * 0.55), location: 0.42),
+            .init(color: color.opacity(opacity * 0.28), location: 0.64),
+            .init(color: color.opacity(opacity * 0.09), location: 0.85),
+            .init(color: color.opacity(0), location: 1),
+        ], startPoint: .top, endPoint: .bottom)
+        .frame(height: 480)
+    }
+}
 
 /// The top of every tab: the large title and its buttons on one line, in the page (Fitness style).
 /// The same height and spacing everywhere, so nothing moves when switching tabs.

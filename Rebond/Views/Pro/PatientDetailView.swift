@@ -150,8 +150,7 @@ struct PatientDetailView: View {
             .padding(.bottom)
         }
         .background(alignment: .top) {
-            LinearGradient(colors: [Color.accentColor.opacity(0.4), .clear], startPoint: .top, endPoint: .bottom)
-                .frame(height: 300)
+            PageTint(color: Color.accentColor, opacity: 0.4)
                 .ignoresSafeArea()
         }
         .background(Color(.systemGroupedBackground))
