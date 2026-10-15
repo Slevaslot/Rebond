@@ -6,6 +6,7 @@ import SwiftUI
 struct ProgramTab: View {
     @Environment(AppRouter.self) private var router
     @Query(sort: \Program.createdAt) private var programs: [Program]
+    @Environment(\.modelContext) private var context
     @AppStorage(PatientIdentity.nameKey) private var patientName = ""
     @State private var showingSettings = false
     @State private var path: [Program] = []
@@ -52,6 +53,7 @@ struct ProgramTab: View {
     }
 
     /// A group of program cards. The circle on each card selects it: followed programs make the day's session.
+    /// Like Mail or Reminders, swiping a card to the left deletes it, to the right follows it or not.
     @ViewBuilder
     private func section(_ title: LocalizedStringKey, _ list: [Program], empty: LocalizedStringKey?) -> some View {
         Text(title)
@@ -59,19 +61,23 @@ struct ProgramTab: View {
             .accessibilityAddTraits(.isHeader)
             .padding(.horizontal, 4)
             .padding(.top, 8)
+            .pageRow()
         if list.isEmpty, let empty {
             Text(empty)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 4)
+                .pageRow()
         }
         ForEach(list) { program in
             let color = ProgramPalette.color(of: program, in: programs)
-            NavigationLink(value: program) {
+            Button {
+                path.append(program)
+            } label: {
                 ProgramCard(program: program, color: color)
             }
             .buttonStyle(.plain)
-            // The check sits in the card, in front of the name, over the link: tapping it only selects.
+            // The check sits in the card, in front of the name: tapping it only selects.
             .overlay(alignment: .topLeading) {
                 Button {
                     withAnimation(.snappy) { program.isActive.toggle() }
@@ -89,32 +95,45 @@ struct ProgramTab: View {
                 .accessibilityLabel(Text(program.isActive ? "Ne plus suivre \(program.title)" : "Suivre \(program.title)"))
                 .sensoryFeedback(.selection, trigger: program.isActive)
             }
+            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                Button("Supprimer", systemImage: "trash", role: .destructive) {
+                    withAnimation { context.delete(program) }
+                }
+            }
+            .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                Button(program.isActive ? "Ne plus suivre" : "Suivre",
+                       systemImage: program.isActive ? "checkmark.circle.badge.xmark" : "checkmark.circle") {
+                    withAnimation(.snappy) { program.isActive.toggle() }
+                }
+                .tint(program.isActive ? .gray : color)
+            }
+            .pageRow()
         }
     }
 
     private var content: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                header
+        // A list rather than a scroll view, for the system's swipe actions; it keeps the look of the cards.
+        List {
+            header.pageRow()
 
-                WeekPlanCard(programs: programs)
+            WeekPlanCard(programs: programs).pageRow()
 
-                section("Programmes suivis", programs.active,
-                        empty: "Aucun programme suivi. Cochez celui que vous voulez faire.")
-                let others = programs.filter { !$0.isActive }
-                if !others.isEmpty {
-                    section("Autres programmes", others, empty: nil)
-                }
-
-                Text("Seul votre kiné décide de votre programme. Ajoutez ici ce qu'il vous a prescrit.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 4)
-                    .padding(.top, 4)
+            section("Programmes suivis", programs.active,
+                    empty: "Aucun programme suivi. Cochez celui que vous voulez faire.")
+            let others = programs.filter { !$0.isActive }
+            if !others.isEmpty {
+                section("Autres programmes", others, empty: nil)
             }
-            .padding(.horizontal)
-            .padding(.bottom)
+
+            Text("Seul votre kiné décide de votre programme. Ajoutez ici ce qu'il vous a prescrit. Glissez une carte vers la gauche pour la supprimer.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 4)
+                .padding(.top, 4)
+                .pageRow()
         }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
         .background(alignment: .top) {
             // Tinted top, fading into the page, like the Accueil page.
             LinearGradient(colors: [Color.accentColor.opacity(0.45), .clear], startPoint: .top, endPoint: .bottom)
@@ -122,6 +141,15 @@ struct ProgramTab: View {
                 .ignoresSafeArea()
         }
         .background(Color(.systemGroupedBackground))
+    }
+}
+
+private extension View {
+    /// A list row that looks like the rest of the page: no separator, no background, the page's margins.
+    func pageRow() -> some View {
+        listRowInsets(EdgeInsets(top: 7, leading: 16, bottom: 7, trailing: 16))
+            .listRowSeparator(.hidden)
+            .listRowBackground(Color.clear)
     }
 }
 
