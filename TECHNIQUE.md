@@ -186,6 +186,12 @@ WidgetSync ── applicationContext(WidgetSnapshot) ▶ App Group de la montre 
 - **Santé** : `HealthRecording.decide` (testé). La montre enregistre si elle a démarré son entraînement (`recordingWorkout`) ; sinon l'iPhone (`PhoneHealth`, `HKWorkoutBuilder`) si le patient l'a activé et que la séance dure au moins 20 s. Jamais de doublon.
 - **Simulateur** : jumeler un iPhone et une montre (`xcrun simctl list pairs`), installer l'app iPhone, puis l'app de la montre (`Rebond.app/Watch/RebondWatch.app`). WatchConnectivity peut mettre une vingtaine de secondes à voir l'app de la montre installée (`isWatchAppInstalled`). La caméra n'existant pas en simulateur, tester avec un maintien chronométré ou un exercice en comptage manuel ; la montre simulée fournit une fréquence cardiaque factice.
 
+## Astuces (TipKit)
+
+- `Rebond/Tips/SessionTips.swift` : `SessionTips.configure()` (appelé dans `RebondApp.init`), `SiriPauseTip`, `WatchAppTip`. `RebondWatch/WatchTips.swift` : `WatchTips.configure()` (dans `RebondWatchApp.init`), `DoubleTapTip`. Chaque appareil a sa propre base TipKit.
+- Règles : `SiriPauseTip` a un `#Rule` sur l'événement `sessionSaved` (donné par `WorkoutView.save`, au moins une séance enregistrée) ; l'instant (pause au bouton pendant la série, pas de montre qui enregistre la séance) est décidé par la vue (`SessionView`, `HoldSetView`). `WatchAppTip` dépend de `PhoneWatchLink.isWatchPaired` / `isWatchAppInstalled` et est invalidée quand l'app de la montre est installée. `DoubleTapTip` suit `statusUpdates` pour rendre la ligne « Série » dès qu'elle n'est plus affichable. `MaxDisplayCount` limite chacune ; `displayFrequency(.immediate)` parce que les écrans garantissent déjà une seule astuce à la fois.
+- Démo et simulateur (Debug) : arguments de lancement `-RebondResetTips` (repart de zéro) et `-RebondShowAllTips` (ignore les règles TipKit, pas les conditions de la vue).
+
 ## Intégrations système
 
 1. **Rappels** : notifications locales les jours de séance et rappel hebdomadaire du rapport.

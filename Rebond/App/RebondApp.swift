@@ -1,5 +1,6 @@
 import SwiftData
 import SwiftUI
+import TipKit
 
 @main struct RebondApp: App {
     @State private var router = AppRouter.shared
@@ -12,8 +13,14 @@ import SwiftUI
         // The Apple Watch: the set on the wrist during the session, today's session on the watch face.
         PhoneWatchLink.shared.activate()
         // Pause and next set from the Live Activity and Siri: the same path as the watch's buttons.
-        ToggleSessionPauseIntent.handler = { PhoneWatchLink.shared.perform(.togglePause) }
+        ToggleSessionPauseIntent.handler = {
+            PhoneWatchLink.shared.perform(.togglePause)
+            // Paused without walking back to the phone: no need to suggest it any more.
+            SiriPauseTip().invalidate(reason: .actionPerformed)
+        }
         NextSetIntent.handler = { PhoneWatchLink.shared.perform(.nextSet) }
+        // The hands-free controls of the session, made discoverable (TipKit).
+        SessionTips.configure()
     }
 
     var body: some Scene {

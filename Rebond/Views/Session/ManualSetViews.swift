@@ -1,5 +1,6 @@
 import AVFoundation
 import SwiftUI
+import TipKit
 
 /// An exercise the camera doesn't follow: the patient counts with the buttons.
 /// Name and set in the navigation bar, standard glass buttons, the main action in the bottom bar.
@@ -88,6 +89,9 @@ struct HoldSetView: View {
     @Environment(\.skipRequest) private var skipRequest
     @Environment(\.pauseRequest) private var pauseRequest
     @Environment(\.reportSetActivity) private var reportSetActivity
+    /// Paused with the button on screen: the patient walked back to the phone, the moment for the Siri tip.
+    @State private var pausedOnScreen = false
+    private let siriPauseTip = SiriPauseTip()
 
     private var remaining: Int { max(0, targetSeconds - Int(elapsed)) }
 
@@ -106,6 +110,10 @@ struct HoldSetView: View {
                 .font(.title3)
                 .foregroundStyle(.secondary)
             Spacer()
+            // Without the Apple Watch: Siri would have spared the walk back.
+            if phase == .paused, pausedOnScreen, !PhoneWatchLink.shared.watchRecordsWorkout {
+                TipView(siriPauseTip)
+            }
         }
         .padding()
         .safeAreaBar(edge: .bottom) {
@@ -117,7 +125,10 @@ struct HoldSetView: View {
         .animation(.default, value: phase)
         .onChange(of: skipRequest) { if skipRequest != nil { onFinish(SetResult(heldSeconds: Int(elapsed))) } }
         .onChange(of: Int(elapsed)) { WorkoutLiveActivity.shared.update(count: Int(elapsed)) }
-        .onChange(of: phase) { WorkoutLiveActivity.shared.setPaused(phase == .paused) }
+        .onChange(of: phase) {
+            WorkoutLiveActivity.shared.setPaused(phase == .paused)
+            if phase != .paused { pausedOnScreen = false }
+        }
         // The pause button of the Apple Watch: starts, pauses or resumes the timer.
         .onChange(of: pauseRequest) {
             switch phase {
@@ -166,6 +177,7 @@ struct HoldSetView: View {
         case .running:
             Button {
                 phase = .paused
+                pausedOnScreen = true
                 coach.say("Pause")
             } label: {
                 Label("Pause", systemImage: "pause.fill").font(.headline).frame(maxWidth: .infinity)
