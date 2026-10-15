@@ -19,7 +19,7 @@ struct ProgramTab: View {
                     content
                 }
             }
-            .navigationTitle("Programmes")
+            .navigationTitle("Exercices")
             // Same top bar as the Accueil page: the large title and its controls on the same line, in the page.
             .toolbarVisibility(.hidden, for: .navigationBar)
             .navigationDestination(for: Program.self) { program in
@@ -36,7 +36,7 @@ struct ProgramTab: View {
     }
 
     private var header: some View {
-        PageHeader("Programmes") {
+        PageHeader("Exercices") {
             AddProgramMenu()
             ProfileButton { showingSettings = true }
         }
@@ -137,7 +137,7 @@ struct ProgramTab: View {
     }
 }
 
-private extension View {
+extension View {
     /// A list row that looks like the rest of the page: no separator, no background, the page's margins.
     func pageRow() -> some View {
         listRowInsets(EdgeInsets(top: 7, leading: 16, bottom: 7, trailing: 16))

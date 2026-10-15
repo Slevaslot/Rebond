@@ -20,6 +20,14 @@ struct PatientDetailView: View {
             }
         }
         .navigationTitle(patient.name)
+        .navigationBarTitleDisplayMode(.large)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu("Options", systemImage: "ellipsis") {
+                    Button("Arrêter le suivi", systemImage: "person.badge.minus", role: .destructive) { confirmingStop = true }
+                }
+            }
+        }
         .sheet(item: $adjusting) { item in
             PrescribeFlow(program: item.program, title: "Programme de \(patient.name)", patientName: patient.name)
         }
@@ -40,17 +48,25 @@ struct PatientDetailView: View {
 
         return ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                // The report's period, and what needs attention.
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Bilan du \(transfer.generatedAt, format: .dateTime.day().month(.wide).year())")
-                        .font(.headline)
-                    Text("Semaine du \(week.start, format: .dateTime.day().month(.wide)) au \(week.end, format: .dateTime.day().month(.wide))")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                // Who, which report, what needs attention: the summary card, as on a program's page.
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack(spacing: 14) {
+                        InitialsBadge(name: patient.name, size: 56)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Bilan du \(transfer.generatedAt, format: .dateTime.day().month(.wide))")
+                                .font(.headline)
+                            Text("Du \(week.start, format: .dateTime.day().month()) au \(week.end, format: .dateTime.day().month())")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                     AttentionLabel(overview: overview)
-                        .padding(.top, 4)
+                    Divider()
+                    PatientMetrics(overview: overview)
                 }
-                .padding(.horizontal, 4)
+                .padding(18)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 26))
 
                 if !painful.isEmpty {
                     SummaryCard(title: Text("Douleur forte signalée"), systemImage: "exclamationmark.triangle.fill", color: .orange) {
@@ -67,10 +83,6 @@ struct PatientDetailView: View {
                                 }
                                 .accessibilityElement(children: .combine)
                             }
-                            Text("Douleur de \(WeeklyReport.highPain) ou plus indiquée par le patient en fin de séance. C'est vous qui décidez de la suite.")
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
                         }
                     }
                 }
@@ -124,14 +136,8 @@ struct PatientDetailView: View {
                     SummaryCard(title: Text("Amplitude"), systemImage: "arrow.up.and.down", color: .blue) {
                         Text("% de l'objectif")
                     } content: {
-                        VStack(alignment: .leading, spacing: 12) {
-                            AmplitudeChart(data: progress)
-                                .frame(height: 200)
-                            Text("Meilleure répétition de chaque séance, mesurée par la caméra du patient, à titre indicatif : 100 % correspond à l'objectif du mouvement.")
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
+                        AmplitudeChart(data: progress)
+                            .frame(height: 200)
                     }
                 }
 
@@ -139,12 +145,14 @@ struct PatientDetailView: View {
                     adjusting = PrescribingItem(program: transfer.program?.editableProgram ?? EditableProgram())
                 }
 
-                Button("Arrêter le suivi", systemImage: "person.badge.minus", role: .destructive) { confirmingStop = true }
-                    .frame(maxWidth: .infinity, minHeight: 44)
-                    .padding(.top, 8)
             }
             .padding(.horizontal)
             .padding(.bottom)
+        }
+        .background(alignment: .top) {
+            LinearGradient(colors: [Color.accentColor.opacity(0.4), .clear], startPoint: .top, endPoint: .bottom)
+                .frame(height: 300)
+                .ignoresSafeArea()
         }
         .background(Color(.systemGroupedBackground))
     }
@@ -222,10 +230,6 @@ private struct ProgramCard: View {
                     Text("Le bilan ne contient pas le programme. Vous pouvez en prescrire un nouveau.")
                         .foregroundStyle(.secondary)
                 }
-                Text("Le nouveau programme s'affiche en QR code : votre patient le scanne et le vérifie avant de l'enregistrer.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
                 Button(action: onAdjust) {
                     Label(program == nil ? "Prescrire un programme" : "Ajuster le programme", systemImage: "pencil")
                         .font(.headline)

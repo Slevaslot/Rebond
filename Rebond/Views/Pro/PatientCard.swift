@@ -7,15 +7,17 @@ struct PatientCard: View {
     let overview: PatientOverview?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 12) {
-                InitialsBadge(name: name)
-                VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 14) {
+                InitialsBadge(name: name, size: 52)
+                VStack(alignment: .leading, spacing: 3) {
                     Text(name)
-                        .font(.headline)
+                        .font(.title3.bold())
                     if let overview {
-                        Text("Bilan du \(overview.reportDate, format: .dateTime.day().month(.wide))")
-                            .font(.subheadline)
+                        AttentionLabel(overview: overview)
+                    } else {
+                        Label("Bilan illisible", systemImage: "doc.questionmark")
+                            .font(.subheadline.weight(.semibold))
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -25,20 +27,14 @@ struct PatientCard: View {
                     .foregroundStyle(.tertiary)
                     .accessibilityHidden(true)
             }
-
             if let overview {
-                AttentionLabel(overview: overview)
-                Divider()
                 PatientMetrics(overview: overview)
-            } else {
-                Label("Bilan illisible", systemImage: "doc.questionmark")
-                    .foregroundStyle(.secondary)
             }
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 24))
-        .contentShape(.rect(cornerRadius: 24))
+        .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 26))
+        .contentShape(.rect(cornerRadius: 26))
     }
 }
 
@@ -73,26 +69,26 @@ struct PatientMetrics: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
-        let columns = dynamicTypeSize.isAccessibilitySize ? 1 : 2
+        let columns = dynamicTypeSize.isAccessibilitySize ? 2 : 4
         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), alignment: .topLeading), count: columns),
                   alignment: .leading, spacing: 14) {
-            MetricTile(title: "Régularité", symbol: "calendar", color: .teal,
-                       value: "\(overview.sessionsDone)/\(overview.sessionsPlanned)", unit: "séances",
+            MetricTile(title: "Séances", symbol: "calendar", color: .teal,
+                       value: "\(overview.sessionsDone)", unit: "/\(overview.sessionsPlanned)",
                        accessibilityValue: Text("\(overview.sessionsDone) séances sur \(overview.sessionsPlanned)"))
             if let pain = overview.lastPain {
                 MetricTile(title: "Douleur", symbol: "bandage.fill", color: .orange,
-                           value: "\(pain)", unit: "sur 10",
+                           value: "\(pain)", unit: "/10",
                            accessibilityValue: Text("\(pain) sur 10 à la dernière séance"))
             } else {
                 MetricTile(title: "Douleur", symbol: "bandage.fill", color: .orange, value: "–", unit: "",
                            accessibilityValue: Text("Aucune séance"))
             }
             if overview.plannedReps > 0 {
-                MetricTile(title: "Répétitions", symbol: "repeat", color: .purple,
-                           value: "\(overview.completedReps)", unit: "sur \(overview.plannedReps)",
+                MetricTile(title: "Répét.", symbol: "repeat", color: .purple,
+                           value: "\(overview.completedReps)", unit: "/\(overview.plannedReps)",
                            accessibilityValue: Text("\(overview.completedReps) sur \(overview.plannedReps), \(overview.incompleteReps) incomplètes"))
             } else {
-                MetricTile(title: "Répétitions", symbol: "repeat", color: .purple, value: "–", unit: "",
+                MetricTile(title: "Répét.", symbol: "repeat", color: .purple, value: "–", unit: "",
                            accessibilityValue: Text("Aucune répétition prévue"))
             }
             if let amplitude = overview.amplitude {

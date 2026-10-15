@@ -277,7 +277,7 @@ private struct RestDayCard: View {
                 if programs.active.isEmpty {
                     Label("Aucun programme suivi", systemImage: "list.bullet.clipboard")
                         .font(.title2.bold())
-                    Text("Choisissez le programme à suivre dans Programmes.")
+                    Text("Choisissez le programme à suivre dans Exercices.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                     Button {

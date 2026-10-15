@@ -44,8 +44,9 @@ struct RootView: View {
                     .environment(\.workoutTransition, workoutTransition)
             }
             // Without a program, Accueil already offers to add one: a second tab would be the same page.
+            // "Exercices": the programs, and single exercises to do on their own.
             if !programs.isEmpty {
-                Tab("Programme", systemImage: "list.bullet.clipboard", value: .program) {
+                Tab("Exercices", systemImage: "figure.mixed.cardio", value: .program) {
                     ProgramTab()
                 }
             }
