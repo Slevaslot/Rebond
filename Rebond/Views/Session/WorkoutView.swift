@@ -16,6 +16,8 @@ struct WorkoutView: View {
     @State private var start = Date.now
     /// Filmed exercises whose example the patient has watched in this session.
     @State private var examplesSeen: Set<Int> = []
+    /// Exercises counted by hand because the camera is unavailable.
+    @State private var countedByHand: Set<Int> = []
     @State private var confirmingStop = false
     /// The set on screen has started (a repetition counted, the timer running): stopping would lose it.
     @State private var currentSetStarted = false
@@ -117,6 +119,8 @@ struct WorkoutView: View {
     private func stepView(_ step: WorkoutStep) -> some View {
         let title: LocalizedStringKey = "Série \(step.set) sur \(step.exercise.sets)"
         switch step.exercise.mode {
+        case .camera where countedByHand.contains(step.exerciseIndex):
+            ManualSetView(name: step.exercise.name, targetReps: step.exercise.reps, setTitle: title, onFinish: finish)
         case .camera(let catalogID):
             if let exercise = CatalogExercise.find(catalogID), let reference = exercise.reference,
                plan.isFirstSetOfExercise, !examplesSeen.contains(step.exerciseIndex) {
@@ -132,6 +136,7 @@ struct WorkoutView: View {
                     showsDemonstration: plan.isFirstSetOfExercise,
                     nextTitle: nextTitle,
                     onAnotherSet: anotherSetAction,
+                    onCountByHand: { countedByHand.insert(step.exerciseIndex) },
                     onFinish: finish
                 )
             }

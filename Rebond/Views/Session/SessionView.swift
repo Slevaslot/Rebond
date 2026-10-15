@@ -1,3 +1,4 @@
+import AVFoundation
 import SwiftUI
 
 /// Guided session: camera feed with the skeleton, repetition counter, depth gauge and corrections on top.
@@ -9,9 +10,14 @@ struct SessionView: View {
     let nextTitle: LocalizedStringKey?
     /// After the last set of an exercise done on its own: one more set, instead of ending on a countdown.
     var onAnotherSet: ((SetResult) -> Void)?
+    /// Without the camera: the rest of this exercise counted by hand.
+    var onCountByHand: (() -> Void)?
     let onFinish: (SetResult) -> Void
 
     @State private var motion: MotionSession
+    @Environment(\.openURL) private var openURL
+    /// Never asked yet: a screen says why before the system alert (HIG *Privacy*), with a single button.
+    @State private var explainingCamera = AVCaptureDevice.authorizationStatus(for: .video) == .notDetermined
     @Environment(\.reportSetActivity) private var reportSetActivity
     @Environment(\.skipRequest) private var skipRequest
     /// Seconds before the next set starts on its own, once this one is finished.
@@ -31,8 +37,10 @@ struct SessionView: View {
         showsDemonstration: Bool = true,
         nextTitle: LocalizedStringKey? = nil,
         onAnotherSet: ((SetResult) -> Void)? = nil,
+        onCountByHand: (() -> Void)? = nil,
         onFinish: @escaping (SetResult) -> Void
     ) {
+        self.onCountByHand = onCountByHand
         self.exercise = exercise
         self.setTitle = setTitle
         self.nextTitle = nextTitle
@@ -74,10 +82,12 @@ struct SessionView: View {
         .ignoresSafeArea()
         .overlay(alignment: .top) {
             Group {
-                if motion.cameraUnavailable {
+                if explainingCamera {
+                    EmptyView()
+                } else if motion.cameraUnavailable {
                     topCard(title: "Caméra indisponible", detail: motion.cameraAccessDenied
-                        ? "Autorisez l'accès à la caméra dans Réglages pour que Rebond suive vos mouvements."
-                        : "Aucune caméra avant n'est disponible. Vous pouvez terminer la série.")
+                        ? "Autorisez l'accès à la caméra dans Réglages pour que Rebond suive vos mouvements, ou comptez vous-même."
+                        : "Aucune caméra avant n'est disponible. Comptez vous-même vos répétitions.")
                 } else if motion.isPaused {
                     EmptyView()
                 } else if motion.phase == .calibrating, !motion.showsDemonstration {
@@ -130,15 +140,34 @@ struct SessionView: View {
         .overlay {
             statusCard.padding()
         }
+        .overlay {
+            if explainingCamera { cameraExplanation.padding() }
+        }
         .overlay(alignment: .bottom) {
             // While paused, only the top bar and the pause button remain.
-            if !motion.isPaused {
+            if !motion.isPaused, !explainingCamera {
                 VStack(spacing: 16) {
                     if let feedback = motion.feedback {
                         feedbackBanner(feedback)
                     }
                     // During setup the guide outline needs the space; Passer stays in the toolbar.
-                    if motion.phase == .active || motion.cameraUnavailable {
+                    if motion.cameraUnavailable {
+                        // A way on without the camera: Réglages, or counting by hand.
+                        if motion.cameraAccessDenied, let settings = URL(string: UIApplication.openSettingsURLString) {
+                            Button("Ouvrir Réglages", systemImage: "gear") { openURL(settings) }
+                                .buttonStyle(.glassProminent)
+                                .controlSize(.extraLarge)
+                        }
+                        if let onCountByHand {
+                            Button("Compter à la main", systemImage: "hand.tap") { onCountByHand() }
+                                .buttonStyle(.glass)
+                                .controlSize(.extraLarge)
+                        } else {
+                            Button("Terminer la série") { onFinish(motion.result) }
+                                .buttonStyle(.glass)
+                                .controlSize(.extraLarge)
+                        }
+                    } else if motion.phase == .active {
                         Button("Terminer la série") { onFinish(motion.result) }
                             .buttonStyle(.glass)
                             .controlSize(.extraLarge)
@@ -154,9 +183,12 @@ struct SessionView: View {
         .navigationTitle(Text(exercise.name))
         .navigationSubtitle(Text(setTitle))
         .navigationBarTitleDisplayMode(.inline)
+        // Over the camera, always light on dark: the exercise name stays readable in light mode too.
+        .toolbarColorScheme(.dark, for: .navigationBar)
+        .environment(\.colorScheme, .dark)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                if motion.phase != .finished, !motion.cameraUnavailable {
+                if motion.phase != .finished, !motion.cameraUnavailable, !explainingCamera {
                     Button(motion.isPaused ? "Reprendre" : "Pause",
                            systemImage: motion.isPaused ? "play.fill" : "pause.fill") {
                         motion.togglePause()
@@ -173,7 +205,8 @@ struct SessionView: View {
         .onChange(of: isWatching || motion.isPaused, initial: true) { _, blurred in
             motion.blurWholePicture(blurred)
         }
-        .task {
+        .task(id: explainingCamera) {
+            guard !explainingCamera else { return }
             // Thumbs up from where the patient stands: next set.
             let session = motion
             session.onNext = { [weak session] in
@@ -391,6 +424,28 @@ struct SessionView: View {
         .glassEffect(in: .capsule)
         .contentTransition(.opacity)
         .animation(.default, value: placement)
+    }
+
+    /// Before the system alert: why the camera, and that the images stay on the iPhone. A single button.
+    private var cameraExplanation: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "camera.fill")
+                .font(.largeTitle)
+                .foregroundStyle(.tint)
+                .accessibilityHidden(true)
+            Text("Rebond a besoin de la caméra")
+                .font(.title3.bold())
+            Text("Elle compte vos répétitions et vous conseille pendant la série. Les images restent sur votre iPhone.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            Button("Continuer") { explainingCamera = false }
+                .buttonStyle(.glassProminent)
+                .controlSize(.large)
+                .padding(.top, 4)
+        }
+        .multilineTextAlignment(.center)
+        .padding(24)
+        .glassEffect(in: .rect(cornerRadius: 28))
     }
 
     private func topCard(title: LocalizedStringKey, detail: LocalizedStringKey) -> some View {
