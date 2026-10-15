@@ -50,7 +50,7 @@ Prévoir des données de démo (un programme et quelques séances pré-remplies)
 | Modèle économique | Le patient ne paie jamais. Kiné : offre gratuite (tout en local, 3 patients suivis) et Rebond Pro (patients illimités, tout en local). Voir `BUSINESS.md`. |
 | Serveur | Aucun. La version connectée de démo (`Server/`, `DemoServer`) a été supprimée : les bilans et les programmes passent seulement par le fichier `.rebond` et le QR code. |
 | Espace kiné | Un onglet « Kiné » de plus (pas une app à part) : le kiné garde l'accès à l'app patient. Activé dans Réglages ou en ouvrant un bilan, il reste activé d'un lancement à l'autre et l'app s'ouvre dessus. Patients de démo pour la présentation. |
-| Tutoriel | Aucun écran d'accueil ni tutoriel : la séance guide le patient à la voix. |
+| Premier lancement | Un seul écran : une phrase, l'avertissement médical, « Je suis patient » / « Je suis kiné » (le kiné arrive sur son espace). Pas de tutoriel : la séance guide le patient à la voix. |
 | Commandes à distance | Geste de la main (paume ouverte = pause) doublé d'un bouton. Pas d'AirPods, pas de boutons de volume. |
 | HealthKit | Seulement s'il est réellement utilisé dans le build soumis. Ne pas déclarer la capacité avant. |
 | Icône | Format Icon Composer (`AppIcon.icon` : fond en dégradé + symbole en calque Liquid Glass), compatible avec les modes sombre, teinté et transparent d'iOS. |

@@ -63,7 +63,8 @@ Le QR code prescrit depuis l'espace Kiné n'a pas besoin de bouton : le patient 
 ## Premier lancement (HIG *Launching*, *Onboarding*, *Privacy*)
 
 - Écran de lancement de la couleur de fond du premier écran, sans logo ni texte.
-- **Pas d'écran d'accueil ni de tutoriel** (décision dans `CLAUDE.md`) : l'app s'ouvre sur l'Accueil sans programme décrit plus haut, et la séance guide le patient à la voix. L'avertissement « Rebond ne remplace pas l'avis d'un professionnel de santé » est dans Réglages et dans le bilan PDF.
+- **Un seul écran de bienvenue**, au premier lancement (`WelcomeView`) : « Votre rééducation à la maison, suivie par votre kiné. », l'avertissement médical, puis « Je suis patient » (Accueil) ou « Je suis kiné » (onglet Kiné). Aucune autorisation demandée. Le choix se change dans Réglages. Il n'apparaît pas quand l'app est ouverte par un QR code ou un bilan.
+- **Pas de tutoriel** : l'Accueil sans programme montre les étapes, la séance guide le patient à la voix. L'avertissement médical est aussi en bas de l'Accueil, dans Réglages et dans le bilan PDF.
 - **Aucune autorisation demandée au lancement.** La caméra est demandée au premier scan ou à la première séance, après un écran d'explication à **un seul bouton** qui ouvre l'alerte système.
 - Les notifications sont proposées après la première séance réussie, quand le patient comprend leur intérêt.
 

@@ -12,6 +12,8 @@ struct RootView: View {
     @Query(sort: \Program.createdAt, order: .reverse) private var programs: [Program]
     @Query private var library: [LibraryExercise]
     @AppStorage(AppRole.key) private var role = AppRole.patient.rawValue
+    /// The welcome screen is shown once, at first launch.
+    @AppStorage(AppRole.welcomeSeenKey) private var welcomeSeen = false
 
     /// The program being reviewed before it is saved: read from a photo, typed, or prescribed.
     private struct Draft: Identifiable {
@@ -75,6 +77,14 @@ struct RootView: View {
         }
         .onChange(of: role) {
             if !isPhysiotherapist, router.tab == .physio { router.tab = .today }
+        }
+        .fullScreenCover(isPresented: Binding(get: { !welcomeSeen }, set: { if !$0 { welcomeSeen = true } })) {
+            WelcomeView { chosen in
+                role = chosen.rawValue
+                if chosen == .physiotherapist { router.openPhysioSpace() }
+                welcomeSeen = true
+            }
+            .interactiveDismissDisabled()
         }
         .fullScreenCover(isPresented: $router.isWorkoutPresented) {
             if let free = router.freeExercise {
@@ -179,6 +189,8 @@ struct RootView: View {
 
     /// A program link scanned from the physiotherapist's QR code, or a report file opened with Rebond.
     private func open(_ url: URL) {
+        // Opened from a QR code or a report: what to do is clear, no welcome screen over it.
+        welcomeSeen = true
         if let transfer = ProgramTransfer(url: url) {
             prescriber = transfer.k ?? ""
             let notice: LocalizedStringKey = if let name = transfer.k {

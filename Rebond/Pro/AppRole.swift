@@ -7,6 +7,8 @@ enum AppRole: String {
     case physiotherapist
 
     static let key = "appRole"
+    /// Set once the first-launch screen (patient or physiotherapist) was answered.
+    static let welcomeSeenKey = "welcomeSeen"
 
     /// Whether the physiotherapist space is turned on. Kept from one launch to the next.
     static var isPhysiotherapistEnabled: Bool {
