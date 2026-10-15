@@ -1,18 +1,5 @@
 import AppIntents
 
-/// "Démarrer ma séance": from Shortcuts, Spotlight, the Action button or Control Center.
-struct StartSessionIntent: AppIntent {
-    static let title: LocalizedStringResource = "Démarrer ma séance"
-    static let description = IntentDescription("Ouvre Rebond et lance la séance de votre programme.")
-    static let supportedModes: IntentModes = .foreground
-
-    @MainActor
-    func perform() async throws -> some IntentResult {
-        AppRouter.shared.startWorkoutIfProgram()
-        return .result()
-    }
-}
-
 extension AppRouter {
     /// Starts the session from outside the app (widget, Shortcuts, Spotlight). Without a program yet,
     /// shows the Accueil page, which explains how to add one, rather than an empty session.
@@ -52,6 +39,15 @@ struct RebondShortcuts: AppShortcutsProvider {
             ],
             shortTitle: "Séances de la semaine",
             systemImageName: "chart.bar"
+        )
+        AppShortcut(
+            intent: StartSeanceIntent(),
+            phrases: [
+                "Commencer \(\.$target) avec \(.applicationName)",
+                "Lancer \(\.$target) avec \(.applicationName)",
+            ],
+            shortTitle: "Commencer une séance",
+            systemImageName: "figure.mixed.cardio"
         )
     }
 }

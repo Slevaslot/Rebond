@@ -42,11 +42,7 @@ enum ReminderScheduler {
         center.removeAllPendingNotificationRequests()
 
         for weekday in Set(days) {
-            let content = UNMutableNotificationContent()
-            content.title = String(localized: "C'est l'heure de votre séance")
-            content.body = String(localized: "Quelques minutes d'exercices, guidés par Rebond.")
-            content.sound = .default
-            content.interruptionLevel = .active
+            let content = sessionContent()
             var date = DateComponents()
             date.weekday = weekday
             date.hour = hour
@@ -63,6 +59,24 @@ enum ReminderScheduler {
         sunday.hour = hour
         let trigger = UNCalendarNotificationTrigger(dateMatching: sunday, repeats: true)
         try? await center.add(UNNotificationRequest(identifier: reportID, content: report, trigger: trigger))
+    }
+
+    /// The session reminder, with its "Commencer maintenant" and "Dans 1 heure" buttons.
+    private static func sessionContent() -> UNMutableNotificationContent {
+        let content = UNMutableNotificationContent()
+        content.title = String(localized: "C'est l'heure de votre séance")
+        content.body = String(localized: "Quelques minutes d'exercices, guidés par Rebond.")
+        content.sound = .default
+        content.interruptionLevel = .active
+        content.categoryIdentifier = ReminderActions.sessionCategory
+        return content
+    }
+
+    /// "Dans 1 heure": the same reminder, once, an hour from now.
+    static func remindLater() async {
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 3600, repeats: false)
+        try? await UNUserNotificationCenter.current().add(
+            UNNotificationRequest(identifier: "\(sessionPrefix)later", content: sessionContent(), trigger: trigger))
     }
 
     /// Session days spread over the week, Monday first (Calendar weekdays: 1 is Sunday).

@@ -3,7 +3,8 @@ import SwiftUI
 import WidgetKit
 
 /// The set in progress on the Lock Screen and in the Dynamic Island: exercise, "4 / 10", "Série 2 sur 3".
-/// Started and updated by the app (`Rebond/Workout/WorkoutLiveActivity.swift`).
+/// Started and updated by the app (`Rebond/Workout/WorkoutLiveActivity.swift`). The small family also shows it
+/// in the Apple Watch Smart Stack, without any watch app.
 struct WorkoutLiveActivityWidget: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: WorkoutActivityAttributes.self) { context in
@@ -51,13 +52,44 @@ struct WorkoutLiveActivityWidget: Widget {
             }
             .keylineTint(.accentColor)
         }
+        .supplementalActivityFamilies([.small])
     }
 }
 
 private struct LockScreenView: View {
     let state: WorkoutActivityAttributes.ContentState
+    @Environment(\.activityFamily) private var family
 
     var body: some View {
+        if family == .small {
+            watchView
+        } else {
+            lockScreenView
+        }
+    }
+
+    /// On the Apple Watch: the exercise and the count, large enough to read at arm's length.
+    private var watchView: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Image(systemName: state.symbol)
+                    .foregroundStyle(Color.accentColor)
+                Text(state.exercise)
+                    .font(.caption.bold())
+                    .lineLimit(1)
+            }
+            CountText(state: state)
+                .font(.system(size: 28, weight: .bold, design: .rounded))
+            SetText(state: state)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(8)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var lockScreenView: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 12) {
                 ExerciseSymbol(symbol: state.symbol, size: 48)

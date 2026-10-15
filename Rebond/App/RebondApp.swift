@@ -5,6 +5,12 @@ import SwiftUI
     @State private var router = AppRouter.shared
     @State private var store = ProStore()
 
+    init() {
+        // The Control Center button, the Action button and Siri start the session through the router.
+        StartSessionIntent.handler = { AppRouter.shared.startWorkoutIfProgram() }
+        ReminderActions.register()
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView()
@@ -17,6 +23,6 @@ import SwiftUI
                     if DeepLink.isSession(url) { router.startWorkoutIfProgram() }
                 }
         }
-        .modelContainer(for: [Program.self, Session.self, TrackedPatient.self, ProgramTemplate.self])
+        .modelContainer(AppData.container)
     }
 }

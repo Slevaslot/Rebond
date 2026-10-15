@@ -15,6 +15,11 @@ struct WidgetSync: ViewModifier {
             .onChange(of: snapshot, initial: true) { _, snapshot in
                 Self.publish(snapshot)
             }
+            // Spotlight: the programs by name, and the exercises the camera follows.
+            .task(id: programs.map { "\($0.title)\($0.exercises.count)" }) {
+                await SeanceEntity.index(programs)
+            }
+            .task { await ExerciseEntity.index() }
     }
 
     private var snapshot: WidgetSnapshot {
