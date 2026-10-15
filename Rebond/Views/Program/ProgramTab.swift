@@ -37,7 +37,6 @@ struct ProgramTab: View {
 
     private var header: some View {
         PageHeader("Exercices") {
-            AddProgramMenu()
             ProfileButton { showingSettings = true }
         }
     }
@@ -313,6 +312,8 @@ private struct AddSessionButton: View {
         .buttonStyle(.glassProminent)
         .buttonBorderShape(.capsule)
         .controlSize(.extraLarge)
+        // In a list, a menu keeps its label's width and sits on the leading side: stretch the menu itself.
+        .frame(maxWidth: .infinity)
     }
 }
 
