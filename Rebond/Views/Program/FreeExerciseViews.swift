@@ -43,32 +43,11 @@ struct FreeExerciseCard: View {
 struct FreeExercisePicker: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(AppRouter.self) private var router
-    /// The exercises filmed at the physiotherapist's, the latest first.
-    @State private var filmed = ReferenceStore.all()
-    @State private var filming = false
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    Button { filming = true } label: {
-                        Label("Filmer un exercice", systemImage: "video.fill")
-                            .font(.headline)
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.glassProminent)
-                    .buttonBorderShape(.capsule)
-                    .controlSize(.extraLarge)
-                    .padding(.vertical, 4)
-
-                    if !filmed.isEmpty {
-                        sectionTitle("Vos exercices")
-                        ForEach(filmed) { movement in
-                            let exercise = movement.catalogExercise
-                            ExerciseStartCard(exercise: exercise) { sets, reps in start(exercise, sets: sets, reps: reps) }
-                        }
-                        sectionTitle("Exercices Rebond")
-                    }
+                VStack(spacing: 14) {
                     ForEach(CatalogExercise.all) { exercise in
                         ExerciseStartCard(exercise: exercise) { sets, reps in start(exercise, sets: sets, reps: reps) }
                     }
@@ -82,20 +61,7 @@ struct FreeExercisePicker: View {
             .toolbar {
                 Button("Fermer", systemImage: "xmark", role: .close) { dismiss() }
             }
-            .sheet(isPresented: $filming) {
-                FilmExerciseView { _ in
-                    withAnimation(.snappy) { filmed = ReferenceStore.all() }
-                }
-            }
         }
-    }
-
-    private func sectionTitle(_ title: LocalizedStringKey) -> some View {
-        Text(title)
-            .font(.title3.bold())
-            .accessibilityAddTraits(.isHeader)
-            .padding(.horizontal, 4)
-            .padding(.top, 8)
     }
 
     private func start(_ exercise: CatalogExercise, sets: Int, reps: Int) {
