@@ -7,6 +7,8 @@ struct SessionView: View {
     let setTitle: LocalizedStringKey
     /// What comes next, shown at the end of the set. Nil after the last set.
     let nextTitle: LocalizedStringKey?
+    /// After the last set of an exercise done on its own: one more set, instead of ending on a countdown.
+    var onAnotherSet: ((SetResult) -> Void)?
     let onFinish: (SetResult) -> Void
 
     @State private var motion: MotionSession
@@ -28,11 +30,13 @@ struct SessionView: View {
         setTitle: LocalizedStringKey,
         showsDemonstration: Bool = true,
         nextTitle: LocalizedStringKey? = nil,
+        onAnotherSet: ((SetResult) -> Void)? = nil,
         onFinish: @escaping (SetResult) -> Void
     ) {
         self.exercise = exercise
         self.setTitle = setTitle
         self.nextTitle = nextTitle
+        self.onAnotherSet = onAnotherSet
         self.onFinish = onFinish
         _motion = State(initialValue: MotionSession(exercise: exercise, targetReps: targetReps, showsDemonstration: showsDemonstration))
     }
@@ -181,7 +185,8 @@ struct SessionView: View {
         .onChange(of: skipRequest) { if skipRequest != nil { onFinish(motion.result) } }
         .task(id: motion.phase == .finished) {
             // The next set starts on its own after a short rest: no need to walk back to the phone.
-            guard motion.phase == .finished else { return }
+            // Not when the patient chooses between one more set and stopping.
+            guard motion.phase == .finished, !offersAnotherSet else { return }
             restRemaining = Self.restDuration
             while restRemaining > 0 {
                 try? await Task.sleep(for: .seconds(1))
@@ -238,6 +243,11 @@ struct SessionView: View {
         .padding()
         .glassEffect(in: .rect(cornerRadius: 28))
         .accessibilityElement(children: .combine)
+    }
+
+    /// The last set of an exercise done on its own: the patient decides whether to do another one.
+    private var offersAnotherSet: Bool {
+        onAnotherSet != nil && nextTitle == nil
     }
 
     /// Far enough from the phone for the outline: the whole body is seen at a size that fits it.
@@ -388,7 +398,24 @@ struct SessionView: View {
     /// Body lost during the set and end-of-set messages, in the middle of the screen.
     @ViewBuilder
     private var statusCard: some View {
-        if motion.phase == .finished {
+        if motion.phase == .finished, offersAnotherSet {
+            VStack(spacing: 16) {
+                card(systemImage: "checkmark.circle.fill", color: .green,
+                     title: "Série terminée !",
+                     detail: "\(motion.repCount) répétitions")
+                HStack {
+                    Button("Terminer", systemImage: "flag.checkered") {
+                        onFinish(motion.result)
+                    }
+                    .buttonStyle(.glass)
+                    Button("Une série de plus", systemImage: "arrow.clockwise") {
+                        onAnotherSet?(motion.result)
+                    }
+                    .buttonStyle(.glassProminent)
+                }
+                .controlSize(.extraLarge)
+            }
+        } else if motion.phase == .finished {
             VStack(spacing: 16) {
                 card(systemImage: "checkmark.circle.fill", color: .green,
                      title: "Série terminée !",

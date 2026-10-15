@@ -19,16 +19,18 @@ struct WorkoutView: View {
     @State private var currentSetStarted = false
     /// Asked from the Passer menu: the set's screen answers with what it did so far.
     @State private var skipRequest: SkipRequest?
+    private let offersMoreSets: Bool
 
     /// - Parameter onlyExercise: index of the single exercise to do, or nil for the whole program.
     init(program: Program, onlyExercise: Int? = nil) {
         var exercises = program.orderedExercises
         if let onlyExercise, exercises.indices.contains(onlyExercise) { exercises = [exercises[onlyExercise]] }
-        self.init(exercises: exercises.map(\.workoutExercise))
+        self.init(exercises: exercises.map(\.workoutExercise), offersMoreSets: onlyExercise != nil)
     }
 
-    /// Exercises without a program, e.g. one exercise chosen on its own.
-    init(exercises: [WorkoutExercise]) {
+    /// Exercises without a program, e.g. one exercise chosen on its own: its last set offers one more.
+    init(exercises: [WorkoutExercise], offersMoreSets: Bool = false) {
+        self.offersMoreSets = offersMoreSets
         let plan = WorkoutPlan(exercises: exercises)
         _plan = State(initialValue: plan)
         _stage = State(initialValue: .sets)
@@ -118,6 +120,7 @@ struct WorkoutView: View {
                     setTitle: title,
                     showsDemonstration: plan.isFirstSetOfExercise,
                     nextTitle: nextTitle,
+                    onAnotherSet: anotherSetAction,
                     onFinish: finish
                 )
             }
@@ -148,6 +151,18 @@ struct WorkoutView: View {
         return next.exerciseIndex == plan.currentStep?.exerciseIndex
             ? "Série \(next.set) sur \(next.exercise.sets)"
             : "\(next.exercise.name), série 1 sur \(next.exercise.sets)"
+    }
+
+    private var anotherSetAction: ((SetResult) -> Void)? {
+        guard offersMoreSets else { return nil }
+        return { result in anotherSet(result) }
+    }
+
+    /// Keeps the set just done and adds one more of the same exercise.
+    private func anotherSet(_ result: SetResult) {
+        currentSetStarted = false
+        plan.record(result)
+        plan.addSet()
     }
 
     private func finish(_ result: SetResult) {

@@ -83,7 +83,7 @@ private struct ExerciseStartCard: View {
     let onStart: (_ sets: Int, _ reps: Int) -> Void
 
     @State private var showsMovement = false
-    private let reps = 10
+    @State private var reps = 10
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -108,9 +108,26 @@ private struct ExerciseStartCard: View {
                 Text(exercise.name)
                     .font(.title.bold())
                     .fixedSize(horizontal: false, vertical: true)
-                Label("^[\(reps) répétition](inflect: true) · suivi caméra", systemImage: "camera.viewfinder")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                // The number of repetitions, chosen in place; the play button starts with it.
+                Menu {
+                    Picker("Répétitions", selection: $reps) {
+                        ForEach([5, 8, 10, 12, 15, 20], id: \.self) { Text("^[\($0) répétition](inflect: true)").tag($0) }
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Text("^[\(reps) répétition](inflect: true)")
+                            .monospacedDigit()
+                        Image(systemName: "chevron.down")
+                            .font(.caption.weight(.bold))
+                    }
+                    .font(.headline)
+                    .foregroundStyle(.tint)
+                    .padding(.horizontal, 14)
+                    .frame(minHeight: 40)
+                    .background(Color.accentColor.opacity(0.15), in: .capsule)
+                }
+                .padding(.top, 4)
+                .accessibilityLabel(Text("Nombre de répétitions : \(reps)"))
             }
             if showsMovement {
                 MovementCard(catalog: exercise, symbol: exercise.symbol, height: 220)

@@ -47,8 +47,8 @@ nonisolated struct ExerciseTally: Sendable, Equatable {
 
 /// The steps of a session and what was done so far. Pure logic, tested without a screen.
 nonisolated struct WorkoutPlan: Sendable {
-    let exercises: [WorkoutExercise]
-    let steps: [WorkoutStep]
+    private(set) var exercises: [WorkoutExercise]
+    private(set) var steps: [WorkoutStep]
     private(set) var tallies: [ExerciseTally]
     private(set) var currentIndex = 0
 
@@ -109,6 +109,18 @@ nonisolated struct WorkoutPlan: Sendable {
         while let next = currentStep, next.exerciseIndex == step.exerciseIndex {
             currentIndex += 1
         }
+    }
+
+    /// One more set of the last exercise, after it was finished (an exercise done on its own).
+    mutating func addSet() {
+        guard let last = steps.last else { return }
+        let index = last.exerciseIndex
+        let old = exercises[index]
+        let exercise = WorkoutExercise(name: old.name, catalogID: old.catalogID, mode: old.mode,
+                                       sets: old.sets + 1, reps: old.reps)
+        exercises[index] = exercise
+        steps = steps.map { $0.exerciseIndex == index ? WorkoutStep(exerciseIndex: index, exercise: exercise, set: $0.set) : $0 }
+            + [WorkoutStep(exerciseIndex: index, exercise: exercise, set: exercise.sets)]
     }
 
     /// Stops early: the remaining sets are left undone.
