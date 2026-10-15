@@ -121,20 +121,37 @@ struct RecordMovementView: View {
         case .countdown:
             EmptyView()
         case .recording:
-            Button { Task { await stopRecording() } } label: {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(.red)
-                    .frame(width: 34, height: 34)
-                    .frame(width: 66, height: 66)
-                    .padding(6)
-                    .overlay(Circle().stroke(.white, lineWidth: 5))
+            ZStack {
+                Button { Task { await stopRecording() } } label: {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(.red)
+                        .frame(width: 34, height: 34)
+                        .frame(width: 66, height: 66)
+                        .padding(6)
+                        .overlay(Circle().stroke(.white, lineWidth: 5))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Text("Arrêter de filmer"))
+                Button("Recommencer", systemImage: "arrow.counterclockwise") { Task { await restartRecording() } }
+                    .labelStyle(.iconOnly)
+                    .font(.title3.weight(.semibold))
+                    .frame(width: 56, height: 56)
+                    .glassEffect(in: .circle)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.leading, 24)
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel(Text("Arrêter de filmer"))
         case .saved:
             VStack(spacing: 12) {
                 Button { startCountdown() } label: {
                     Label("Filmer l'exercice suivant", systemImage: "video.fill")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.glass)
+                .buttonBorderShape(.capsule)
+                .controlSize(.extraLarge)
+                Button { redoLastTake() } label: {
+                    Label("Refilmer cet exercice", systemImage: "arrow.counterclockwise")
                         .font(.headline)
                         .frame(maxWidth: .infinity)
                 }
@@ -195,6 +212,18 @@ struct RecordMovementView: View {
         } else {
             finish()
         }
+    }
+
+    /// Throws the take being filmed away and films it again, after the countdown.
+    private func restartRecording() async {
+        if let video = await camera.stopRecording() { try? FileManager.default.removeItem(at: video) }
+        startCountdown()
+    }
+
+    /// Throws the last saved take away and films that exercise again.
+    private func redoLastTake() {
+        if let video = takes.popLast() { try? FileManager.default.removeItem(at: video) }
+        startCountdown()
     }
 
     private func finish() {
