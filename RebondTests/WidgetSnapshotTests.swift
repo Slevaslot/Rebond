@@ -76,12 +76,38 @@ struct WidgetSnapshotTests {
         ]
         context.insert(program)
         sessions.forEach(context.insert)
-        let snapshot = WidgetSnapshot(program: program, sessions: sessions, now: now)
+        let snapshot = WidgetSnapshot(programs: [program], sessions: sessions, now: now)
         #expect(snapshot.hasProgram)
         #expect(snapshot.sessionsPerWeek == 4)
         #expect(snapshot.exercises.map(\.name) == ["Squat", "Gainage"])
         #expect(snapshot.exercises[1].holdSeconds == 30)
         #expect(snapshot.sessionDates.count == 1)
-        #expect(WidgetSnapshot(program: nil, sessions: sessions) == .empty)
+        #expect(WidgetSnapshot(programs: [], sessions: sessions) == .empty)
+    }
+
+    @MainActor
+    @Test func gathersTheProgramsOfTheDay() throws {
+        let container = try ModelContainer(for: Program.self, Session.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+        let context = container.mainContext
+        let now = Date.now
+        let today = Calendar.current.component(.weekday, from: now)
+        let otherDay = today % 7 + 1
+        let knee = Program(createdAt: now.addingTimeInterval(-60), sessionsPerWeek: 2, exercises: [
+            PlannedExercise(catalogID: "squat", name: "Squat", sets: 3, reps: 10, order: 0),
+        ], weekdays: [today, otherDay])
+        let back = Program(createdAt: now, sessionsPerWeek: 1, exercises: [
+            PlannedExercise(catalogID: nil, name: "Gainage", sets: 2, reps: 0, holdSeconds: 30, order: 0),
+        ], weekdays: [today])
+        let paused = Program(sessionsPerWeek: 1, exercises: [
+            PlannedExercise(catalogID: nil, name: "Étirement", sets: 1, reps: 5, order: 0),
+        ], weekdays: [today])
+        paused.isActive = false
+        [knee, back, paused].forEach(context.insert)
+
+        let snapshot = WidgetSnapshot(programs: [back, paused, knee], sessions: [], now: now)
+        // Oldest program first; a program not followed is left out.
+        #expect(snapshot.exercises.map(\.name) == ["Squat", "Gainage"])
+        // Two different days in the week, whatever the number of programs.
+        #expect(snapshot.sessionsPerWeek == 2)
     }
 }
