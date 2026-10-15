@@ -166,7 +166,7 @@ struct InitialsBadge: View {
 extension PatientOverview {
     /// "1 séance sur 3 · douleur 8/10 · amplitude 73 %": the week in one quiet line.
     var summaryLine: String {
-        var parts = [String(localized: "\(sessionsDone) séances sur \(sessionsPlanned)")]
+        var parts = [String(localized: "^[\(sessionsDone) séance](inflect: true) sur \(sessionsPlanned)")]
         if let lastPain { parts.append(String(localized: "douleur \(lastPain)/10")) }
         if let amplitude { parts.append(String(localized: "amplitude \(Int(amplitude.rounded())) %")) }
         return parts.joined(separator: " · ")

@@ -19,6 +19,7 @@ struct ProHomeView: View {
     @State private var importError = false
     @State private var removing: TrackedPatient?
     @State private var showingPatientSettings = false
+    @State private var search = ""
 
     /// The patients with what the last report says, those needing attention first.
     private var followed: [(patient: TrackedPatient, overview: PatientOverview?)] {
@@ -35,50 +36,70 @@ struct ProHomeView: View {
 
     var body: some View {
         NavigationStack(path: $path) {
-            // A list rather than a scroll view, for the system's swipe actions; it keeps the look of the cards.
+            // A plain iOS list, like Contacts: search, one row per patient, nothing else.
             List {
-                PageHeader("Espace kiné") {
-                    Button { showingSettings = true } label: { HeaderIcon(systemImage: "gearshape") }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Réglages de l'espace kiné")
-                    ProfileButton { showingPatientSettings = true }
-                }
-                .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 7, trailing: 16))
-                .listRowSeparator(.hidden)
-                .listRowBackground(Color.clear)
-
-                let followed = followed
-                WeekOverviewCard(overviews: followed.compactMap(\.overview), patientCount: patients.count, hasPro: store.hasPro)
-                    .pageRow()
-                PrescribeCard { prescribing = PrescribingItem(program: EditableProgram()) }
-                    .pageRow()
-
-                patientsHeader.pageRow()
-                if followed.isEmpty {
-                    EmptyPatientsCard(
-                        onImport: { importing = true },
-                        onDemo: { DemoData.loadPatients(into: context) }
-                    )
-                    .pageRow()
-                } else {
-                    ForEach(followed, id: \.patient.patientID) { item in
-                        Button { path.append(item.patient.patientID) } label: {
-                            PatientCard(name: item.patient.name, overview: item.overview)
+                Section {
+                    PageHeader("Espace kiné") {
+                        Menu {
+                            Button("Prescrire un programme", systemImage: "qrcode") {
+                                prescribing = PrescribingItem(program: EditableProgram())
+                            }
+                            Button("Importer un bilan", systemImage: "square.and.arrow.down") { importing = true }
+                            Divider()
+                            Button("Réglages de l'espace kiné", systemImage: "gearshape") { showingSettings = true }
+                        } label: {
+                            HeaderIcon(systemImage: "plus")
                         }
-                        .buttonStyle(.plain)
-                        // Like Mail: swipe to the left to stop following.
-                        .swipeActions(edge: .trailing) {
-                            Button("Arrêter le suivi", systemImage: "person.badge.minus", role: .destructive) { removing = item.patient }
-                        }
-                        .accessibilityAction(named: "Arrêter le suivi") { removing = item.patient }
-                        .pageRow()
+                        .accessibilityLabel("Ajouter")
+                        ProfileButton { showingPatientSettings = true }
                     }
-                }
+                    .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 4, trailing: 16))
+                    .listRowBackground(Color.clear)
 
-                OfferCard(patientCount: patients.count, hasPro: store.hasPro) { showingPaywall = true }
-                    .pageRow()
+                    SearchField(text: $search)
+                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 8, trailing: 16))
+                        .listRowBackground(Color.clear)
+                }
+                .listSectionSeparator(.hidden)
+
+                let followed = followed.filter { search.isEmpty || $0.patient.name.localizedStandardContains(search) }
+                Section {
+                    if patients.isEmpty {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Aucun patient pour l'instant")
+                                .font(.headline)
+                            Button("Importer un bilan", systemImage: "square.and.arrow.down") { importing = true }
+                            Button("Essayer avec des patients de démo", systemImage: "person.2") {
+                                DemoData.loadPatients(into: context)
+                            }
+                        }
+                        .padding(.vertical, 6)
+                    } else {
+                        ForEach(followed, id: \.patient.patientID) { item in
+                            NavigationLink(value: item.patient.patientID) {
+                                PatientRow(name: item.patient.name, overview: item.overview)
+                            }
+                            .swipeActions(edge: .trailing) {
+                                Button("Arrêter le suivi", systemImage: "person.badge.minus", role: .destructive) { removing = item.patient }
+                            }
+                        }
+                    }
+                } footer: {
+                    Button {
+                        showingPaywall = true
+                    } label: {
+                        Text(store.hasPro ? "Rebond Pro · patients illimités"
+                                          : "\(min(patients.count, ProStore.freePatientLimit)) / \(ProStore.freePatientLimit) patients gratuits")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 8)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(store.hasPro)
+                }
             }
-            .listStyle(.plain)
+            .listStyle(.insetGrouped)
             .contentMargins(.top, 0, for: .scrollContent)
             .scrollContentBackground(.hidden)
             .background(alignment: .top) {
@@ -134,20 +155,6 @@ struct ProHomeView: View {
         }
     }
 
-    private var patientsHeader: some View {
-        HStack {
-            Text("Mes patients")
-                .font(.title2.bold())
-                .accessibilityAddTraits(.isHeader)
-            Spacer()
-            Button { importing = true } label: { HeaderIcon(systemImage: "square.and.arrow.down") }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Importer un bilan")
-        }
-        .padding(.leading, 4)
-        .padding(.top, 10)
-    }
-
     /// Leaves the patient's page first, so it never shows a deleted patient.
     private func stopFollowing(_ patient: TrackedPatient) {
         removing = nil
@@ -188,140 +195,68 @@ struct PrescribingItem: Identifiable {
     let program: EditableProgram
 }
 
-// MARK: - Cards
+// MARK: - Rows
 
-/// The week at a glance, like Accueil's cards: one sentence first, then patients, those to look at, reports received.
-private struct WeekOverviewCard: View {
-    let overviews: [PatientOverview]
-    let patientCount: Int
-    let hasPro: Bool
+/// A search field in the page, like the system's: the page has no navigation bar to hold one.
+private struct SearchField: View {
+    @Binding var text: String
 
     var body: some View {
-        let attention = overviews.filter { $0.attention != .none }.count
-        let painful = overviews.filter { $0.attention == .highPain }.count
-        let recent = overviews.filter { $0.daysSinceReport < 7 }.count
-
-        SummaryCard(title: Text("Cette semaine"), systemImage: nil, color: .accentColor, sectionHeader: true) {
-            EmptyView()
-        } content: {
-            VStack(alignment: .leading, spacing: 6) {
-                Group {
-                    if patientCount == 0 {
-                        Text("Vos patients apparaîtront ici avec leurs bilans.")
-                    } else if painful > 0 {
-                        Text("^[\(painful) patient](inflect: true) signale une douleur forte.")
-                    } else if attention > 0 {
-                        Text("^[\(attention) patient](inflect: true) à regarder.")
-                    } else {
-                        Text("Tout va bien pour vos patients.")
-                    }
-                }
-                .font(.title3.weight(.semibold))
-                .fixedSize(horizontal: false, vertical: true)
-                if patientCount > 0 {
-                    Text("^[\(patientCount) patient](inflect: true) · ^[\(recent) bilan](inflect: true) reçus en 7 jours")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+            TextField("Rechercher", text: $text)
+                .textInputAutocapitalization(.words)
+                .autocorrectionDisabled()
+            if !text.isEmpty {
+                Button("Effacer", systemImage: "xmark.circle.fill") { text = "" }
+                    .labelStyle(.iconOnly)
+                    .foregroundStyle(.secondary)
+                    .buttonStyle(.plain)
             }
         }
+        .padding(.horizontal, 12)
+        .frame(minHeight: 40)
+        .background(Color(.tertiarySystemFill), in: .capsule)
     }
 }
 
-/// The main action, as the exercise cards: a large symbol, the action in large type, a round button.
-private struct PrescribeCard: View {
-    let onPrescribe: () -> Void
+/// One patient: initials, name, when the last report came, and an orange dot when the pain was strong.
+private struct PatientRow: View {
+    let name: String
+    let overview: PatientOverview?
 
-    var body: some View {
-        Button(action: onPrescribe) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(alignment: .top) {
-                    Image(systemName: "qrcode")
-                        .font(.system(size: 40))
-                        .foregroundStyle(.tint)
-                    Spacer()
-                    Image(systemName: "plus")
-                        .font(.title2.weight(.bold))
-                        .foregroundStyle(.black)
-                        .frame(width: 56, height: 56)
-                        .background(Color.accentColor, in: .circle)
-                }
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Prescrire un programme")
-                        .font(.title.bold())
-                    Text("Votre patient scanne le QR code avec son iPhone.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .padding(20)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.accentColor.opacity(0.14), in: .rect(cornerRadius: 30))
-            .contentShape(.rect(cornerRadius: 30))
+    private var detail: String {
+        guard let overview else { return String(localized: "Bilan illisible") }
+        let when = switch overview.daysSinceReport {
+        case 0: String(localized: "Bilan aujourd'hui")
+        case 1: String(localized: "Bilan hier")
+        default: String(localized: "Bilan il y a \(overview.daysSinceReport) j")
         }
-        .buttonStyle(.plain)
+        if overview.attention == .highPain, let pain = overview.lastPain {
+            return when + " · " + String(localized: "douleur \(pain)/10")
+        }
+        return when
     }
-}
-
-/// No patient yet: where they come from, and demo patients to try.
-private struct EmptyPatientsCard: View {
-    let onImport: () -> Void
-    let onDemo: () -> Void
 
     var body: some View {
-        SummaryCard(title: Text("Aucun patient"), systemImage: "person.2", color: .accentColor) {
-            EmptyView()
-        } content: {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Ils apparaissent quand vous ouvrez leur bilan Rebond.")
-                    .font(.title3.weight(.semibold))
-                    .fixedSize(horizontal: false, vertical: true)
-                Button(action: onImport) {
-                    Label("Importer un bilan", systemImage: "square.and.arrow.down")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.glassProminent)
-                .buttonBorderShape(.capsule)
-                .controlSize(.large)
-                Button("Essayer avec des patients de démo", action: onDemo)
-                    .font(.subheadline.weight(.semibold))
-                    .frame(maxWidth: .infinity, minHeight: 44)
+        HStack(spacing: 12) {
+            InitialsBadge(name: name, size: 40)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(name)
+                    .font(.body.weight(.semibold))
+                Text(detail)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 8)
+            if overview?.attention == .highPain {
+                Circle()
+                    .fill(.orange)
+                    .frame(width: 10, height: 10)
+                    .accessibilityLabel(Text("Douleur forte"))
             }
         }
-    }
-}
-
-/// The free offer's limit, and Rebond Pro, in one short card.
-private struct OfferCard: View {
-    let patientCount: Int
-    let hasPro: Bool
-    let onUpgrade: () -> Void
-
-    var body: some View {
-        SummaryCard(title: Text("Rebond Pro"), systemImage: hasPro ? "checkmark.seal.fill" : "infinity", color: .accentColor) {
-            EmptyView()
-        } content: {
-            if hasPro {
-                Text("Patients illimités.")
-                    .font(.title3.weight(.semibold))
-            } else {
-                let used = min(patientCount, ProStore.freePatientLimit)
-                VStack(alignment: .leading, spacing: 12) {
-                    BigValue(value: "\(used)", unit: "sur \(ProStore.freePatientLimit) patients gratuits")
-                    ProgressView(value: Double(used), total: Double(ProStore.freePatientLimit))
-                        .tint(.accentColor)
-                        .accessibilityHidden(true)
-                    Button(action: onUpgrade) {
-                        Text("Passer à Rebond Pro")
-                            .font(.headline)
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.glass)
-                    .buttonBorderShape(.capsule)
-                    .controlSize(.large)
-                }
-            }
-        }
+        .padding(.vertical, 2)
     }
 }
