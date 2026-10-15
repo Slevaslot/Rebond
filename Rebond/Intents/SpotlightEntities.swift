@@ -5,8 +5,22 @@ import SwiftData
 /// The data store of the app, shared with the App Intents so they find the programs.
 enum AppData {
     static let container: ModelContainer = {
+        let schema = Schema([Program.self, Session.self, TrackedPatient.self, ProgramTemplate.self, LibraryExercise.self])
+        if let container = try? ModelContainer(for: schema) { return container }
+        // A store SwiftData can't migrate (a build installed before a model change) must not stop the app
+        // from launching: it is set aside, not deleted, and the app starts from an empty store.
+        let store = ModelConfiguration().url
+        let setAside = store.deletingLastPathComponent()
+            .appending(path: "unreadable-\(Int(Date.now.timeIntervalSince1970))", directoryHint: .isDirectory)
+        try? FileManager.default.createDirectory(at: setAside, withIntermediateDirectories: true)
+        for suffix in ["", "-shm", "-wal"] {
+            let file = URL(filePath: store.path(percentEncoded: false) + suffix)
+            try? FileManager.default.moveItem(at: file, to: setAside.appending(path: file.lastPathComponent))
+        }
+        if let container = try? ModelContainer(for: schema) { return container }
+        // Last resort: nothing is kept after the app quits, but the app works.
         do {
-            return try ModelContainer(for: Program.self, Session.self, TrackedPatient.self, ProgramTemplate.self, LibraryExercise.self)
+            return try ModelContainer(for: schema, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
         } catch {
             fatalError("Could not open the data store: \(error)")
         }
