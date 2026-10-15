@@ -18,3 +18,4 @@ build/
 *.mobileprovision
 Server/demo-data.json
 Tools/Replay/replay
+Tools/Catalog/catalog
