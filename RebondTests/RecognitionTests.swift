@@ -111,7 +111,10 @@ final class RecognitionTests: XCTestCase {
         print(report("Kinect, personnes de test, trois répétitions à la suite", video))
         print("  Raisons des non reconnus : " + Self.reasons.sorted { $0.value > $1.value }.map { "\($0.key) (\($0.value))" }.joined(separator: " ; "))
         // A wrong name is worse than none: what is recognized must be right.
-        let wrong = single.confusion.flatMap { truth, row in row.filter { $0.key != truth && $0.key != "nonReconnu" }.map(\.value) }.reduce(0, +)
+        // A diagonal raise named lateral is a product decision (ExerciseRecognizer.preferred), not a mistake.
+        let wrong = single.confusion.flatMap { truth, row in
+            row.filter { $0.key != truth && $0.key != "nonReconnu" && ExerciseRecognizer.preferred[truth] != $0.key }.map(\.value)
+        }.reduce(0, +)
         XCTAssertLessThanOrEqual(Double(wrong) / Double(single.total), 0.1, "Trop d'exercices mal nommés")
         XCTAssertGreaterThanOrEqual(video.accuracy, 0.7)
     }
@@ -170,6 +173,9 @@ final class RecognitionTests: XCTestCase {
                 tally.add(truth: truth, chosen: "inutilisable")
             }
         }
+        // Vision finds no body in the simulator: nothing was measured, nothing to judge.
+        let unusable = tally.confusion.values.reduce(0) { $0 + ($1["inutilisable"] ?? 0) }
+        try XCTSkipIf(unusable == tally.total, "Vision ne détecte pas les corps dans le simulateur : lancer sur iPhone")
         print(report("Vidéos iPhone", tally))
     }
 }

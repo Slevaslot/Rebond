@@ -14,7 +14,7 @@ nonisolated struct FoundationModelsChooser: RecognitionChooser {
         let model = SystemLanguageModel.default
         guard case .available = model.availability, !candidates.isEmpty else { return nil }
 
-        let ids = candidates.map(\.id) + (allowsNotRecognized ? [Self.notRecognized] : [])
+        let ids = candidates.map(\.id).sorted() + (allowsNotRecognized ? [Self.notRecognized] : [])
         let root = DynamicGenerationSchema(name: "Identification", properties: [
             .init(name: "exercice", description: "L'id d'un candidat, ou nonReconnu si aucun ne correspond.",
                   schema: DynamicGenerationSchema(name: "Exercice", anyOf: ids)),
@@ -33,13 +33,17 @@ nonisolated struct FoundationModelsChooser: RecognitionChooser {
             Si aucun ne correspond vraiment, réponds nonReconnu. Ne devine pas.
             Exemples :
             - « hauteur des hanches 0,5→1,0, genoux, plan sagittal, debout avec descente, les deux côtés » sans chaise \
-            → squat ; avec une chaise derrière le patient → sit-to-stand.
+            → squat ; avec une chaise derrière le patient → sit-to-stand ; un pied devant l'autre → forward-lunge ; \
+            un pas sur le côté → side-lunge.
             - « hauteur du poignet, épaule, plan frontal, un côté » bras écarté sur le côté → shoulder-abduction ; \
-            bras levé en diagonale, vers l'avant → scaption.
+            bras levé en diagonale, vers l'avant → scaption. En cas de doute entre les deux, choisis \
+            shoulder-abduction.
             - Jambe levée devant, un côté : « genou le plus plié » sous 120° (genou plié) → hurdle-step ; \
             au-dessus de 120° (jambe tendue) → leg-raise.
             """)
-        let list = candidates.map { "- \($0.id) (\($0.name)) : \($0.summary)" }.joined(separator: "\n")
+        // Always in the same order (by id), not nearest first: the model tends to favor the first choice it reads.
+        let listed = candidates.sorted { $0.id < $1.id }
+        let list = listed.map { "- \($0.id) (\($0.name)) : \($0.summary)" }.joined(separator: "\n")
         let text = """
             Mesures du mouvement filmé : \(summary).
             Candidats :

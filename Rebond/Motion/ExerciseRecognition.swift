@@ -65,6 +65,9 @@ nonisolated struct ExerciseRecognizer: Sendable {
     var alwaysNames = true
     /// Two seconds of movement at least.
     static let minimumFrames = 30
+    /// Seen from the front, a diagonal arm raise (30° forward) looks like a lateral one: when both fit the
+    /// measures, the lateral raise is named, the more common exercise.
+    static let preferred = ["scaption": "shoulder-abduction"]
 
     /// The candidates, from both preselections: their ranks added up, the nearest first.
     func preselect(_ measurement: MovementMeasurement, count: Int? = nil) -> [Preselection.Candidate] {
@@ -127,6 +130,12 @@ nonisolated struct ExerciseRecognizer: Sendable {
         }
         if choice == nil {
             choice = await fallback.choose(summary: measurement.summary, candidates: signatures, images: images)
+        }
+
+        // Two exercises that can't be told apart from the front: the preferred one when both fit.
+        if let chosen = choice?.id, let preferred = Self.preferred[chosen], signatures.contains(where: { $0.id == preferred }),
+           let current = choice {
+            choice = RecognitionChoice(id: preferred, confidence: current.confidence, description: current.description)
         }
 
         if alwaysNames {
