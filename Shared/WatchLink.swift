@@ -22,15 +22,17 @@ nonisolated struct WatchSetState: Codable, Equatable, Sendable {
     var isPaused: Bool
     /// The set can be paused (camera and held sets; not repetitions counted by hand).
     var canPause: Bool
+    /// "côté droit" or "côté gauche" for an exercise done on both sides, already localized; nil otherwise.
+    var side: String? = nil
 
     var isSetComplete: Bool { target > 0 && count >= target }
     /// Paused before anything was done: a held set whose timer has not started.
     var isWaitingToStart: Bool { isPaused && count == 0 }
     var fraction: Double { target > 0 ? min(1, Double(count) / Double(target)) : 0 }
 
-    /// Same set of the same exercise: only the count or the pause changed.
+    /// Same set of the same exercise, on the same side: only the count or the pause changed.
     func isSameSet(as other: WatchSetState) -> Bool {
-        exercise == other.exercise && set == other.set && totalSets == other.totalSets
+        exercise == other.exercise && set == other.set && totalSets == other.totalSets && side == other.side
     }
 }
 

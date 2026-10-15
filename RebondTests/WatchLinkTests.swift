@@ -42,6 +42,13 @@ struct WatchLinkTests {
         #expect(WatchHaptic.feedback(from: set(10, set: 3), to: set(0, exercise: "Gainage")) == .newSet)
     }
 
+    @Test func otherSideTapsAsANewSet() {
+        var right = set(10), left = set(0)
+        right.side = "côté droit"
+        left.side = "côté gauche"
+        #expect(WatchHaptic.feedback(from: right, to: left) == .newSet)
+    }
+
     @Test func heldSetTapsEveryTenSeconds() {
         let held = { (seconds: Int) in set(seconds, target: 30, isHold: true) }
         #expect(WatchHaptic.feedback(from: held(8), to: held(9)) == nil)

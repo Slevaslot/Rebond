@@ -26,9 +26,9 @@ final class WorkoutLiveActivity {
     ///   - target: repetitions to do, or seconds to hold when `isHold`.
     ///   - startsPaused: a held set waits for the patient to start its timer.
     func start(exercise: String, symbol: String = "figure.cooldown", set: Int, totalSets: Int, targetReps target: Int,
-               isHold: Bool = false, canPause: Bool = true, startsPaused: Bool = false) {
+               isHold: Bool = false, canPause: Bool = true, startsPaused: Bool = false, side: String? = nil) {
         let state = State(exercise: exercise, symbol: symbol, set: set, totalSets: totalSets, count: 0,
-                          target: target, isHold: isHold, isPaused: startsPaused, canPause: canPause)
+                          target: target, isHold: isHold, isPaused: startsPaused, canPause: canPause, side: side)
         self.state = state
         sendToWatch(state)
         if activityID != nil {
@@ -77,7 +77,8 @@ final class WorkoutLiveActivity {
     private func sendToWatch(_ state: State) {
         PhoneWatchLink.shared.update(WatchSetState(
             exercise: state.exercise, symbol: state.symbol, set: state.set, totalSets: state.totalSets,
-            count: state.count, target: state.target, isHold: state.isHold, isPaused: state.isPaused, canPause: state.canPause
+            count: state.count, target: state.target, isHold: state.isHold, isPaused: state.isPaused, canPause: state.canPause,
+            side: state.side
         ))
     }
 

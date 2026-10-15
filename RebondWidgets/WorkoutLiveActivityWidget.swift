@@ -177,6 +177,8 @@ private struct SetText: View {
     var body: some View {
         if state.isPaused, state.count > 0 {
             Label("En pause", systemImage: "pause.fill")
+        } else if let side = state.side {
+            Text("Série \(state.set) sur \(state.totalSets) · \(side)")
         } else {
             Text("Série \(state.set) sur \(state.totalSets)")
         }

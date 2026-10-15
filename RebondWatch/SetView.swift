@@ -43,9 +43,17 @@ struct SetView: View {
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(accessibilityCount)
 
-            Text(set.isSetComplete ? "Série terminée !" : "Série \(set.set) sur \(set.totalSets)")
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(set.isSetComplete ? .green : .secondary)
+            Group {
+                if set.isSetComplete {
+                    Text("Série terminée !")
+                } else if let side = set.side {
+                    Text("Série \(set.set) sur \(set.totalSets) · \(side)")
+                } else {
+                    Text("Série \(set.set) sur \(set.totalSets)")
+                }
+            }
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(set.isSetComplete ? .green : .secondary)
         }
         .navigationTitle {
             Label(set.exercise, systemImage: set.symbol)

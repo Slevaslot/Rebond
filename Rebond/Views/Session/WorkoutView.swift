@@ -120,6 +120,8 @@ struct WorkoutView: View {
                     // A fresh screen (and camera analysis) for every set.
                     .id(plan.currentIndex)
                     .onChange(of: plan.currentIndex, initial: true) { showOnLockScreen(step) }
+                    // Switched to counting by hand: the watch and the Live Activity drop the pause button.
+                    .onChange(of: countedByHand) { showOnLockScreen(step) }
                     .onDisappear { if plan.isFinished { WorkoutLiveActivity.shared.end() } }
             }
         case .pain:
@@ -170,6 +172,11 @@ struct WorkoutView: View {
     private func showOnLockScreen(_ step: WorkoutStep) {
         let catalog = step.exercise.catalogID.flatMap(CatalogExercise.find)
         let seconds: Int? = if case .hold(let seconds) = step.exercise.mode { seconds } else { nil }
+        let side: String? = switch step.side {
+        case .right: String(localized: "côté droit")
+        case .left: String(localized: "côté gauche")
+        case nil: nil
+        }
         WorkoutLiveActivity.shared.start(
             exercise: step.exercise.name,
             symbol: catalog?.symbol ?? "figure.cooldown",
@@ -177,8 +184,10 @@ struct WorkoutView: View {
             totalSets: step.exercise.sets,
             targetReps: seconds ?? step.exercise.reps,
             isHold: seconds != nil,
-            canPause: step.exercise.mode != .manual,
-            startsPaused: seconds != nil
+            // Counted by hand (no camera follows it, or none available): nothing to pause.
+            canPause: step.exercise.mode != .manual && !countedByHand.contains(step.exerciseIndex),
+            startsPaused: seconds != nil,
+            side: side
         )
     }
 

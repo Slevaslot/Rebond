@@ -20,6 +20,8 @@ nonisolated struct WorkoutActivityAttributes: ActivityAttributes {
         var isPaused: Bool
         /// Repetitions counted by hand can't be paused: no pause button for them.
         var canPause = true
+        /// "côté droit" or "côté gauche" for an exercise done on both sides, already localized; nil otherwise.
+        var side: String? = nil
 
         var isSetComplete: Bool { target > 0 && count >= target }
         var fraction: Double { target > 0 ? min(1, Double(count) / Double(target)) : 0 }
