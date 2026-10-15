@@ -297,13 +297,12 @@ struct TrackingBadge: View {
 /// Adding a session, in full: a large button, with the same four ways as the + of the header.
 private struct AddSessionButton: View {
     @Environment(AppRouter.self) private var router
+    @State private var choosing = false
 
     var body: some View {
-        Menu {
-            Button("Coller le message du kiné", systemImage: "text.bubble") { router.addProgram(from: .message) }
-            Button("Scanner sa feuille", systemImage: "doc.viewfinder") { router.addProgram(from: .scan) }
-            Button("Choisir une photo", systemImage: "photo") { router.addProgram(from: .photo) }
-            Button("Saisir à la main", systemImage: "square.and.pencil") { router.addProgram(from: .manual) }
+        // A plain button, centered like the others; the ways to add it come up from the bottom.
+        Button {
+            choosing = true
         } label: {
             Label("Ajouter une séance", systemImage: "plus")
                 .font(.headline)
@@ -312,8 +311,13 @@ private struct AddSessionButton: View {
         .buttonStyle(.glassProminent)
         .buttonBorderShape(.capsule)
         .controlSize(.extraLarge)
-        // In a list, a menu keeps its label's width and sits on the leading side: stretch the menu itself.
-        .frame(maxWidth: .infinity)
+        .confirmationDialog("Ajouter une séance", isPresented: $choosing) {
+            Button("Coller le message du kiné") { router.addProgram(from: .message) }
+            Button("Scanner sa feuille") { router.addProgram(from: .scan) }
+            Button("Choisir une photo") { router.addProgram(from: .photo) }
+            Button("Saisir à la main") { router.addProgram(from: .manual) }
+            Button("Annuler", role: .cancel) {}
+        }
     }
 }
 
