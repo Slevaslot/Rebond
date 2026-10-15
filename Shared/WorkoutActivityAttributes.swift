@@ -18,6 +18,8 @@ nonisolated struct WorkoutActivityAttributes: ActivityAttributes {
         var target: Int
         var isHold: Bool
         var isPaused: Bool
+        /// Repetitions counted by hand can't be paused: no pause button for them.
+        var canPause = true
 
         var isSetComplete: Bool { target > 0 && count >= target }
         var fraction: Double { target > 0 ? min(1, Double(count) / Double(target)) : 0 }

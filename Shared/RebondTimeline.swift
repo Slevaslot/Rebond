@@ -1,5 +1,7 @@
 import WidgetKit
 
+// Compiled into the iPhone widgets and the watch complications (folder `Shared/`).
+
 /// What a widget shows at a given time.
 nonisolated struct RebondEntry: TimelineEntry {
     let date: Date
@@ -7,6 +9,11 @@ nonisolated struct RebondEntry: TimelineEntry {
 
     var doneToday: Bool { snapshot.isDone(on: date) }
     var week: WidgetSnapshot.Week { snapshot.week(containing: date) }
+
+    /// Smart Stack of the watch: brought up while the day's session is still to do.
+    var relevance: TimelineEntryRelevance? {
+        TimelineEntryRelevance(score: snapshot.hasProgram && !doneToday ? 50 : 0)
+    }
 }
 
 /// Reads the snapshot written by the app in the App Group. The data only changes when the app writes it

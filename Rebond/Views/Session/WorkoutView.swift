@@ -21,6 +21,11 @@ struct WorkoutView: View {
     @State private var currentSetStarted = false
     /// Asked from the Passer menu: the set's screen answers with what it did so far.
     @State private var skipRequest: SkipRequest?
+    /// Pause or resume, asked from the Apple Watch.
+    @State private var pauseRequest: UUID?
+    /// The session was saved: leaving it no longer abandons it on the watch.
+    @State private var saved = false
+    private let watch = PhoneWatchLink.shared
     private let offersMoreSets: Bool
     /// An exercise tried outside any program: saved, but not counted as a session of the program.
     private let isTrial: Bool
@@ -44,7 +49,14 @@ struct WorkoutView: View {
     var body: some View {
         NavigationStack {
             content
-                .onDisappear { WorkoutLiveActivity.shared.end() }
+                .onAppear { watch.sessionStarted(at: start) }
+                .onDisappear {
+                    WorkoutLiveActivity.shared.end()
+                    if !saved { watch.sessionEnded(saved: false) }
+                }
+                .onChange(of: watch.command) { _, command in
+                    if let command { handleWatch(command.message) }
+                }
                 .toolbar {
                     if case .summary = stage {} else {
                         ToolbarItem(placement: .topBarLeading) {
@@ -58,6 +70,7 @@ struct WorkoutView: View {
                                         Button("Enregistrer ce qui a été fait") {
                                             plan.finishEarly()
                                             stage = .pain
+                                            watch.setsFinished()
                                         }
                                     }
                                     Button("Abandonner la séance", role: .destructive) { dismiss() }
@@ -101,6 +114,7 @@ struct WorkoutView: View {
                 stepView(step)
                     .environment(\.reportSetActivity) { currentSetStarted = true }
                     .environment(\.skipRequest, skipRequest)
+                    .environment(\.pauseRequest, pauseRequest)
                     // A fresh screen (and camera analysis) for every set.
                     .id(plan.currentIndex)
                     .onChange(of: plan.currentIndex, initial: true) { showOnLockScreen(step) }
@@ -152,8 +166,20 @@ struct WorkoutView: View {
             set: step.set,
             totalSets: step.exercise.sets,
             targetReps: seconds ?? step.exercise.reps,
-            isHold: seconds != nil
+            isHold: seconds != nil,
+            canPause: step.exercise.mode != .manual,
+            startsPaused: seconds != nil
         )
+    }
+
+    /// A tap on the Apple Watch: the same as the Passer menu's next set, or the pause button.
+    private func handleWatch(_ message: WatchMessage) {
+        guard case .sets = stage, plan.currentStep != nil else { return }
+        switch message {
+        case .nextSet: skipRequest = SkipRequest(kind: .set)
+        case .togglePause: pauseRequest = UUID()
+        case .recordingWorkout: break
+        }
     }
 
     /// What comes after this set, for the end-of-set card.
@@ -184,7 +210,10 @@ struct WorkoutView: View {
             plan.record(result)
         }
         skipRequest = nil
-        if plan.isFinished { stage = .pain }
+        if plan.isFinished {
+            stage = .pain
+            watch.setsFinished()
+        }
     }
 
     private func save(pain: Int) {
@@ -205,6 +234,9 @@ struct WorkoutView: View {
         }
         let session = Session(pain: pain, duration: Date.now.timeIntervalSince(start), results: results, isTrial: isTrial)
         context.insert(session)
+        saved = true
+        PhoneHealth.shared.record(start: start, end: .now, watchRecorded: watch.watchRecordsWorkout)
+        watch.sessionEnded(saved: true)
         stage = .summary(session)
     }
 }
@@ -239,4 +271,6 @@ extension EnvironmentValues {
     /// Called by a set's screen once something was done in it, so stopping the session asks before losing it.
     @Entry var reportSetActivity: () -> Void = {}
     @Entry var skipRequest: SkipRequest? = nil
+    /// Pause or resume the set, asked from the Apple Watch: a new value at each request.
+    @Entry var pauseRequest: UUID? = nil
 }

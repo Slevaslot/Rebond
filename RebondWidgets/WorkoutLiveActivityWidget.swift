@@ -1,4 +1,5 @@
 import ActivityKit
+import AppIntents
 import SwiftUI
 import WidgetKit
 
@@ -33,6 +34,7 @@ struct WorkoutLiveActivityWidget: Widget {
                         SetText(state: state)
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                        SessionControls(state: state)
                     }
                 }
             } compactLeading: {
@@ -107,9 +109,33 @@ private struct LockScreenView: View {
             }
             ProgressView(value: state.fraction)
                 .tint(.accentColor)
+            SessionControls(state: state)
         }
         .padding(16)
-        .accessibilityElement(children: .combine)
+    }
+}
+
+/// Pause and next set without unlocking the iPhone: the same as the buttons of the session screen.
+private struct SessionControls: View {
+    let state: WorkoutActivityAttributes.ContentState
+
+    var body: some View {
+        HStack {
+            if state.canPause {
+                Button(intent: ToggleSessionPauseIntent()) {
+                    Label(state.isPaused ? (state.count == 0 ? "Commencer" : "Reprendre") : "Pause",
+                          systemImage: state.isPaused ? "play.fill" : "pause.fill")
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            Button(intent: NextSetIntent()) {
+                Label("Série suivante", systemImage: "forward.end.fill")
+                    .frame(maxWidth: .infinity)
+            }
+        }
+        .font(.subheadline.weight(.semibold))
+        .buttonStyle(.bordered)
+        .tint(.accentColor)
     }
 }
 
@@ -144,12 +170,12 @@ private struct CountText: View {
     }
 }
 
-/// "Série 2 sur 3", or "En pause".
+/// "Série 2 sur 3", or "En pause" (not before a held set's timer starts).
 private struct SetText: View {
     let state: WorkoutActivityAttributes.ContentState
 
     var body: some View {
-        if state.isPaused {
+        if state.isPaused, state.count > 0 {
             Label("En pause", systemImage: "pause.fill")
         } else {
             Text("Série \(state.set) sur \(state.totalSets)")

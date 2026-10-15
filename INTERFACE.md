@@ -100,7 +100,7 @@ Règles pendant la série :
 - **Confiance** : quand Vision voit mal le corps, on n'affiche ni compteur qui bouge ni correction ; on dit « Je ne vous vois plus en entier » et on montre la silhouette.
 - **Pause à distance** : paume ouverte levée environ 0,6 s. Toujours doublée par le bouton à l'écran.
 - **Aucune commande physique détournée** : pas de boutons de volume, pas de commandes AirPods (HIG *Playing audio* : ne pas détourner les contrôles audio ; App Review 2.5.9).
-- **Haptique** : inutile pendant la série (téléphone posé). Utilisée seulement dans l'interface tenue en main (sélecteur de douleur, enregistrement réussi), avec les retours système.
+- **Haptique** : inutile sur l'iPhone pendant la série (téléphone posé) ; c'est la montre qui tapote (voir « Apple Watch »). Sur l'iPhone, seulement dans l'interface tenue en main (sélecteur de douleur, enregistrement réussi), avec les retours système.
 
 ### Voix du coach (HIG *Playing audio*, *Writing*)
 
@@ -145,12 +145,27 @@ Règles pendant la série :
 - Messages d'erreur : ce qui s'est passé, puis ce qu'on peut faire.
 - Majuscule uniquement en début de libellé.
 
-## Intégration système (bonus, HIG *Widgets*, *Siri*, *Managing notifications*)
+## Apple Watch (HIG *Designing for watchOS*, *Workouts*, *Playing haptics*, *Complications*)
+
+La montre sert le moment de l'exercice : le patient ne revient pas au téléphone posé à 2 m. Elle **ne compte rien** : l'iPhone et sa caméra restent la seule source, la montre affiche et transmet.
+
+- **Ouverture automatique** : au lancement d'une séance sur l'iPhone, l'app de la montre s'ouvre seule (`startWatchApp`) et démarre un entraînement. Aucune manipulation.
+- **Hors séance** : « Séance du jour » (nombre d'exercices, durée), jauge de la semaine, « Lancez la séance sur votre iPhone : votre montre suivra vos séries ».
+- **Pendant la série** : nom de l'exercice, compteur dans un anneau (« 4 sur 10 », ou « 12 sur 30 s » pour un maintien), « Série 2 sur 3 », fréquence cardiaque en haut à droite. En bas, **Pause / Reprendre** (« Commencer » avant le départ d'un maintien) et **Série suivante**. Pas de bouton pause pour le comptage manuel.
+- **Double Tap** (pincer deux fois) appuie sur le bouton principal : pause, ou série suivante quand la série est terminée ou n'a pas de pause.
+- **Haptique**, une seule à la fois, la plus importante : un tapotement à chaque répétition (toutes les 10 s pour un maintien), « succès » à l'objectif atteint, « stop » à la pause, « départ » à la reprise, une notification à chaque nouvelle série.
+- **Placement, douleur** : « Placez-vous devant l'iPhone », puis « Séries terminées ! Indiquez votre douleur sur l'iPhone ».
+- **Fin** : « Séance terminée, bravo ! », durée, cœur moyen, calories si mesurées, « Enregistrée dans Santé ». Une séance abandonnée sur l'iPhone n'est pas enregistrée.
+- **Complications** : anneau de régularité (circulaire, coin) et séance du jour (rectangulaire, en ligne), remontée dans la Smart Stack tant que la séance du jour reste à faire.
+
+## Intégration système (HIG *Widgets*, *Live Activities*, *Siri*, *Managing notifications*, *HealthKit*)
 
 - **Rappels** : notification locale les jours de séance (niveau « actif », jamais « urgent ») et rappel hebdomadaire d'envoi du rapport. Réglables dans l'app.
-- **App Intents** : « Démarrer ma séance Rebond » dans Raccourcis, Spotlight et le centre de contrôle.
-- **Widget** « Prochaine séance » (petit et rectangulaire pour l'écran verrouillé), qui ouvre directement la séance.
-- Siri AI n'est pas disponible dans l'UE avec iOS 27 : les App Intents restent utilisables via Raccourcis et Spotlight, mais aucune fonctionnalité ne repose sur Siri.
+- **App Intents** : « Démarrer ma séance Rebond » dans Raccourcis, Spotlight et le centre de contrôle ; « Combien de séances cette semaine » (iPhone et montre) ; pendant la séance, « Pause dans Rebond » et « Série suivante dans Rebond », à la voix, les mains occupées (iPhone et montre).
+- **Live Activity** de la série (écran verrouillé, Dynamic Island, Smart Stack de la montre) avec les boutons **Pause** et **Série suivante**, utilisables sans déverrouiller.
+- **Widgets** « Séance du jour » et « Régularité », qui ouvrent directement la séance.
+- **Santé** : l'offre « Ajouter vos séances à l'app Santé ? » apparaît une fois en fin de séance (après celle des rappels, jamais les deux en même temps), et un interrupteur « Enregistrer dans Santé » est dans Réglages. Le résumé indique « Enregistrée dans Santé » ou « … par votre Apple Watch ». L'autorisation n'est jamais demandée au lancement.
+- Siri AI n'est pas disponible dans l'UE avec iOS 27 : les phrases sont de simples App Shortcuts, aussi proposés dans Spotlight et Raccourcis ; aucune fonctionnalité ne repose sur Siri AI.
 
 ## Traduction
 

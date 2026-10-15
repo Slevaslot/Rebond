@@ -5,6 +5,7 @@ Document de travail pour l'équipe. Le contexte produit et les décisions sont d
 ## En bref
 
 - App iPhone, SwiftUI, iOS 27.0 minimum, Swift 6 en concurrence stricte, isolation `MainActor` par défaut.
+- App Apple Watch compagnon (watchOS 27.0) et ses complications, reliées à l'iPhone par WatchConnectivity.
 - Frameworks Apple uniquement, aucune dépendance tierce.
 - Tout est traité sur l'appareil, aucun serveur.
 - La logique (lecture de la feuille, analyse des mouvements, rapport) est séparée de l'interface et testée sans écran.
@@ -28,9 +29,16 @@ Rebond/
 ├── Store/               abonnement Rebond Pro (StoreKit 2)
 ├── Pro/                 rôle patient / kiné, transferts (lien du programme, fichier de bilan), synthèse d'un patient
 ├── Intents/             App Intents
+├── Watch/               lien avec l'Apple Watch côté iPhone (WatchConnectivity)
+├── Health/              enregistrement des séances dans Santé depuis l'iPhone
 ├── Views/               écrans SwiftUI, regroupés par onglet
 └── Resources/           String Catalog, données de démo, PrivacyInfo
-RebondTests/             tests (Swift Testing) : compteurs, séance, bilan, programme
+RebondTests/             tests (Swift Testing) : compteurs, séance, bilan, programme, montre
+RebondWidgets/           widgets iPhone, Live Activity, bouton du Centre de contrôle
+RebondWatch/             app Apple Watch : série en direct, haptique, entraînement HealthKit, Siri
+RebondWatchWidgets/      complications et Smart Stack de la montre
+Shared/                  compilé dans plusieurs cibles (exceptions dans le projet) : App Group, instantané
+                         des widgets, protocole iPhone ↔ montre, types Santé, intents partagés
 Rebond-Info.plist        schéma d'URL `rebond://` et type de fichier `.rebond`
 Rebond.storekit          produits Rebond Pro pour les tests dans Xcode
 ```
@@ -159,11 +167,31 @@ ExerciseResult                     copie autonome, pas de lien vers PlannedExerc
 - **Accès** : `ProStore` lit les droits StoreKit ; offre gratuite limitée à 3 patients (`TrackedPatient.importReport`), Rebond Pro illimité. L'app patient ne demande jamais l'abonnement.
 - **Aucun serveur** : la version connectée de démo a été retirée. Programmes par QR code, bilans par fichier `.rebond`, sur geste du patient.
 
-## Bonus, dans l'ordre
+## Apple Watch
+
+```
+iPhone (caméra, comptage)                         Apple Watch
+WorkoutView ── sessionStarted ──────────────────▶ startWatchApp → HKWorkoutSession (cœur, calories)
+WorkoutLiveActivity ── set(WatchSetState) ──────▶ SetView + WatchHaptic → WKInterfaceDevice.play
+PhoneWatchLink.command ◀── togglePause/nextSet ── boutons, Double Tap, Siri
+                       ◀── recordingWorkout ───── la montre enregistrera l'entraînement
+WorkoutView ── setsFinished, sessionEnded(saved) ▶ finishWorkout (Santé) ou discardWorkout
+WidgetSync ── applicationContext(WidgetSnapshot) ▶ App Group de la montre → complications
+```
+
+- **Protocole** (`Shared/WatchLink.swift`, logique pure testée) : `PhoneMessage`, `WatchMessage`, `WatchSetState`, encodés en JSON sous une clé unique (`WatchCoding`). `WatchHaptic.feedback(from:to:)` choisit le seul retour à jouer.
+- **Transport** : `sendMessage` pour le direct (seulement si la montre est joignable : une répétition en retard ne sert à rien) ; `transferUserInfo` pour le début, la fin et `recordingWorkout`, qui doivent arriver ; `updateApplicationContext` pour la séance du jour (seule la dernière compte).
+- **Branchement** : `WorkoutLiveActivity` transmet chaque état à `PhoneWatchLink` : tout écran de série qui met à jour la Live Activity met aussi à jour la montre. Les commandes de la montre arrivent dans `WorkoutView` comme le menu Passer (`SkipRequest`) et un `pauseRequest` (environnement) lu par `SessionView` et `HoldSetView`.
+- **Live Activity et Siri** : `ToggleSessionPauseIntent` et `NextSetIntent` (`LiveActivityIntent`, `Shared/SessionControlIntents.swift`) passent par le même chemin (`PhoneWatchLink.perform`).
+- **Santé** : `HealthRecording.decide` (testé). La montre enregistre si elle a démarré son entraînement (`recordingWorkout`) ; sinon l'iPhone (`PhoneHealth`, `HKWorkoutBuilder`) si le patient l'a activé et que la séance dure au moins 20 s. Jamais de doublon.
+- **Simulateur** : jumeler un iPhone et une montre (`xcrun simctl list pairs`), installer l'app iPhone, puis l'app de la montre (`Rebond.app/Watch/RebondWatch.app`). WatchConnectivity peut mettre une vingtaine de secondes à voir l'app de la montre installée (`isWatchAppInstalled`). La caméra n'existant pas en simulateur, tester avec un maintien chronométré ou un exercice en comptage manuel ; la montre simulée fournit une fréquence cardiaque factice.
+
+## Intégrations système
 
 1. **Rappels** : notifications locales les jours de séance et rappel hebdomadaire du rapport.
-2. **App Intents + widget** : « Démarrer ma séance » (Raccourcis, Spotlight, centre de contrôle), widget « Prochaine séance ».
-3. **HealthKit** : enregistrer chaque séance comme entraînement (type « renforcement fonctionnel »).
+2. **App Intents + widgets** : « Démarrer ma séance » (Raccourcis, Spotlight, centre de contrôle), « Séances de la semaine » (iPhone et montre), « Pause » et « Série suivante » (iPhone et montre), widgets « Séance du jour » et « Régularité ».
+3. **Live Activity interactive** : boutons Pause et Série suivante.
+4. **HealthKit** : chaque séance comme entraînement « renforcement fonctionnel », voir « Apple Watch ».
 
 ## Répartition
 
@@ -193,4 +221,4 @@ Point de synchro : le catalogue (`catalogId`) et les événements Motion ci-dess
 
 - Seuil de douleur et profondeur cible du squat à valider avec un kiné.
 - Modèle économique (paiement côté kiné ou abonnement patient), après le hackathon.
-- Usage de l'Apple Watch, après le hackathon.
+- Apple Watch : compter sur la montre elle-même (accéléromètre) pour les exercices que la caméra ne suit pas, après le hackathon.

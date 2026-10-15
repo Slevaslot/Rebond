@@ -26,8 +26,10 @@ struct WidgetSync: ViewModifier {
         WidgetSnapshot(programs: programs, sessions: sessions)
     }
 
-    /// Writes the snapshot and reloads the widgets, only if something changed.
+    /// Writes the snapshot and reloads the widgets, only if something changed. Also sends it to the Apple Watch,
+    /// for its app and complications (WatchConnectivity keeps only the latest).
     static func publish(_ snapshot: WidgetSnapshot) {
+        PhoneWatchLink.shared.updateContext(snapshot)
         if snapshot.save() {
             WidgetCenter.shared.reloadAllTimelines()
         }

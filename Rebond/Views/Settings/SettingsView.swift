@@ -12,6 +12,8 @@ struct SettingsView: View {
     @AppStorage(ReminderSettings.enabledKey) private var remindersEnabled = false
     @AppStorage(ReminderSettings.hourKey) private var reminderHour = ReminderSettings.defaultHour
 
+    private let health = PhoneHealth.shared
+
     private var days: [Int] { programs.isEmpty ? ReminderScheduler.sessionDays(count: 3) : programs.allDays }
 
     var body: some View {
@@ -48,6 +50,25 @@ struct SettingsView: View {
                         .onChange(of: reminderHour) {
                             Task { await ReminderScheduler.schedule(days: days, hour: reminderHour) }
                         }
+                    }
+                }
+
+                if PhoneHealth.isAvailable {
+                    Section {
+                        Toggle(isOn: Binding(
+                            get: { health.isEnabled },
+                            set: { on in
+                                if on {
+                                    Task { _ = await health.enable() }
+                                } else {
+                                    health.isEnabled = false
+                                }
+                            }
+                        )) {
+                            Label("Enregistrer dans Santé", systemImage: "heart.text.square")
+                        }
+                    } footer: {
+                        Text("Chaque séance devient un entraînement dans l'app Santé. Avec une Apple Watch, c'est la montre qui l'enregistre, avec votre fréquence cardiaque.")
                     }
                 }
 

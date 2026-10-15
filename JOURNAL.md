@@ -265,3 +265,18 @@ Fait en parallèle par trois agents (worktrees) puis fusionné sur `technique`.
 - **Séance** : plus d'étoiles ; démonstration seulement à la première série d'un exercice, et les répétitions faites pendant la démonstration comptent (le modèle se range dès que le patient bouge) ; menu **Passer** (série suivante, passer l'exercice, terminer la séance) ; reprise automatique 20 s après une série ; **pouce levé** = série suivante, rappel des signes à l'écran ; pause possible à tout moment, même avant le début ; trop près, « Reculez » d'abord, la silhouette n'apparaît qu'une fois le corps entier visible.
 
 À vérifier sur iPhone : le pouce levé (Vision hand pose), la Live Activity et les widgets (App Group et signature de l'extension), la démonstration qui se range quand on bouge.
+
+## Apple Watch et intégrations Apple (15 octobre, nuit)
+
+La montre entre dans le périmètre (décision de l'équipe pour le jury Apple). Construit sur la branche `claude/apple-watch-ae8d8a`.
+
+- **App watchOS compagnon** (`RebondWatch/`) : la séance lancée sur l'iPhone ouvre l'app de la montre (`HKHealthStore.startWatchApp`), qui démarre un entraînement `HKWorkoutSession`. La série en direct (exercice, compteur, série, pause) arrive par WatchConnectivity ; haptique à chaque répétition et à l'objectif ; Pause et Série suivante renvoyés à l'iPhone ; Double Tap sur le bouton principal.
+- **Santé** : entraînement enregistré par la montre (cœur, calories) seulement si la séance est enregistrée sur l'iPhone, abandonné sinon. Sans montre, l'iPhone enregistre l'entraînement si le patient l'a activé (offre en fin de séance, interrupteur dans Réglages).
+- **Complications** (`RebondWatchWidgets/`) : régularité et séance du jour, nourries par l'instantané des widgets envoyé en contexte d'application.
+- **Live Activity interactive** : boutons Pause et Série suivante ; mêmes commandes à la voix (« Pause dans Rebond », « Série suivante dans Rebond ») sur l'iPhone et la montre.
+- **Live Activity corrigée** : elle disparaissait aussitôt démarrée. `WorkoutLiveActivity.start` terminait les activités restantes dans une tâche qui s'exécutait après la demande de la nouvelle, et la terminait donc aussi. Désormais, seules les activités présentes avant la demande sont terminées. Vérifié en simulateur : la Live Activity reste sur l'écran verrouillé, et son bouton « Commencer » lance le minuteur sans déverrouiller.
+- `RebondTimeline.swift` et `WeekProgressIntent.swift` déplacés dans `Shared/` pour servir aussi à la montre.
+
+Vérifié en simulateur (iPhone 18 Pro Max + Apple Watch Series 12, jumelés) : séance du jour reçue par la montre, ouverture automatique de l'app de la montre au lancement de la séance, autorisation Santé, minuteur démarré depuis la montre et secondes affichées en direct, Série suivante depuis la montre, « Séries terminées » pendant la douleur, puis résumé « Enregistrée dans Santé » (durée, cœur moyen) sur la montre.
+
+À vérifier sur de vrais appareils : haptique ressentie, Double Tap, comptage caméra transmis à la montre, phrases Siri, complications sur un cadran, signature des deux nouvelles cibles (identifiants, App Group, HealthKit).

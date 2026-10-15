@@ -22,7 +22,7 @@ Projet développé pendant le Build Challenge (Unaite, MWM, Apple, ⌘+F), les 1
 
 **Esprit du hackathon :** tirer parti de l'écosystème Apple. Quand une technologie Apple répond au besoin, la préférer à une solution générique et la mettre en valeur dans la démo. Proposer les technologies Apple qui enrichiraient l'app, mais ne pas les ajouter sans validation. Le parcours principal de la démo reste prioritaire : une technologie de plus ne doit pas le mettre en danger.
 
-**Apple Watch :** hors périmètre du hackathon. Ne rien construire pour la montre.
+**Apple Watch :** dans le périmètre depuis le 15 octobre au soir (décision de l'équipe), centrée sur le moment de l'exercice. L'iPhone compte avec la caméra ; la montre affiche la série au poignet, tapote à chaque répétition, permet pause et série suivante, enregistre l'entraînement dans Santé avec la fréquence cardiaque, et montre la séance du jour en complication. Elle ne compte rien elle-même. Détails dans `INTERFACE.md` et `TECHNIQUE.md`.
 
 ## Priorités (ordre de construction)
 
@@ -52,14 +52,15 @@ Prévoir des données de démo (un programme et quelques séances pré-remplies)
 | Espace kiné | Un onglet « Kiné » de plus (pas une app à part) : le kiné garde l'accès à l'app patient. Activé dans Réglages ou en ouvrant un bilan, il reste activé d'un lancement à l'autre et l'app s'ouvre dessus. Patients de démo pour la présentation. |
 | Tutoriel | Aucun écran d'accueil ni tutoriel : la séance guide le patient à la voix. |
 | Commandes à distance | Geste de la main (paume ouverte = pause) doublé d'un bouton. Pas d'AirPods, pas de boutons de volume. |
-| HealthKit | Seulement s'il est réellement utilisé dans le build soumis. Ne pas déclarer la capacité avant. |
+| HealthKit | Utilisé : chaque séance enregistrée devient un entraînement « renforcement fonctionnel » dans Santé. Par la montre (avec fréquence cardiaque et calories) quand elle suit la séance, sinon par l'iPhone si le patient l'a activé. Jamais les deux. Aucune donnée Santé ne sort des appareils ni n'entre dans le bilan. |
+| Apple Watch | App compagnon (pas autonome) : série en direct, haptique, pause et série suivante (boutons, Double Tap, Siri), entraînement HealthKit, complications. Liaison directe par WatchConnectivity, sans serveur. |
 | Icône | Format Icon Composer (`AppIcon.icon` : fond en dégradé + symbole en calque Liquid Glass), compatible avec les modes sombre, teinté et transparent d'iOS. |
 | Traductions | String Catalog en français (pluriels compris). Les autres langues sont générées à la fin avec « Generate Translations » d'Xcode, puis relues. |
 
 ## Environnement
 
 - Xcode 27.1, Swift 6.4 (mode de langage Swift 6), SDK iOS 27.1
-- Cible de déploiement : iOS 27.0, iPhone uniquement
+- Cible de déploiement : iOS 27.0, iPhone uniquement ; watchOS 27.0 pour l'app de la montre
 - SwiftUI uniquement
 - Frameworks Apple natifs uniquement, aucune dépendance tierce sans validation
 - Isolation `MainActor` par défaut : les types de logique (Motion, SheetReader, Report) sont marqués `nonisolated`
@@ -79,8 +80,9 @@ Prévoir des données de démo (un programme et quelques séances pré-remplies)
 | Rappels | UserNotifications (notifications locales) |
 | Abonnement kiné | StoreKit 2 (`SubscriptionStoreView`, codes d'offre) |
 | Prescription par QR code | Core Image (QR), lien `rebond://programme` |
-| Intégration système (bonus) | App Intents, WidgetKit |
-| Enregistrement des séances (bonus) | HealthKit |
+| Intégration système | App Intents (Siri, Raccourcis, Spotlight, Centre de contrôle), WidgetKit, ActivityKit (Live Activity interactive) |
+| Apple Watch | SwiftUI pour watchOS, WatchConnectivity, WatchKit (haptique, Double Tap), WidgetKit (complications, Smart Stack) |
+| Enregistrement des séances | HealthKit (`HKWorkoutSession` sur la montre, `HKWorkoutBuilder` sur l'iPhone) |
 | Traductions | String Catalogs (`Localizable.xcstrings`) |
 
 ## Interface
@@ -105,7 +107,8 @@ Tout ce qui concerne l'interface (structure, séance, scan, autorisations, Liqui
 
 ## Soumission App Store
 
-- Chaîne d'autorisation caméra dans Info.plist, avec un texte clair sur l'usage (scan et séance). `PhotosPicker` ne demande pas d'autorisation. HealthKit seulement s'il est utilisé.
+- Chaîne d'autorisation caméra dans Info.plist, avec un texte clair sur l'usage (scan et séance). `PhotosPicker` ne demande pas d'autorisation. Chaînes Santé (`NSHealthShareUsageDescription`, `NSHealthUpdateUsageDescription`) sur l'iPhone et la montre, capacité HealthKit sur les deux cibles.
+- Identifiants : `com.rebond.app.watchkitapp` (montre) et `com.rebond.app.watchkitapp.widgets` (complications), à créer avec l'App Group `group.com.rebond.app` et HealthKit. Captures d'écran Apple Watch à fournir dans App Store Connect.
 - Privacy manifest (`PrivacyInfo.xcprivacy`) à jour, y compris les API à justification (`UserDefaults`, dates de fichiers…) si elles sont utilisées.
 - Étiquettes de confidentialité App Store Connect : « Aucune donnée collectée ».
 - URL de politique de confidentialité (obligatoire), même courte : à publier, puis mettre à jour `AppLinks.privacyPolicy`.

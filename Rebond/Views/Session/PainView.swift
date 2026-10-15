@@ -81,14 +81,16 @@ struct PainView: View {
     }
 }
 
-/// What the session produced, to end on a positive note. Offers the reminders once.
+/// What the session produced, to end on a positive note. Offers the reminders once, then Health once.
 struct WorkoutSummaryView: View {
     let session: Session
     let onDone: () -> Void
 
     @AppStorage(ReminderSettings.enabledKey) private var remindersEnabled = false
     @AppStorage("hasOfferedReminders") private var hasOfferedReminders = false
+    @AppStorage(PhoneHealth.offeredKey) private var hasOfferedHealth = false
     @Query(sort: \Program.createdAt, order: .reverse) private var programs: [Program]
+    private let health = PhoneHealth.shared
 
     var body: some View {
         List {
@@ -120,6 +122,7 @@ struct WorkoutSummaryView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+            healthSection
         }
         .navigationTitle("Résumé")
         .navigationBarTitleDisplayMode(.inline)
@@ -132,6 +135,46 @@ struct WorkoutSummaryView: View {
             .buttonStyle(.glassProminent)
             .controlSize(.extraLarge)
             .padding(.horizontal)
+        }
+    }
+}
+
+extension WorkoutSummaryView {
+    /// Where the workout went in Health, or the offer to save the sessions there (once).
+    @ViewBuilder
+    private var healthSection: some View {
+        switch health.lastRecording {
+        case .watch:
+            Section {
+                Label("Enregistrée dans Santé par votre Apple Watch", systemImage: "applewatch")
+            }
+        case .phone:
+            Section {
+                Label {
+                    Text("Enregistrée dans Santé")
+                } icon: {
+                    Image(systemName: "heart.fill").foregroundStyle(.pink)
+                }
+            }
+        case .none:
+            // One offer at a time: the reminders first, Health at a later session.
+            if PhoneHealth.isAvailable, !health.isEnabled, !hasOfferedHealth, remindersEnabled || hasOfferedReminders {
+                Section {
+                    Label("Ajouter vos séances à l'app Santé ?", systemImage: "heart.text.square")
+                    Button("Enregistrer dans Santé") {
+                        hasOfferedHealth = true
+                        Task {
+                            if await health.enable() {
+                                health.recordAfterEnabling(start: session.date.addingTimeInterval(-session.duration), end: session.date)
+                            }
+                        }
+                    }
+                    Button("Plus tard") { hasOfferedHealth = true }
+                        .foregroundStyle(.secondary)
+                } footer: {
+                    Text("Chaque séance devient un entraînement dans Santé et compte dans vos anneaux d'Activité. Avec une Apple Watch, votre fréquence cardiaque est enregistrée aussi.")
+                }
+            }
         }
     }
 }

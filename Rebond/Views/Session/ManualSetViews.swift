@@ -86,6 +86,7 @@ struct HoldSetView: View {
     @State private var coach = Coach()
     @AppStorage(Coach.mutedKey) private var muted = false
     @Environment(\.skipRequest) private var skipRequest
+    @Environment(\.pauseRequest) private var pauseRequest
     @Environment(\.reportSetActivity) private var reportSetActivity
 
     private var remaining: Int { max(0, targetSeconds - Int(elapsed)) }
@@ -117,6 +118,21 @@ struct HoldSetView: View {
         .onChange(of: skipRequest) { if skipRequest != nil { onFinish(SetResult(heldSeconds: Int(elapsed))) } }
         .onChange(of: Int(elapsed)) { WorkoutLiveActivity.shared.update(count: Int(elapsed)) }
         .onChange(of: phase) { WorkoutLiveActivity.shared.setPaused(phase == .paused) }
+        // The pause button of the Apple Watch: starts, pauses or resumes the timer.
+        .onChange(of: pauseRequest) {
+            switch phase {
+            case .ready:
+                phase = .running
+                coach.say("C'est parti, tenez la position")
+            case .running:
+                phase = .paused
+                coach.say("Pause")
+            case .paused:
+                phase = .running
+                coach.say("On reprend")
+            case .done: break
+            }
+        }
         .navigationTitle(name)
         .navigationSubtitle(Text(setTitle))
         .navigationBarTitleDisplayMode(.inline)

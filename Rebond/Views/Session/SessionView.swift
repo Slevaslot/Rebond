@@ -14,6 +14,7 @@ struct SessionView: View {
     @State private var motion: MotionSession
     @Environment(\.reportSetActivity) private var reportSetActivity
     @Environment(\.skipRequest) private var skipRequest
+    @Environment(\.pauseRequest) private var pauseRequest
     /// Seconds before the next set starts on its own, once this one is finished.
     @State private var restRemaining = SessionView.restDuration
     /// Long enough to breathe and walk back, short enough not to have to touch the phone.
@@ -183,6 +184,10 @@ struct SessionView: View {
             await motion.start()
         }
         .onChange(of: skipRequest) { if skipRequest != nil { onFinish(motion.result) } }
+        // The pause button of the Apple Watch.
+        .onChange(of: pauseRequest) {
+            if motion.phase != .finished, !motion.cameraUnavailable { motion.togglePause() }
+        }
         .task(id: motion.phase == .finished) {
             // The next set starts on its own after a short rest: no need to walk back to the phone.
             // Not when the patient chooses between one more set and stopping.

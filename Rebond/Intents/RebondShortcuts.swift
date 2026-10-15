@@ -40,6 +40,28 @@ struct RebondShortcuts: AppShortcutsProvider {
             shortTitle: "Séances de la semaine",
             systemImageName: "chart.bar"
         )
+        // During the session, hands busy: "Dis Siri, pause dans Rebond".
+        AppShortcut(
+            intent: ToggleSessionPauseIntent(),
+            phrases: [
+                "Pause dans \(.applicationName)",
+                "Mettre \(.applicationName) en pause",
+                "Reprendre dans \(.applicationName)",
+                "Pause \(.applicationName)",
+            ],
+            shortTitle: "Pause",
+            systemImageName: "pause.fill"
+        )
+        AppShortcut(
+            intent: NextSetIntent(),
+            phrases: [
+                "Série suivante dans \(.applicationName)",
+                "Série suivante \(.applicationName)",
+                "Next set in \(.applicationName)",
+            ],
+            shortTitle: "Série suivante",
+            systemImageName: "forward.end.fill"
+        )
         AppShortcut(
             intent: StartSeanceIntent(),
             phrases: [

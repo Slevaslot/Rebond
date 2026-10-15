@@ -1,6 +1,8 @@
 import AppIntents
 import Foundation
 
+// Compiled into the iPhone app and the Apple Watch app (folder `Shared/`): Siri answers on both.
+
 /// "Combien de séances cette semaine ?": answers with one sentence, without opening the app.
 /// Reads the snapshot the app shares with its widgets, so it answers like the Accueil page.
 struct WeekProgressIntent: AppIntent {
