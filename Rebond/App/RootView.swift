@@ -17,7 +17,7 @@ struct RootView: View {
         enum Content {
             case message
             case photo(UIImage)
-            case program(EditableProgram, notice: LocalizedStringKey?)
+            case program(EditableProgram, notice: LocalizedStringKey?, start: ProgramEditorView.Start? = nil)
         }
         let id = UUID()
         let content: Content
@@ -25,8 +25,9 @@ struct RootView: View {
 
     @State private var draft: Draft?
     @State private var pickedPhoto: PhotosPickerItem?
-    /// A movement just filmed, waiting for the camera to close to open its new séance.
-    @State private var filmed: ReferenceMovement?
+    /// Videos just filmed, waiting for the camera to close to open their new séance.
+    @State private var filmed: [URL] = []
+    @State private var pickedVideos: [PhotosPickerItem] = []
     @State private var savedProgram = 0
     /// Set while the program being reviewed comes from the physiotherapist.
     @State private var prescriber: String?
@@ -91,14 +92,25 @@ struct RootView: View {
             get: { router.importSource == .film },
             set: { if !$0 { router.importSource = nil } }
         ), onDismiss: {
-            // Once the camera is gone: the new séance with the filmed movement, to complete and save.
-            guard let filmed else { return }
-            self.filmed = nil
-            var program = EditableProgram()
-            program.exercises = [EditableProgram.Exercise(filmed)]
-            draft = Draft(content: .program(program, notice: "Ajoutez d'autres exercices si besoin, puis enregistrez la séance."))
+            // Once the camera is gone: the new séance, its videos being analyzed.
+            guard !filmed.isEmpty else { return }
+            draft = Draft(content: .program(EditableProgram(), notice: nil, start: .recordings(filmed)))
+            filmed = []
         }) {
-            RecordMovementView { movement in filmed = movement }
+            RecordMovementView { filmed = $0 }
+        }
+        .photosPicker(
+            isPresented: Binding(
+                get: { router.importSource == .videos },
+                set: { if !$0 { router.importSource = nil } }
+            ),
+            selection: $pickedVideos,
+            matching: .videos
+        )
+        .onChange(of: pickedVideos) {
+            guard !pickedVideos.isEmpty else { return }
+            draft = Draft(content: .program(EditableProgram(), notice: nil, start: .videos(pickedVideos)))
+            pickedVideos = []
         }
         .photosPicker(
             isPresented: Binding(
@@ -111,7 +123,7 @@ struct RootView: View {
         .onChange(of: router.importSource) {
             if router.importSource == .manual {
                 router.importSource = nil
-                draft = Draft(content: .program(EditableProgram(), notice: nil))
+                draft = Draft(content: .program(EditableProgram(), notice: nil, start: .chooseExercise))
             } else if router.importSource == .message {
                 router.importSource = nil
                 draft = Draft(content: .message)
@@ -133,8 +145,8 @@ struct RootView: View {
                     MessageReadingView(onSave: save)
                 case .photo(let image):
                     SheetReadingView(photo: image, onSave: save)
-                case .program(let program, let notice):
-                    ProgramEditorView(program: program, notice: notice, onSave: save)
+                case .program(let program, let notice, let start):
+                    ProgramEditorView(program: program, notice: notice, start: start, onSave: save)
                 }
             }
             .interactiveDismissDisabled()

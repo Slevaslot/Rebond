@@ -3,28 +3,28 @@ import PhotosUI
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// At the physiotherapist's: the patient does the movement right, the iPhone films it, and Rebond learns it.
+/// At the physiotherapist's: the iPhone films the patient doing each exercise right, one take per exercise.
 /// The iPhone stands where it will at home, the patient faces it; the physiotherapist starts and stops.
-/// A video already filmed can be picked from Photos instead.
+/// Only films: the séance screen analyzes the videos.
 struct RecordMovementView: View {
-    let onSave: (ReferenceMovement) -> Void
+    /// Several takes in a row, one per exercise; otherwise one take (to replace an exercise's video).
+    var allowsSeveral = true
+    let onFinish: ([URL]) -> Void
 
     private enum Stage: Equatable {
         case ready
         case countdown(Int)
         case recording
-        case analyzing
-        case review(UUID)
-        case failed(LocalizedStringResource)
+        /// A take is saved: next one, or done.
+        case saved
+        case failed
     }
 
     @Environment(\.dismiss) private var dismiss
     @State private var camera = ReferenceCamera()
     @State private var stage = Stage.ready
-    @State private var movement: ReferenceMovement?
-    @State private var name = ""
+    @State private var takes: [URL] = []
     @State private var recordingStart = Date.now
-    @State private var pickedVideo: PhotosPickerItem?
     @State private var coach = Coach()
     /// Long enough for five slow repetitions; the physiotherapist usually stops before.
     private static let maximumDuration = 60.0
@@ -32,18 +32,9 @@ struct RecordMovementView: View {
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
-            switch stage {
-            case .ready, .countdown, .recording:
-                CameraPreview(session: camera.session)
-                    .ignoresSafeArea()
-            case .analyzing, .failed:
-                EmptyView()
-            case .review:
-                if let movement {
-                    ReferenceFramesView(movement: movement, contentMode: .fit)
-                        .ignoresSafeArea()
-                }
-            }
+            CameraPreview(session: camera.session)
+                .ignoresSafeArea()
+                .opacity(stage == .saved ? 0.4 : 1)
             if case .countdown(let seconds) = stage {
                 Text("\(seconds)")
                     .font(.system(size: 140, weight: .bold, design: .rounded))
@@ -55,8 +46,8 @@ struct RecordMovementView: View {
         .overlay(alignment: .top) { topCard.padding() }
         .overlay(alignment: .bottom) { controls.padding() }
         .overlay(alignment: .topLeading) {
-            if stage != .recording, stage != .analyzing {
-                Button("Fermer", systemImage: "xmark") { cancel() }
+            if stage == .ready || stage == .saved || stage == .failed {
+                Button(takes.isEmpty ? "Annuler" : "Terminé", systemImage: "xmark") { finish() }
                     .labelStyle(.iconOnly)
                     .font(.title3.weight(.semibold))
                     .frame(width: 44, height: 44)
@@ -68,10 +59,6 @@ struct RecordMovementView: View {
         .animation(.smooth, value: stage)
         .task { await camera.start() }
         .onDisappear { camera.stop() }
-        .onChange(of: pickedVideo) {
-            guard let pickedVideo else { return }
-            Task { await importVideo(pickedVideo) }
-        }
         .task(id: stage == .recording) {
             // Stops on its own after a minute.
             guard stage == .recording else { return }
@@ -80,13 +67,11 @@ struct RecordMovementView: View {
         }
     }
 
-    // MARK: Cards
-
     @ViewBuilder
     private var topCard: some View {
         switch stage {
         case .ready:
-            card(title: "Filmez le mouvement",
+            card(title: takes.isEmpty ? "Filmez un exercice" : "Exercice suivant",
                  detail: "Posez l'iPhone debout à 2 ou 3 mètres, comme pour vos séances. Restez immobile au début, puis faites 3 à 5 répétitions bien faites avec votre kiné.")
         case .countdown:
             card(title: "Mettez-vous en position de départ", detail: "Restez immobile")
@@ -104,21 +89,12 @@ struct RecordMovementView: View {
                 .padding(.vertical, 12)
                 .glassEffect(in: .capsule)
             }
-        case .analyzing:
-            VStack(spacing: 16) {
-                ProgressView().controlSize(.large).tint(.white)
-                Text("Rebond apprend le mouvement…")
-                    .font(.headline)
-                    .foregroundStyle(.white)
-            }
-            .padding(.top, 240)
-        case .review:
-            if let movement {
-                card(title: "^[\(movement.repCount) répétition repérée](inflect: true)",
-                     detail: "Pendant vos séances, cette vidéo avancera avec vous et Rebond comparera chaque répétition à celle-ci.")
-            }
-        case .failed(let reason):
-            card(title: "Mouvement non reconnu", detail: reason)
+            .padding(.top, 56)
+        case .saved:
+            card(title: "^[\(takes.count) exercice filmé](inflect: true)",
+                 detail: "Filmez l'exercice suivant, ou terminez : Rebond analyse les vidéos.")
+        case .failed:
+            card(title: "La vidéo n'a pas pu être enregistrée", detail: "Réessayez.")
         }
     }
 
@@ -140,26 +116,8 @@ struct RecordMovementView: View {
     @ViewBuilder
     private var controls: some View {
         switch stage {
-        case .ready:
-            VStack(spacing: 18) {
-                Button { startCountdown() } label: {
-                    Circle()
-                        .fill(.red)
-                        .frame(width: 66, height: 66)
-                        .padding(6)
-                        .overlay(Circle().stroke(.white, lineWidth: 5))
-                }
-                .buttonStyle(.plain)
-                .disabled(camera.isUnavailable)
-                .accessibilityLabel(Text("Commencer à filmer"))
-                PhotosPicker(selection: $pickedVideo, matching: .videos) {
-                    Text("Choisir une vidéo")
-                        .font(.headline)
-                        .padding(.horizontal, 8)
-                }
-                .buttonStyle(.glass)
-                .controlSize(.large)
-            }
+        case .ready, .failed:
+            recordButton
         case .countdown:
             EmptyView()
         case .recording:
@@ -173,41 +131,40 @@ struct RecordMovementView: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel(Text("Arrêter de filmer"))
-        case .analyzing:
-            EmptyView()
-        case .review:
+        case .saved:
             VStack(spacing: 12) {
-                TextField("Nom de l'exercice", text: $name, prompt: Text("Nom de l'exercice, ex. : Fente arrière"))
-                    .textInputAutocapitalization(.sentences)
-                    .font(.headline)
-                    .padding()
-                    .glassEffect(in: .capsule)
-                Button { save() } label: {
-                    Text("Enregistrer l'exercice")
+                Button { startCountdown() } label: {
+                    Label("Filmer l'exercice suivant", systemImage: "video.fill")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.glass)
+                .buttonBorderShape(.capsule)
+                .controlSize(.extraLarge)
+                Button { finish() } label: {
+                    Text("Terminé")
                         .font(.headline)
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.glassProminent)
                 .buttonBorderShape(.capsule)
                 .controlSize(.extraLarge)
-                .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
-                Button("Filmer à nouveau") { retry() }
-                    .buttonStyle(.glass)
-                    .controlSize(.large)
             }
-        case .failed:
-            Button { retry() } label: {
-                Text("Filmer à nouveau")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.glassProminent)
-            .buttonBorderShape(.capsule)
-            .controlSize(.extraLarge)
         }
     }
 
-    // MARK: Steps
+    private var recordButton: some View {
+        Button { startCountdown() } label: {
+            Circle()
+                .fill(.red)
+                .frame(width: 66, height: 66)
+                .padding(6)
+                .overlay(Circle().stroke(.white, lineWidth: 5))
+        }
+        .buttonStyle(.plain)
+        .disabled(camera.isUnavailable)
+        .accessibilityLabel(Text("Commencer à filmer"))
+    }
 
     /// Five seconds to walk to the place and stand still, the last three said aloud.
     private func startCountdown() {
@@ -228,60 +185,26 @@ struct RecordMovementView: View {
 
     private func stopRecording() async {
         guard let video = await camera.stopRecording() else {
-            stage = .failed("La vidéo n'a pas pu être enregistrée. Réessayez.")
+            stage = .failed
             return
         }
         coach.say("C'est noté")
-        await learn(from: video, mirrored: false)
-    }
-
-    private func importVideo(_ item: PhotosPickerItem) async {
-        stage = .analyzing
-        guard let movie = try? await item.loadTransferable(type: PickedMovie.self) else {
-            stage = .failed("Cette vidéo n'a pas pu être ouverte.")
-            return
-        }
-        // Filmed by someone else, not like a mirror: turned over to look like the session's camera.
-        await learn(from: movie.url, mirrored: true)
-    }
-
-    private func learn(from video: URL, mirrored: Bool) async {
-        stage = .analyzing
-        do {
-            let learned = try await ReferenceStore.learn(from: video, name: "", mirrored: mirrored)
-            movement = learned
-            stage = .review(learned.id)
-        } catch ReferenceError.noBody {
-            stage = .failed("Rebond n'a pas bien vu le corps. Filmez de face, le corps entier dans l'image, pieds compris.")
-        } catch {
-            stage = .failed("Rebond n'a pas trouvé de mouvement répété. Restez immobile au début, puis faites 3 à 5 répétitions bien marquées.")
+        takes.append(video)
+        if allowsSeveral {
+            stage = .saved
+        } else {
+            finish()
         }
     }
 
-    private func save() {
-        guard var movement else { return }
-        movement.name = name.trimmingCharacters(in: .whitespaces)
-        ReferenceStore.rename(movement.id, to: movement.name)
-        self.movement = nil
-        onSave(movement)
-        dismiss()
-    }
-
-    private func retry() {
-        if let movement { ReferenceStore.delete(movement.id) }
-        movement = nil
-        pickedVideo = nil
-        stage = .ready
-    }
-
-    private func cancel() {
-        if let movement { ReferenceStore.delete(movement.id) }
+    private func finish() {
+        onFinish(takes)
         dismiss()
     }
 }
 
 /// A video picked in Photos, copied where Rebond can read it.
-private struct PickedMovie: Transferable {
+struct PickedMovie: Transferable {
     let url: URL
 
     static var transferRepresentation: some TransferRepresentation {

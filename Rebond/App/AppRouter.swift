@@ -16,13 +16,15 @@ final class AppRouter {
         case physio
     }
 
-    /// Ways to add a program: filming a movement at the physiotherapist's, their message, scanning the sheet,
-    /// picking a photo of it, or typing it.
+    /// Ways to add a séance: the physiotherapist's videos (picked in Photos or filmed), their message or sheet
+    /// (scanned or picked from the photos), or exercises picked in the list.
     enum ImportSource {
+        case videos
         case film
         case message
         case scan
         case photo
+        /// Exercises picked in the list (or typed).
         case manual
     }
 

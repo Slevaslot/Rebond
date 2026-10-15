@@ -87,12 +87,24 @@ nonisolated struct PoseAnalyzer {
         analyze(VNImageRequestHandler(cgImage: image, orientation: orientation), size: CGSize(width: image.width, height: image.height))
     }
 
+    /// Everyone in an image of a filmed video: the physiotherapist is often next to the patient.
+    func analyzeEveryone(_ image: CGImage) -> [PoseFrame] {
+        let handler = VNImageRequestHandler(cgImage: image, orientation: orientation)
+        let request = VNDetectHumanBodyPoseRequest()
+        guard (try? handler.perform([request])) != nil else { return [] }
+        let size = CGSize(width: image.width, height: image.height)
+        return people(in: request.results ?? []).map { frame(from: $0, size: size) }.filter { $0.skeleton != nil }
+    }
+
     private func analyze(_ handler: VNImageRequestHandler, size: CGSize) -> PoseFrame {
         let request = VNDetectHumanBodyPoseRequest()
         guard (try? handler.perform([request])) != nil,
-              let visible = patientPoints(in: request.results ?? [])
+              let visible = people(in: request.results ?? []).max(by: { Self.area(of: $0) < Self.area(of: $1) })
         else { return PoseFrame(skeleton: nil, measure: nil) }
+        return frame(from: visible, size: size)
+    }
 
+    private func frame(from visible: [VNHumanBodyPoseObservation.JointName: VNRecognizedPoint], size: CGSize) -> PoseFrame {
         guard visible.count >= 4 else { return PoseFrame(skeleton: nil, measure: nil) }
 
         let skeleton = PoseSkeleton(
@@ -137,14 +149,13 @@ nonisolated struct PoseAnalyzer {
         return PoseFrame(skeleton: skeleton, measure: measure)
     }
 
-    /// Several people can be in view (family, colleagues in the background): the patient is the one
-    /// standing closest to the phone, so the largest on screen.
-    private func patientPoints(in observations: [VNHumanBodyPoseObservation]) -> [VNHumanBodyPoseObservation.JointName: VNRecognizedPoint]? {
-        let people = observations.compactMap { observation -> [VNHumanBodyPoseObservation.JointName: VNRecognizedPoint]? in
+    /// The reliable joints of each person seen. During a session, several people can be in view (family,
+    /// colleagues in the background): the patient is the one standing closest to the phone, so the largest.
+    private func people(in observations: [VNHumanBodyPoseObservation]) -> [[VNHumanBodyPoseObservation.JointName: VNRecognizedPoint]] {
+        observations.compactMap { observation in
             guard let points = try? observation.recognizedPoints(.all) else { return nil }
             return points.filter { $0.value.confidence >= minimumConfidence }
         }
-        return people.max { Self.area(of: $0) < Self.area(of: $1) }
     }
 
     private static func area(of points: [VNHumanBodyPoseObservation.JointName: VNRecognizedPoint]) -> Double {

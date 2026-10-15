@@ -293,18 +293,35 @@ struct TrackingBadge: View {
     }
 }
 
-/// Adding a session, in full: a large button, with the same four ways as the + of the header.
+/// The three ways to add a séance, on an equal footing: the physiotherapist's videos, their sheet or message,
+/// or exercises picked in the list. All lead to the same "Ma séance" screen.
+struct AddSessionChoices: View {
+    @Environment(AppRouter.self) private var router
+
+    var body: some View {
+        Section("Vidéos de mon kiné") {
+            Button("Choisir mes vidéos", systemImage: "photo.on.rectangle") { router.addProgram(from: .videos) }
+            Button("Filmer", systemImage: "video") { router.addProgram(from: .film) }
+        }
+        Section("Feuille ou message du kiné") {
+            Button("Scanner la feuille", systemImage: "doc.viewfinder") { router.addProgram(from: .scan) }
+            Button("Photo de la feuille", systemImage: "photo") { router.addProgram(from: .photo) }
+            Button("Coller le message", systemImage: "text.bubble") { router.addProgram(from: .message) }
+        }
+        Section("Exercices") {
+            Button("Choisir mes exercices", systemImage: "list.bullet") { router.addProgram(from: .manual) }
+        }
+    }
+}
+
+/// Adding a session, in full: a large button, with the same choices as the + of the header.
 private struct AddSessionButton: View {
     @Environment(AppRouter.self) private var router
 
     var body: some View {
         // The system's bubble, opening from the button: nothing darkens the page.
         Menu {
-            Button("Filmer un exercice chez mon kiné", systemImage: "video") { router.addProgram(from: .film) }
-            Button("Coller le message du kiné", systemImage: "text.bubble") { router.addProgram(from: .message) }
-            Button("Scanner sa feuille", systemImage: "doc.viewfinder") { router.addProgram(from: .scan) }
-            Button("Choisir une photo", systemImage: "photo") { router.addProgram(from: .photo) }
-            Button("Saisir à la main", systemImage: "square.and.pencil") { router.addProgram(from: .manual) }
+            AddSessionChoices()
         } label: {
             Text("Ajouter une séance")
                 .font(.headline)
@@ -318,18 +335,13 @@ private struct AddSessionButton: View {
     }
 }
 
-/// The four ways to add a program, in a Liquid Glass button: the physiotherapist's message, their sheet
-/// scanned or picked from the photos, or typed by hand.
+/// The ways to add a séance, in a Liquid Glass button.
 struct AddProgramMenu: View {
     @Environment(AppRouter.self) private var router
 
     var body: some View {
         Menu {
-            Button("Filmer un exercice chez mon kiné", systemImage: "video") { router.addProgram(from: .film) }
-            Button("Coller le message du kiné", systemImage: "text.bubble") { router.addProgram(from: .message) }
-            Button("Scanner sa feuille", systemImage: "doc.viewfinder") { router.addProgram(from: .scan) }
-            Button("Choisir une photo", systemImage: "photo") { router.addProgram(from: .photo) }
-            Button("Saisir à la main", systemImage: "square.and.pencil") { router.addProgram(from: .manual) }
+            AddSessionChoices()
         } label: {
             HeaderIcon(systemImage: "plus")
         }
@@ -351,32 +363,26 @@ struct NoProgramView<Header: View>: View {
             VStack(alignment: .leading, spacing: 14) {
                 header
 
-                SummaryCard(title: Text("Votre programme"), systemImage: "stethoscope", color: .accentColor) {
+                SummaryCard(title: Text("Ajouter une séance"), systemImage: "plus", color: .accentColor) {
                     EmptyView()
                 } content: {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Filmez vos exercices chez votre kiné : Rebond les apprend sur votre corps.")
+                        Text("Comment votre kiné vous a-t-il donné vos exercices ?")
                             .font(.title3.weight(.semibold))
                             .fixedSize(horizontal: false, vertical: true)
-                            .padding(.bottom, 8)
-                        Button {
-                            router.addProgram(from: .film)
-                        } label: {
-                            Label("Filmer un exercice", systemImage: "video.fill")
-                                .font(.headline)
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.glassProminent)
-                        .buttonBorderShape(.capsule)
-                        .controlSize(.large)
-                        .padding(.bottom, 6)
-                        AddRow(title: "Coller son message", symbol: "text.bubble") { router.addProgram(from: .message) }
+                            .padding(.bottom, 6)
+                        AddGroup(title: "Vidéos de mon kiné")
+                        AddRow(title: "Choisir mes vidéos", symbol: "photo.on.rectangle") { router.addProgram(from: .videos) }
                         Divider().padding(.leading, 44)
-                        AddRow(title: "Scanner sa feuille", symbol: "doc.viewfinder") { router.addProgram(from: .scan) }
+                        AddRow(title: "Filmer", symbol: "video") { router.addProgram(from: .film) }
+                        AddGroup(title: "Feuille ou message du kiné")
+                        AddRow(title: "Scanner la feuille", symbol: "doc.viewfinder") { router.addProgram(from: .scan) }
                         Divider().padding(.leading, 44)
-                        AddRow(title: "Choisir une photo", symbol: "photo") { router.addProgram(from: .photo) }
+                        AddRow(title: "Photo de la feuille", symbol: "photo") { router.addProgram(from: .photo) }
                         Divider().padding(.leading, 44)
-                        AddRow(title: "Saisir à la main", symbol: "square.and.pencil") { router.addProgram(from: .manual) }
+                        AddRow(title: "Coller le message", symbol: "text.bubble") { router.addProgram(from: .message) }
+                        AddGroup(title: "Exercices")
+                        AddRow(title: "Choisir mes exercices", symbol: "list.bullet") { router.addProgram(from: .manual) }
                         #if DEBUG
                         Divider().padding(.leading, 44)
                         AddRow(title: "Programme de démo", symbol: "sparkles") { DemoData.load(into: context) }
@@ -394,6 +400,20 @@ struct NoProgramView<Header: View>: View {
                 .ignoresSafeArea()
         }
         .background(Color(.systemGroupedBackground))
+    }
+}
+
+/// A group of ways in the card: "Vidéos de mon kiné".
+private struct AddGroup: View {
+    let title: LocalizedStringKey
+
+    var body: some View {
+        Text(title)
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .textCase(.uppercase)
+            .padding(.top, 12)
+            .padding(.bottom, 2)
     }
 }
 

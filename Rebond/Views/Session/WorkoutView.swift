@@ -14,6 +14,8 @@ struct WorkoutView: View {
     @State private var plan: WorkoutPlan
     @State private var stage: Stage
     @State private var start = Date.now
+    /// Filmed exercises whose example the patient has watched in this session.
+    @State private var examplesSeen: Set<Int> = []
     @State private var confirmingStop = false
     /// The set on screen has started (a repetition counted, the timer running): stopping would lose it.
     @State private var currentSetStarted = false
@@ -113,7 +115,13 @@ struct WorkoutView: View {
         let title: LocalizedStringKey = "Série \(step.set) sur \(step.exercise.sets)"
         switch step.exercise.mode {
         case .camera(let catalogID):
-            if let exercise = CatalogExercise.find(catalogID) {
+            if let exercise = CatalogExercise.find(catalogID), let reference = exercise.reference,
+               plan.isFirstSetOfExercise, !examplesSeen.contains(step.exerciseIndex) {
+                // Filmed at the physiotherapist's: the patient watches their video before doing it.
+                ReferenceExampleView(movement: reference, setTitle: title) {
+                    examplesSeen.insert(step.exerciseIndex)
+                }
+            } else if let exercise = CatalogExercise.find(catalogID) {
                 SessionView(
                     exercise: exercise,
                     targetReps: step.exercise.reps,

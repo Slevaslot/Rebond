@@ -154,7 +154,7 @@ struct PrescribeFlow: View {
             }
         } else {
             NavigationStack {
-                ProgramEditorView(program: chosen ?? program, title: title) { program in
+                ProgramEditorView(program: chosen ?? program, title: title, allowsVideos: false) { program in
                     withAnimation { prescribed = program }
                 }
             }

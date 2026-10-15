@@ -182,22 +182,24 @@ nonisolated enum ReferenceAnalyzer {
         let valid = samples.filter { $0.measure != nil }
         guard valid.count >= 20 else { throw .noBody }
 
-        // The patient stands still at the start of the video: that's the resting position.
-        let restCount = min(8, valid.count)
-        let torso = median(valid.prefix(restCount).map { $0.measure!.torsoLength })
+        let torso = median(valid.map { $0.measure!.torsoLength })
         guard torso > 0 else { throw .noBody }
 
         // Measures of every frame; a measure missing on a frame keeps its last value.
-        var raw = valid.map { MovementFeatures.vector($0.measure!, torso: torso) }
-        for f in 0..<MovementFeatures.count {
-            let firstSeen = raw.lazy.compactMap { $0[f] }.first ?? 0
-            var last = firstSeen
-            for i in raw.indices {
-                if let value = raw[i][f] { last = value } else { raw[i][f] = last }
-            }
-        }
-        let features = smooth(raw.map { $0.map { $0 ?? 0 } })
-        let rest = (0..<MovementFeatures.count).map { f in median(features.prefix(restCount).map { $0[f] }) }
+        let features = filledFeatures(valid, torso: torso)
+
+        // The resting position can be anywhere in the video (the patient settles, the physiotherapist talks):
+        // along the main change, it is the end where the body stays the longest.
+        let mean = (0..<MovementFeatures.count).map { f in features.map { $0[f] }.reduce(0, +) / Double(features.count) }
+        let centered = features.map { zip($0, mean).map { $0 - $1 } }
+        let mainChange = principalDirection(of: centered)
+        let along = centered.map { MovementFeatures.dot($0, mainChange) }
+        let low = along.min() ?? 0, high = along.max() ?? 0
+        let band = (high - low) * 0.15
+        let nearLow = along.indices.filter { along[$0] <= low + band }
+        let nearHigh = along.indices.filter { along[$0] >= high - band }
+        let restFrames = nearLow.count >= nearHigh.count ? nearLow : nearHigh
+        let rest = (0..<MovementFeatures.count).map { f in median(restFrames.map { features[$0][f] }) }
         let deviations = features.map { zip($0, rest).map { $0 - $1 } }
 
         // The movement's direction: where the measures change the most, together.
@@ -246,7 +248,7 @@ nonisolated enum ReferenceAnalyzer {
             for joint in MovementFeatures.joints[f] { joints.insert(joint.rawValue.rawValue) }
         }
 
-        let restFrame = valid[restCount / 2]
+        let restFrame = valid[restFrames.min { MovementFeatures.norm(deviations[$0]) < MovementFeatures.norm(deviations[$1]) } ?? 0]
         let peakFrame = valid[reps[best].peak]
         let poses = guidePoses(rest: restFrame, target: peakFrame)
 
@@ -263,6 +265,46 @@ nonisolated enum ReferenceAnalyzer {
             bestPeak: peakFrame.time,
             bestEnd: valid[reps[best].end].time
         )
+    }
+
+    /// The measures of each frame, smoothed; one missing on a frame keeps its last value.
+    static func filledFeatures(_ samples: [ReferenceSample], torso: Double) -> [[Double]] {
+        var raw = samples.compactMap { $0.measure.map { MovementFeatures.vector($0, torso: torso) } }
+        for f in 0..<MovementFeatures.count {
+            var last = raw.lazy.compactMap { $0[f] }.first ?? 0
+            for i in raw.indices {
+                if let value = raw[i][f] { last = value } else { raw[i][f] = last }
+            }
+        }
+        return smooth(raw.map { $0.map { $0 ?? 0 } })
+    }
+
+    /// How much a person moves over the video: the patient doing the exercise moves more, and more often,
+    /// than the physiotherapist watching.
+    static func motion(of samples: [ReferenceSample]) -> Double {
+        let valid = samples.filter { $0.measure != nil }
+        guard valid.count >= 20 else { return 0 }
+        let torso = median(valid.map { $0.measure!.torsoLength })
+        guard torso > 0 else { return 0 }
+        let features = filledFeatures(valid, torso: torso)
+        let mean = (0..<MovementFeatures.count).map { f in features.map { $0[f] }.reduce(0, +) / Double(features.count) }
+        let spread = features.map { MovementFeatures.distance($0, mean) }.reduce(0, +) / Double(features.count)
+        return spread * Double(valid.count)
+    }
+
+    /// A name from what moves, so nothing has to be typed: "Bras", "Jambes", "Bras et jambes", "Buste".
+    static func suggestedName(moving joints: [String]) -> String {
+        typealias Joint = VNHumanBodyPoseObservation.JointName
+        let names = Set(joints)
+        func moves(_ list: [Joint]) -> Bool { list.contains { names.contains($0.rawValue.rawValue) } }
+        let arms = moves([.leftElbow, .rightElbow, .leftWrist, .rightWrist])
+        let legs = moves([.leftKnee, .rightKnee, .leftAnkle, .rightAnkle])
+        switch (arms, legs) {
+        case (true, true): return String(localized: "Bras et jambes")
+        case (true, false): return String(localized: "Bras")
+        case (false, true): return String(localized: "Jambes")
+        case (false, false): return String(localized: "Buste")
+        }
     }
 
     /// The patient's body at rest and at the end of the movement, in the guide's unit box (as wide as 0.65 of

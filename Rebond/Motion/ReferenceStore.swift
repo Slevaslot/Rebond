@@ -68,23 +68,26 @@ nonisolated enum ReferenceStore {
         let asset = AVURLAsset(url: video)
         let duration = min(try await asset.load(.duration).seconds, 90)
 
-        // 15 images per second, as during the session.
+        // 15 images per second, as during the session. Everyone seen is followed from one image to the next:
+        // the physiotherapist is often in the picture with the patient.
         let analyzer = PoseAnalyzer(orientation: mirrored ? .upMirrored : .up)
-        var samples: [ReferenceSample] = []
+        var people: [PersonTrack] = []
         let generator = imageGenerator(for: asset, maximumSide: 1280)
         let times = stride(from: 0.0, to: duration, by: 1.0 / 15).map { CMTime(seconds: $0, preferredTimescale: 600) }
+        var frames: [(time: Double, people: [PoseFrame], size: CGSize)] = []
         for await result in generator.images(for: times) {
             guard let image = try? result.image else { continue }
-            let frame = analyzer.analyze(image)
-            samples.append(ReferenceSample(
-                time: result.requestedTime.seconds,
-                measure: frame.measure,
-                points: frame.skeleton?.points ?? [:],
-                imageSize: frame.skeleton?.imageSize ?? CGSize(width: image.width, height: image.height)
-            ))
+            frames.append((result.requestedTime.seconds, analyzer.analyzeEveryone(image),
+                           CGSize(width: image.width, height: image.height)))
         }
-        samples.sort { $0.time < $1.time }
-        let analysis = try ReferenceAnalyzer.analyze(samples)
+        frames.sort { $0.time < $1.time }
+        for frame in frames {
+            PersonTrack.follow(frame.people, at: frame.time, imageSize: frame.size, in: &people)
+        }
+        // The patient is the one doing the movement.
+        guard let patient = people.max(by: { ReferenceAnalyzer.motion(of: $0.samples) < ReferenceAnalyzer.motion(of: $1.samples) })
+        else { throw ReferenceError.noBody }
+        let analysis = try ReferenceAnalyzer.analyze(patient.samples)
 
         try FileManager.default.createDirectory(at: folder(id), withIntermediateDirectories: true)
         // The images of the clearest repetition, shown during the session as the patient moves.
@@ -102,7 +105,8 @@ nonisolated enum ReferenceStore {
         try FileManager.default.copyItem(at: video, to: videoURL(id))
 
         let movement = ReferenceMovement(
-            id: id, name: name, createdAt: .now,
+            id: id, name: name.isEmpty ? ReferenceAnalyzer.suggestedName(moving: analysis.highlightedJoints) : name,
+            createdAt: .now,
             axis: analysis.axis, target: analysis.target, template: analysis.template,
             minDuration: analysis.minDuration, repCount: analysis.repCount,
             highlightedJoints: analysis.highlightedJoints,
@@ -163,5 +167,37 @@ nonisolated extension ReferenceMovement {
             guideTarget: pose(targetPose),
             armStyle: .straight
         )
+    }
+}
+
+/// One person followed through a video, by where their body is from one image to the next.
+nonisolated struct PersonTrack {
+    private(set) var samples: [ReferenceSample] = []
+    private var center: CGPoint
+    private var lastTime: Double
+
+    /// Gives each body of the image to the person it continues, or starts a new person.
+    static func follow(_ bodies: [PoseFrame], at time: Double, imageSize: CGSize, in tracks: inout [PersonTrack]) {
+        var taken = Set<Int>()
+        for body in bodies {
+            guard let skeleton = body.skeleton, !skeleton.points.isEmpty else { continue }
+            let points = skeleton.points.values
+            let center = CGPoint(x: points.map(\.x).reduce(0, +) / Double(points.count),
+                                 y: points.map(\.y).reduce(0, +) / Double(points.count))
+            let sample = ReferenceSample(time: time, measure: body.measure, points: skeleton.points, imageSize: imageSize)
+            let nearest = tracks.indices
+                .filter { !taken.contains($0) && time - tracks[$0].lastTime < 1 }
+                .min { hypot(tracks[$0].center.x - center.x, tracks[$0].center.y - center.y)
+                    < hypot(tracks[$1].center.x - center.x, tracks[$1].center.y - center.y) }
+            if let nearest, hypot(tracks[nearest].center.x - center.x, tracks[nearest].center.y - center.y) < 0.2 {
+                tracks[nearest].samples.append(sample)
+                tracks[nearest].center = center
+                tracks[nearest].lastTime = time
+                taken.insert(nearest)
+            } else {
+                tracks.append(PersonTrack(samples: [sample], center: center, lastTime: time))
+                taken.insert(tracks.count - 1)
+            }
+        }
     }
 }

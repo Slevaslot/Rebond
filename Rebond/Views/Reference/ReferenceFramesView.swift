@@ -79,3 +79,85 @@ struct ReferenceVideoSheet: View {
         .onDisappear { player?.pause() }
     }
 }
+
+/// Before a filmed exercise: the patient's own video from the physiotherapist's, full screen and with its sound
+/// (the physiotherapist's advice), as the example to follow. Then "Je suis prêt".
+struct ReferenceExampleView: View {
+    let movement: ReferenceMovement
+    let setTitle: LocalizedStringKey
+    let onReady: () -> Void
+
+    @State private var player: AVQueuePlayer?
+    @State private var looper: AVPlayerLooper?
+
+    var body: some View {
+        ZStack {
+            Color.black
+            if let player {
+                PlayerLayerView(player: player)
+            }
+        }
+        .ignoresSafeArea()
+        .overlay(alignment: .top) {
+            VStack(spacing: 6) {
+                Text("Regardez l'exemple").font(.headline)
+                Text("Votre mouvement, filmé chez votre kiné. Vous allez le refaire de la même façon.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .multilineTextAlignment(.center)
+            .padding()
+            .frame(maxWidth: .infinity)
+            .glassEffect(in: .rect(cornerRadius: 26))
+            .padding()
+        }
+        .overlay(alignment: .bottom) {
+            Button(action: onReady) {
+                Text("Je suis prêt")
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.glassProminent)
+            .buttonBorderShape(.capsule)
+            .controlSize(.extraLarge)
+            .padding()
+        }
+        .navigationTitle(movement.name)
+        .navigationSubtitle(Text(setTitle))
+        .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            let item = AVPlayerItem(url: ReferenceStore.videoURL(movement.id))
+            let player = AVQueuePlayer()
+            looper = AVPlayerLooper(player: player, templateItem: item)
+            self.player = player
+            try? AVAudioSession.sharedInstance().setCategory(.playback)
+            player.play()
+        }
+        .onDisappear {
+            player?.pause()
+            looper = nil
+        }
+    }
+}
+
+/// A video without controls, filling its frame.
+private struct PlayerLayerView: UIViewRepresentable {
+    let player: AVPlayer
+
+    func makeUIView(context: Context) -> PlayerView {
+        let view = PlayerView()
+        view.playerLayer.player = player
+        view.playerLayer.videoGravity = .resizeAspect
+        return view
+    }
+
+    func updateUIView(_ uiView: PlayerView, context: Context) {
+        uiView.playerLayer.player = player
+    }
+
+    final class PlayerView: UIView {
+        override class var layerClass: AnyClass { AVPlayerLayer.self }
+        var playerLayer: AVPlayerLayer { layer as! AVPlayerLayer }
+    }
+}
