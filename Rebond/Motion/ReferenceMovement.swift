@@ -25,8 +25,8 @@ nonisolated struct ReferenceMovement: Codable, Sendable, Identifiable {
     let repCount: Int
     /// Raw names of the joints that move, highlighted on the skeleton.
     let highlightedJoints: [String]
-    /// The catalog exercise it was recognized as (a squat filmed at the physiotherapist's): its counter, tested on
-    /// many videos, counts the repetitions; the film still gives the example and the comparison.
+    /// The catalog exercise it was recognized as (a squat filmed at the physiotherapist's): only its name and
+    /// symbol are shown; the film alone counts the repetitions.
     var recognizedID: String? = nil
     /// The measures of the body at rest in the film: at home, the starting position is only measured close to it.
     var rest: [Double]? = nil
@@ -188,7 +188,7 @@ nonisolated struct ReferenceAnalysis: Sendable {
     let bestStart: Double
     let bestPeak: Double
     let bestEnd: Double
-    /// The catalog exercise it was recognized as, which then counts the repetitions.
+    /// The catalog exercise it was recognized as, for its name and symbol.
     var recognizedID: String? = nil
     var rest: [Double] = []
 }
@@ -480,9 +480,6 @@ nonisolated struct ReferenceCounter: MovementCounter {
     /// About 25° of a joint, or a quarter of the torso length: a visible difference, not detection noise.
     private let mismatchThreshold = 0.42
 
-    /// The recognized catalog exercise's counter, which then counts: tested on many videos, with its own advice.
-    private var driver: (any MovementCounter)?
-
     init(movement: ReferenceMovement) {
         self.movement = movement
         let along = movement.template.map { MovementFeatures.dot($0, movement.axis) }
@@ -492,27 +489,21 @@ nonisolated struct ReferenceCounter: MovementCounter {
         cycle = RepCycle(start: target * ReferenceAnalyzer.startFraction, target: target,
                          back: target * ReferenceAnalyzer.backFraction, reversalMargin: target * 0.1,
                          noise: target * 0.4, minDuration: movement.minDuration, shortfall: .followReference)
-        driver = movement.recognizedID.flatMap(CatalogExercise.find)?.makeCounter()
     }
 
     mutating func process(_ measure: PoseMeasure?, at time: Double) -> CounterUpdate {
-        var driven: CounterUpdate?
-        if var counter = driver {
-            driven = counter.process(measure, at: time)
-            driver = counter
-        }
         guard let measure else {
             cycle.abandon()
             trajectory = []
             collecting = false
             recent = []
-            return driven ?? CounterUpdate(progress: 0, event: nil)
+            return CounterUpdate(progress: 0, event: nil)
         }
 
         var calibratedNow = false
         recent.append((MovementFeatures.vector(measure, torso: torso > 0 ? torso : measure.torsoLength), measure.torsoLength))
         if recent.count > stillFrames { recent.removeFirst() }
-        let wasInRepetition = isInRepetition(driven)
+        let wasInRepetition = cycle.isInRepetition
         if !wasInRepetition, let still = stillPosition(), looksLikeFilmRest(still.features) {
             if rest == nil { calibratedNow = true }
             // Again at each still moment at rest: the patient may have moved a little in the room.
@@ -521,7 +512,7 @@ nonisolated struct ReferenceCounter: MovementCounter {
                 torso = still.torso
             }
         }
-        guard let rest else { return driven ?? CounterUpdate(progress: 0, event: nil) }
+        guard let rest else { return CounterUpdate(progress: 0, event: nil) }
 
         let features = MovementFeatures.vector(measure, torso: torso).enumerated().map { $1 ?? rest[$0] }
         let deviation = zip(features, rest).map { $0 - $1 }
@@ -529,16 +520,9 @@ nonisolated struct ReferenceCounter: MovementCounter {
         let mirrored = MovementFeatures.dot(MovementFeatures.swapped(deviation), movement.axis)
         let value = max(direct, mirrored)
 
-        var event: RepEvent?
-        var posture: Correction?
-        let progress: Double
-        if let driven {
-            (event, posture, progress) = (driven.event, driven.posture, driven.progress)
-        } else {
-            (event, posture) = cycle.advance(value, fault: nil, at: time)
-            progress = min(1, max(0, value / movement.target))
-        }
-        let inRepetition = isInRepetition(driven)
+        var (event, posture) = cycle.advance(value, fault: nil, at: time)
+        let progress = min(1, max(0, value / movement.target))
+        let inRepetition = cycle.isInRepetition
 
         // Compared with the film at the same moment of the movement: the body part that differs the most.
         if inRepetition, progress >= 0.3, posture == nil,
@@ -575,7 +559,7 @@ nonisolated struct ReferenceCounter: MovementCounter {
 
         var result = event
         if case .repCompleted(let rep) = event {
-            // How close to the film, whoever counted it: the repetition just ended, or the one going on.
+            // How close to the film: the repetition just ended, or the one going on.
             let points = finished.flatMap { time - $0.time < 1.5 ? $0.points : nil } ?? trajectory
             let score = points.count >= 3 ? MovementFeatures.resemblance(points, to: movement.template) : rep.amplitude
             // Too fast compared with the film's own pace (15 measures per second).
@@ -583,14 +567,8 @@ nonisolated struct ReferenceCounter: MovementCounter {
             result = .repCompleted(RepResult(amplitude: score, tooFast: tooFast))
             finished = nil
         }
-        if calibratedNow, driver == nil, case .none = result { result = .calibrated }
+        if calibratedNow, case .none = result { result = .calibrated }
         return CounterUpdate(progress: progress, event: result, posture: posture)
-    }
-
-    /// In a repetition: by the film's own cycle, or by the recognized exercise's progress.
-    private func isInRepetition(_ driven: CounterUpdate?) -> Bool {
-        if let driven { return driven.progress > 0.12 }
-        return cycle.isInRepetition
     }
 
     /// The body part furthest from the film's body at the same point of the movement, if far enough to show.
