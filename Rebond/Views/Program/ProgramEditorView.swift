@@ -417,10 +417,6 @@ private struct ExerciseCard: View {
             ProgressView()
                 .frame(width: 52, height: 68)
                 .background(Color(.tertiarySystemFill), in: .rect(cornerRadius: 12))
-        } else if let reference = catalog?.reference {
-            ReferenceFramesView(movement: reference)
-                .frame(width: 52, height: 68)
-                .clipShape(.rect(cornerRadius: 12))
         } else {
             Image(systemName: analysis.isFailed ? "exclamationmark.triangle" : symbol)
                 .font(.title3)

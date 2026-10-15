@@ -109,21 +109,26 @@ nonisolated enum ReferenceStore {
             index += 1
         }
         let peakFrame = frameTimes.firstIndex { $0 >= analysis.bestPeak } ?? frameTimes.count / 2
+        let peakIndex = min(peakFrame, max(index - 1, 0))
+        let movementName = name.isEmpty ? suggestedName(for: analysis) : name
+        let symbol = await MovementSymbolPicker.pick(peakImage: loadImage(frameURL(id, peakIndex)),
+                                                     movingJoints: analysis.highlightedJoints, name: movementName)
 
         try? FileManager.default.removeItem(at: videoURL(id))
         try FileManager.default.copyItem(at: video, to: videoURL(id))
 
         let movement = ReferenceMovement(
-            id: id, name: name.isEmpty ? suggestedName(for: analysis) : name,
+            id: id, name: movementName,
             createdAt: .now,
             axis: analysis.axis, target: analysis.target, template: analysis.template,
             minDuration: analysis.minDuration, repCount: analysis.repCount,
             highlightedJoints: analysis.highlightedJoints,
             recognizedID: analysis.recognizedID,
+            symbol: symbol.systemName,
             rest: analysis.rest,
             restPose: analysis.restPose,
             targetPose: analysis.targetPose,
-            frameCount: index, peakFrame: min(peakFrame, max(index - 1, 0))
+            frameCount: index, peakFrame: peakIndex
         )
         try save(movement)
         return movement
@@ -158,6 +163,11 @@ nonisolated enum ReferenceStore {
         return context.makeImage() ?? image
     }
 
+    private static func loadImage(_ url: URL) -> CGImage? {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+        return CGImageSourceCreateImageAtIndex(source, 0, nil)
+    }
+
     private static func writeJPEG(_ image: CGImage, to url: URL) {
         guard let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.jpeg.identifier as CFString, 1, nil) else { return }
         CGImageDestinationAddImage(destination, image, [kCGImageDestinationLossyCompressionQuality: 0.75] as CFDictionary)
@@ -185,7 +195,9 @@ nonisolated extension ReferenceMovement {
         return CatalogExercise(
             id: catalogID,
             name: LocalizedStringResource(stringLiteral: name),
-            symbol: recognizedID.flatMap(CatalogExercise.find)?.symbol ?? Self.symbol,
+            // Movements learned before Apple Intelligence chose a symbol: the rule from what moves.
+            symbol: symbol ?? recognizedID.flatMap(CatalogExercise.find)?.symbol
+                ?? MovementSymbolPicker.rule(movingJoints: highlightedJoints).systemName,
             analysis: .recorded(self),
             highlightedJoints: Set(highlightedJoints.map { VNHumanBodyPoseObservation.JointName(rawValue: VNRecognizedPointKey(rawValue: $0)) }),
             returnCue: "Revenez doucement",

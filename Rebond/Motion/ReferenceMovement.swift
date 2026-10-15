@@ -28,6 +28,8 @@ nonisolated struct ReferenceMovement: Codable, Sendable, Identifiable {
     /// The catalog exercise it was recognized as (a squat filmed at the physiotherapist's): only its name and
     /// symbol are shown; the film alone counts the repetitions.
     var recognizedID: String? = nil
+    /// Raw name of the SF Symbol shown for it, chosen by Apple Intelligence when it was learned.
+    var symbol: String? = nil
     /// The measures of the body at rest in the film: at home, the starting position is only measured close to it.
     var rest: [Double]? = nil
     /// The patient's own body at rest and at the end of the movement, in the guide's unit box.
