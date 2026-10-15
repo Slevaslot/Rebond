@@ -101,9 +101,13 @@ nonisolated enum ReferenceStore {
         }
         let peakFrame = frameTimes.firstIndex { $0 >= analysis.bestPeak } ?? frameTimes.count / 2
         let peakIndex = min(peakFrame, max(index - 1, 0))
-        let movementName = name.isEmpty ? suggestedName(for: analysis) : name
-        let symbol = await MovementSymbolPicker.pick(peakImage: loadImage(frameURL(id, peakIndex)),
-                                                     movingJoints: analysis.highlightedJoints, name: movementName)
+        // The typed name, or the catalog exercise's; otherwise Apple Intelligence names it from the image,
+        // and without it, from what moves ("Jambes").
+        let knownName = name.isEmpty ? recognizedName(for: analysis) : name
+        let label = await MovementSymbolPicker.pick(peakImage: loadImage(frameURL(id, peakIndex)),
+                                                    movingJoints: analysis.highlightedJoints, name: knownName)
+        let symbol = label.symbol
+        let movementName = knownName ?? label.name ?? ReferenceAnalyzer.suggestedName(moving: analysis.highlightedJoints)
 
         try? FileManager.default.removeItem(at: videoURL(id))
         try FileManager.default.copyItem(at: video, to: videoURL(id))
@@ -125,12 +129,9 @@ nonisolated enum ReferenceStore {
         return movement
     }
 
-    /// The catalog exercise's name when it was recognized ("Squat"), otherwise from what moves ("Jambes").
-    private static func suggestedName(for analysis: ReferenceAnalysis) -> String {
-        if let recognized = analysis.recognizedID.flatMap(CatalogExercise.find) {
-            return String(localized: recognized.name)
-        }
-        return ReferenceAnalyzer.suggestedName(moving: analysis.highlightedJoints)
+    /// The catalog exercise's name when it was recognized ("Squat").
+    private static func recognizedName(for analysis: ReferenceAnalysis) -> String? {
+        analysis.recognizedID.flatMap(CatalogExercise.find).map { String(localized: $0.name) }
     }
 
     private static func imageGenerator(for asset: AVAsset, maximumSide: Double) -> AVAssetImageGenerator {

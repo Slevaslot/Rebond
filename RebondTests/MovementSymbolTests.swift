@@ -21,4 +21,10 @@ struct MovementSymbolTests {
             #expect(UIImage(systemName: symbol.systemName) != nil, "\(symbol.systemName)")
         }
     }
+
+    @Test func modelNameIsCleanedUp() {
+        #expect(MovementSymbolPicker.cleanName("  fente latérale. ") == "Fente latérale")
+        #expect(MovementSymbolPicker.cleanName("") == nil)
+        #expect(MovementSymbolPicker.cleanName("Un exercice très long qui décrit tout le mouvement en détail") == nil)
+    }
 }
