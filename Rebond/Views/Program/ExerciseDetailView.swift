@@ -119,10 +119,11 @@ struct MovementCard: View {
         Group {
             if let reference = catalog?.reference {
                 // Filmed at the physiotherapist's: the patient's own movement, in a loop.
-                ReferenceFramesView(movement: reference)
+                // Whole, head to feet: the patient sees the full movement.
+                ReferenceFramesView(movement: reference, contentMode: .fit)
                     .frame(maxWidth: .infinity)
                     .frame(height: height)
-                    .clipped()
+                    .background(Color.black)
                     .overlay(alignment: .bottomTrailing) {
                         Button("Vidéo complète", systemImage: "play.fill") { showingVideo = true }
                             .font(.subheadline.weight(.semibold))
