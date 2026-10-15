@@ -41,20 +41,31 @@ struct ProHomeView: View {
                 Section {
                     PageHeader("Espace kiné") {
                         Menu {
-                            Button("Prescrire un programme", systemImage: "qrcode") {
-                                prescribing = PrescribingItem(program: EditableProgram())
-                            }
                             Button("Importer un bilan", systemImage: "square.and.arrow.down") { importing = true }
-                            Divider()
                             Button("Réglages de l'espace kiné", systemImage: "gearshape") { showingSettings = true }
                         } label: {
-                            HeaderIcon(systemImage: "plus")
+                            HeaderIcon(systemImage: "ellipsis")
                         }
-                        .accessibilityLabel("Ajouter")
+                        .accessibilityLabel("Plus d'options")
                         ProfileButton { showingPatientSettings = true }
                     }
                     // The list's own margin already insets the rows: none more, so the title sits as on the other tabs.
                     .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 6, trailing: 0))
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+
+                    // The main action, as « Ajouter une séance » on the patient's side.
+                    Button {
+                        prescribing = PrescribingItem(program: EditableProgram())
+                    } label: {
+                        Text("Prescrire un programme")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.glassProminent)
+                    .buttonBorderShape(.capsule)
+                    .controlSize(.extraLarge)
+                    .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
 
