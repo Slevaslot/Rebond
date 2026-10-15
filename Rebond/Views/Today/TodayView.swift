@@ -80,7 +80,7 @@ struct TodayView: View {
                 } else {
                     ForEach(todays) { program in
                         // With several programs, the card says which one it is.
-                        SessionCard(program: program, title: programs.count > 1 ? program.title : nil) {
+                        SessionCard(program: program, title: programs.active.count > 1 ? program.title : nil) {
                             router.startWorkout(program)
                         }
                     }
@@ -273,10 +273,7 @@ private struct RestDayCard: View {
     let programs: [Program]
     @Environment(AppRouter.self) private var router
 
-    private var next: (program: Program, day: Date)? {
-        programs.compactMap { program in ProgramSchedule.nextDay(after: .now, in: program.days).map { (program, $0) } }
-            .min { $0.1 < $1.1 }
-    }
+    private var next: (program: Program, day: Date)? { programs.next() }
 
     private var anywayLabel: some View {
         Text("Faire une séance quand même")
@@ -289,29 +286,52 @@ private struct RestDayCard: View {
             EmptyView()
         } content: {
             VStack(alignment: .leading, spacing: 14) {
-                Label("Repos aujourd'hui", systemImage: "moon.zzz.fill")
-                    .font(.title2.bold())
-                if let next {
-                    Text("Prochaine séance \(next.day.formatted(.dateTime.weekday(.wide))) : \(next.program.title)")
+                if programs.active.isEmpty {
+                    Label("Aucun programme suivi", systemImage: "list.bullet.clipboard")
+                        .font(.title2.bold())
+                    Text("Choisissez le programme à suivre dans Programmes.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
-                }
-                Group {
-                    if programs.count == 1 {
-                        Button { router.startWorkout(programs[0]) } label: { anywayLabel }
-                    } else {
-                        Menu {
-                            ForEach(programs) { program in
-                                Button(program.title) { router.startWorkout(program) }
-                            }
-                        } label: { anywayLabel }
+                    Button {
+                        router.tab = .program
+                    } label: {
+                        Text("Choisir un programme")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
                     }
+                    .buttonStyle(.glassProminent)
+                    .buttonBorderShape(.capsule)
+                    .controlSize(.large)
+                } else {
+                    Label("Repos aujourd'hui", systemImage: "moon.zzz.fill")
+                        .font(.title2.bold())
+                    if let next {
+                        Text("Prochaine séance \(next.day.formatted(.dateTime.weekday(.wide))) : \(next.program.title)")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    anywayButton
                 }
-                .buttonStyle(.glass)
-                .buttonBorderShape(.capsule)
-                .controlSize(.large)
             }
         }
+    }
+
+    private var anywayButton: some View {
+        let followed = programs.active
+        return Group {
+            if followed.count == 1 {
+                Button { router.startWorkout(followed[0]) } label: { anywayLabel }
+            } else {
+                Menu {
+                    ForEach(followed) { program in
+                        Button(program.title) { router.startWorkout(program) }
+                    }
+                } label: { anywayLabel }
+            }
+        }
+        .buttonStyle(.glass)
+        .buttonBorderShape(.capsule)
+        .controlSize(.large)
     }
 }
 

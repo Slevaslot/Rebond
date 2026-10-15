@@ -51,6 +51,44 @@ struct ProgramTab: View {
         .padding(.bottom, 4)
     }
 
+    /// A group of program cards. The circle on each card selects it: followed programs make the day's session.
+    @ViewBuilder
+    private func section(_ title: LocalizedStringKey, _ list: [Program], empty: LocalizedStringKey?) -> some View {
+        Text(title)
+            .font(.title3.bold())
+            .accessibilityAddTraits(.isHeader)
+            .padding(.horizontal, 4)
+            .padding(.top, 8)
+        if list.isEmpty, let empty {
+            Text(empty)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 4)
+        }
+        ForEach(list) { program in
+            HStack(spacing: 10) {
+                Button {
+                    withAnimation(.snappy) { program.isActive.toggle() }
+                } label: {
+                    Image(systemName: program.isActive ? "checkmark.circle.fill" : "circle")
+                        .font(.title)
+                        .foregroundStyle(program.isActive ? AnyShapeStyle(ProgramPalette.color(of: program, in: programs)) : AnyShapeStyle(.tertiary))
+                        .frame(width: 44, height: 44)
+                        .contentTransition(.symbolEffect(.replace))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Text(program.isActive ? "Ne plus suivre \(program.title)" : "Suivre \(program.title)"))
+                .sensoryFeedback(.selection, trigger: program.isActive)
+
+                NavigationLink(value: program) {
+                    ProgramCard(program: program, color: ProgramPalette.color(of: program, in: programs))
+                        .opacity(program.isActive ? 1 : 0.6)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
     private var content: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
@@ -58,11 +96,11 @@ struct ProgramTab: View {
 
                 WeekPlanCard(programs: programs)
 
-                ForEach(programs) { program in
-                    NavigationLink(value: program) {
-                        ProgramCard(program: program, color: ProgramPalette.color(of: program, in: programs))
-                    }
-                    .buttonStyle(.plain)
+                section("Programmes suivis", programs.active,
+                        empty: "Aucun programme suivi. Cochez celui que vous voulez faire.")
+                let others = programs.filter { !$0.isActive }
+                if !others.isEmpty {
+                    section("Autres programmes", others, empty: nil)
                 }
 
                 Text("Seul votre kiné décide de votre programme. Ajoutez ici ce qu'il vous a prescrit.")
@@ -110,9 +148,9 @@ private struct WeekPlanCard: View {
                             .frame(maxWidth: .infinity)
                     }
                 }
-                if programs.count > 1 {
+                if programs.active.count > 1 {
                     VStack(alignment: .leading, spacing: 6) {
-                        ForEach(programs) { program in
+                        ForEach(programs.active) { program in
                             Label {
                                 Text(program.title).font(.subheadline)
                             } icon: {
@@ -132,7 +170,7 @@ private struct DayColumn: View {
 
     private var isToday: Bool { Calendar.current.component(.weekday, from: .now) == weekday }
 
-    private var planned: [Program] { programs.filter { $0.days.contains(weekday) } }
+    private var planned: [Program] { programs.active.filter { $0.days.contains(weekday) } }
 
     var body: some View {
         VStack(spacing: 8) {
@@ -175,7 +213,7 @@ private struct ProgramCard: View {
                     .foregroundStyle(.primary)
                     .multilineTextAlignment(.leading)
                 Spacer()
-                if program.isScheduled(on: .now) {
+                if program.isActive, program.isScheduled(on: .now) {
                     Text("Aujourd'hui")
                         .font(.caption.weight(.semibold))
                         .padding(.horizontal, 8)

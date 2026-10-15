@@ -32,27 +32,32 @@ nonisolated enum ProgramSchedule {
 }
 
 extension Array where Element == Program {
-    /// The programs planned on that day, oldest first so the order stays the same.
+    /// The programs the patient follows now.
+    var active: [Program] { filter(\.isActive) }
+
+    /// The followed programs planned on that day, oldest first so the order stays the same.
     func scheduled(on date: Date) -> [Program] {
-        filter { $0.isScheduled(on: date) }.sorted { $0.createdAt < $1.createdAt }
+        active.filter { $0.isScheduled(on: date) }.sorted { $0.createdAt < $1.createdAt }
     }
 
-    /// Every day with at least one session, for the reminders and the week's dots.
+    /// Every day with at least one session of a followed program, for the reminders and the week's dots.
     var allDays: [Int] {
-        ProgramSchedule.days(weekdays: flatMap(\.days), sessionsPerWeek: 0)
+        ProgramSchedule.days(weekdays: active.flatMap(\.days), sessionsPerWeek: 0)
     }
 
-    /// Sessions planned in a week, all programs together.
+    /// Sessions planned in a week, followed programs together.
     var sessionsPerWeek: Int {
-        isEmpty ? 0 : reduce(0) { $0 + $1.days.count }
+        active.reduce(0) { $0 + $1.days.count }
+    }
+
+    /// The next session of a followed program after `date`: which program, which day.
+    func next(after date: Date = .now) -> (program: Program, day: Date)? {
+        active.compactMap { program in ProgramSchedule.nextDay(after: date, in: program.days).map { (program, $0) } }
+            .min { $0.1 < $1.1 }
     }
 
     /// The program to show first: the one of the day, otherwise the next one coming.
     func current(on date: Date = .now) -> Program? {
-        if let today = scheduled(on: date).first { return today }
-        let next = compactMap { program in
-            ProgramSchedule.nextDay(after: date, in: program.days).map { (program, $0) }
-        }
-        return next.min { $0.1 < $1.1 }?.0 ?? first
+        scheduled(on: date).first ?? next(after: date)?.program ?? active.first ?? first
     }
 }

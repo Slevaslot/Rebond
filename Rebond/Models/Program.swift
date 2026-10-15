@@ -15,6 +15,9 @@ final class Program {
     var weekdays: [Int] = []
     /// The physiotherapist who prescribed it, when it came from them.
     var prescriber: String? = nil
+    /// Selected by the patient: only the followed programs make the day's session, the week and the reminders.
+    /// The others stay ready, to pick again later.
+    var isActive: Bool = true
 
     init(createdAt: Date = .now, sessionsPerWeek: Int, exercises: [PlannedExercise], name: String = "",
          weekdays: [Int] = [], prescriber: String? = nil) {
