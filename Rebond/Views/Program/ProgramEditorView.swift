@@ -41,8 +41,6 @@ struct ProgramEditorView: View {
     @State private var filmed: [URL] = []
     /// The exercise whose video is being added or replaced; nil adds new exercises.
     @State private var videoTarget: EditableProgram.Exercise.ID?
-    /// New exercises from videos, chosen in the list of exercises.
-    @State private var videoSource: ExerciseChooser.VideoSource?
     @State private var scheduling = false
     @State private var started = false
 
@@ -103,7 +101,7 @@ struct ProgramEditorView: View {
             }
 
             Section {
-                Button("Ajouter un exercice", systemImage: "plus") { choosingExercise = true }
+                addMenu
             }
         }
         .navigationTitle(title)
@@ -129,18 +127,8 @@ struct ProgramEditorView: View {
                 onSave(saved)
             }
         }
-        .sheet(isPresented: $choosingExercise, onDismiss: {
-            // Filming or picking a video, chosen in the list: once the list is gone.
-            if let source = videoSource {
-                videoSource = nil
-                videoTarget = nil
-                if source == .film { filming = true } else { pickingVideos = true }
-            }
-        }) {
-            ExerciseChooser(allowsVideos: allowsVideos, onVideo: { source in
-                videoSource = source
-                choosingExercise = false
-            }) { exercise in
+        .sheet(isPresented: $choosingExercise) {
+            ExerciseChooser { exercise in
                 program.exercises.append(exercise)
                 withAnimation(.snappy) { expanded = exercise.id }
             }
@@ -191,6 +179,27 @@ struct ProgramEditorView: View {
 
     private var hasFailures: Bool {
         analyses.values.contains { if case .failed = $0 { true } else { false } }
+    }
+
+    /// The same ways as when creating the séance: the physiotherapist's videos, or an exercise of the list.
+    private var addMenu: some View {
+        Menu {
+            if allowsVideos {
+                Section("Vidéos de mon kiné") {
+                    Button("Choisir mes vidéos", systemImage: "photo.on.rectangle") {
+                        videoTarget = nil
+                        pickingVideos = true
+                    }
+                    Button("Filmer", systemImage: "video") {
+                        videoTarget = nil
+                        filming = true
+                    }
+                }
+            }
+            Button("Choisir dans la liste", systemImage: "list.bullet") { choosingExercise = true }
+        } label: {
+            Label("Ajouter un exercice", systemImage: "plus")
+        }
     }
 
     // MARK: Videos
@@ -302,7 +311,7 @@ private struct ScheduleStep: View {
             } footer: {
                 Text(program.weekdays.isEmpty
                      ? "Choisissez au moins un jour."
-                     : "^[\(program.weekdays.count) séance](inflect: true) par semaine : \(ProgramSchedule.describe(program.weekdays)). Un jour pris par une autre séance passe à celle-ci.")
+                     : "^[\(program.weekdays.count) séance](inflect: true) par semaine : \(ProgramSchedule.describe(program.weekdays)).")
             }
 
             if asksReminder {
@@ -459,13 +468,8 @@ private struct ExerciseCard: View {
     }
 }
 
-/// Adding an exercise, all ways in one list: a new video of the physiotherapist's, one already filmed, one the
-/// camera follows, or another one counted or held.
+/// Adding an exercise: the ones the camera follows, with their symbols, or another one counted or held.
 struct ExerciseChooser: View {
-    enum VideoSource { case film, library }
-
-    var allowsVideos = true
-    var onVideo: (VideoSource) -> Void = { _ in }
     let onChoose: (EditableProgram.Exercise) -> Void
     @Environment(\.dismiss) private var dismiss
     /// An exercise Rebond doesn't know, waiting for its name.
@@ -476,26 +480,16 @@ struct ExerciseChooser: View {
     var body: some View {
         NavigationStack {
             List {
-                if allowsVideos {
-                    Section("Vidéo de mon kiné") {
+                if !filmedMovements.isEmpty {
+                Section("Vos vidéos") {
+                    ForEach(filmedMovements) { movement in
                         Button {
-                            onVideo(.film)
+                            choose(EditableProgram.Exercise(movement))
                         } label: {
-                            Label { Text("Filmer l'exercice").foregroundStyle(.primary) } icon: { Image(systemName: "video") }
-                        }
-                        Button {
-                            onVideo(.library)
-                        } label: {
-                            Label { Text("Choisir une vidéo").foregroundStyle(.primary) } icon: { Image(systemName: "photo.on.rectangle") }
-                        }
-                        ForEach(filmedMovements) { movement in
-                            Button {
-                                choose(EditableProgram.Exercise(movement))
-                            } label: {
-                                Label { Text(movement.name).foregroundStyle(.primary) } icon: { Image(systemName: movement.catalogExercise.symbol) }
-                            }
+                            Label { Text(movement.name).foregroundStyle(.primary) } icon: { Image(systemName: ReferenceMovement.symbol) }
                         }
                     }
+                }
                 }
                 Section("Suivis par la caméra") {
                     ForEach(CatalogExercise.all) { catalog in

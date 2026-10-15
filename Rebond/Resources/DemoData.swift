@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
 
-/// A program of two séances and three weeks of sessions, to show the progress and the report during the demo.
+/// A program and three weeks of sessions, to show the progress and the report during the demo.
 enum DemoData {
     static func load(into context: ModelContext) {
         try? context.delete(model: Session.self)
@@ -17,7 +17,7 @@ enum DemoData {
         try? context.delete(model: Program.self)
         Program.add(program, prescriber: "M. Martin", in: context)
 
-        // A second séance on the other days, to show a week with two different séances.
+        // A second program on the other days, to show several programs side by side.
         var stretching = EditableProgram()
         stretching.name = String(localized: "Souplesse")
         stretching.weekdays = [3, 5]

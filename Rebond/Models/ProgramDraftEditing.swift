@@ -116,50 +116,25 @@ extension Program {
         add(editable, in: context)
     }
 
-    /// A new séance, next to the others. Its days are taken from the séances that had them.
+    /// A new program, next to the others.
     @discardableResult
     static func add(_ editable: EditableProgram, prescriber: String? = nil, in context: ModelContext) -> Program {
         let program = Program(sessionsPerWeek: editable.sessionsPerWeek, exercises: Self.exercises(of: editable),
                               name: editable.name.trimmingCharacters(in: .whitespaces),
                               weekdays: editable.weekdays, prescriber: prescriber)
         context.insert(program)
-        program.setDays(program.days, in: context)
         // A permanent identifier right away: the session and the pages find the program by it.
         try? context.save()
         return program
     }
 
-    /// Changes this séance in place: its past sessions and its place among the others stay.
+    /// Changes this program in place: its sessions and its place among the others stay.
     func update(with editable: EditableProgram, in context: ModelContext) {
         for exercise in exercises { context.delete(exercise) }
         exercises = Self.exercises(of: editable)
         name = editable.name.trimmingCharacters(in: .whitespaces)
-        setDays(ProgramSchedule.days(weekdays: editable.weekdays, sessionsPerWeek: editable.sessionsPerWeek), in: context)
-    }
-
-    /// Plans this séance on these days; another séance planned on one of them loses it.
-    func setDays(_ days: [Int], in context: ModelContext) {
-        weekdays = ProgramSchedule.days(weekdays: days, sessionsPerWeek: 0)
-        sessionsPerWeek = weekdays.count
-        claimDays(in: context)
-    }
-
-    /// Puts this séance on `weekday`, or takes it off.
-    func toggle(_ weekday: Int, in context: ModelContext) {
-        setDays(days.contains(weekday) ? days.filter { $0 != weekday } : days + [weekday], in: context)
-    }
-
-    /// At most one séance a day: the others planned on this one's days lose them.
-    private func claimDays(in context: ModelContext) {
-        let mine = Set(weekdays)
-        guard !mine.isEmpty, let others = try? context.fetch(FetchDescriptor<Program>()) else { return }
-        for other in others where other.persistentModelID != persistentModelID {
-            // Its days written out first: older séances keep theirs only as a number per week.
-            let kept = other.days.filter { !mine.contains($0) }
-            guard kept.count != other.days.count || other.weekdays.isEmpty else { continue }
-            other.weekdays = kept
-            other.sessionsPerWeek = kept.count
-        }
+        weekdays = editable.weekdays
+        sessionsPerWeek = editable.sessionsPerWeek
     }
 
     private static func exercises(of editable: EditableProgram) -> [PlannedExercise] {

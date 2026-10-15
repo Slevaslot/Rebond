@@ -24,14 +24,14 @@ struct SheetReadingView: View {
             ProgramEditorView(
                 program: program,
                 photo: photo,
-                notice: "Exercices lus par Apple Intelligence, sur votre iPhone. Vérifiez-les : l'écriture manuscrite peut être mal lue.",
+                notice: "Programme lu par Apple Intelligence, sur votre iPhone. Vérifiez-le : l'écriture manuscrite peut être mal lue.",
                 onSave: onSave
             )
         case .failed(let message, let opensSettings):
             ProgramEditorView(
                 program: EditableProgram(),
                 photo: photo,
-                notice: "\(message) Saisissez les exercices en vous aidant de la feuille.",
+                notice: "\(message) Saisissez le programme en vous aidant de la feuille.",
                 noticeSymbol: "exclamationmark.triangle",
                 opensSettings: opensSettings,
                 onSave: onSave

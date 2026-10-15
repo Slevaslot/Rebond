@@ -40,7 +40,7 @@ struct FreeExerciseCard: View {
 
 /// The exercises the camera follows, as Fitness shows its workouts: one large card each, its symbol in color,
 /// a play button to start, the movement and the goal set right in the card.
-struct FreeExercisePicker: View {
+private struct FreeExercisePicker: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(AppRouter.self) private var router
 

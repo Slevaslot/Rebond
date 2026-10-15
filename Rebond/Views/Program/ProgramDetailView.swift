@@ -1,8 +1,8 @@
 import SwiftData
 import SwiftUI
 
-/// One séance: when and how long, a button to start it, then its exercises in order. An exercise opens its
-/// page (the movement, how it is followed, do it alone). Modifier changes it; deleting is at the end.
+/// One program: when and how long, a button to start it, then its exercises in order. An exercise opens its
+/// page (the movement, how it is followed, do it alone). Changing or deleting the program is in the ⋯ menu.
 struct ProgramDetailView: View {
     let program: Program
     let color: Color
@@ -38,30 +38,43 @@ struct ProgramDetailView: View {
                 }
                 .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 26))
 
-                // Deleting, at the end of the page, as in Contacts.
-                Button(role: .destructive) {
-                    confirmingDelete = true
-                } label: {
-                    HStack {
-                        Label("Supprimer la séance", systemImage: "trash")
-                            // Anchored to the words: the bubble points at them, not at the middle of the row.
-                            .confirmationDialog("Supprimer « \(program.title) » ?", isPresented: $confirmingDelete,
-                                                titleVisibility: .visible) {
-                                Button("Supprimer la séance", role: .destructive) {
-                                    dismiss()
-                                    context.delete(program)
-                                }
-                            } message: {
-                                Text("Vos séances passées restent dans votre suivi.")
-                            }
-                        Spacer(minLength: 0)
+                // Following and deleting, at the end of the page, as in Contacts.
+                VStack(spacing: 0) {
+                    Button {
+                        program.isActive.toggle()
+                    } label: {
+                        Label(program.isActive ? "Ne plus suivre cette séance" : "Suivre cette séance",
+                              systemImage: program.isActive ? "checkmark.circle.badge.xmark" : "checkmark.circle")
+                            .frame(maxWidth: .infinity, minHeight: 50, alignment: .leading)
+                            .padding(.horizontal)
+                            .contentShape(.rect)
                     }
-                    .frame(minHeight: 50)
-                    .padding(.horizontal)
-                    .contentShape(.rect)
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.tint)
+                    Divider().padding(.leading)
+                    Button(role: .destructive) {
+                        confirmingDelete = true
+                    } label: {
+                        HStack {
+                            Label("Supprimer la séance", systemImage: "trash")
+                                // Anchored to the words: the bubble points at them, not at the middle of the row.
+                                .confirmationDialog("Supprimer « \(program.title) » ?", isPresented: $confirmingDelete, titleVisibility: .visible) {
+                        Button("Supprimer la séance", role: .destructive) {
+                            dismiss()
+                            context.delete(program)
+                        }
+                                } message: {
+                                    Text("Vos séances passées restent dans votre suivi.")
+                                }
+                            Spacer(minLength: 0)
+                        }
+                        .frame(minHeight: 50)
+                        .padding(.horizontal)
+                        .contentShape(.rect)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.red)
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(.red)
                 .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 26))
                 .padding(.top, 10)
             }

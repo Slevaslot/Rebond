@@ -34,7 +34,7 @@ struct MessageReadingView: View {
         case .failed(let message, let opensSettings):
             ProgramEditorView(
                 program: EditableProgram(),
-                notice: "\(message) Saisissez les exercices en vous aidant du message.",
+                notice: "\(message) Saisissez le programme en vous aidant du message.",
                 noticeSymbol: "exclamationmark.triangle",
                 opensSettings: opensSettings,
                 onSave: onSave
@@ -58,7 +58,7 @@ struct MessageReadingView: View {
                         }
                     }
             } footer: {
-                Text("Apple Intelligence trouve les exercices dans le message, sur votre iPhone. Vous vérifiez ensuite les exercices.")
+                Text("Apple Intelligence trouve les exercices dans le message, sur votre iPhone. Vous vérifiez ensuite le programme.")
             }
 
             Section {
