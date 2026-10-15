@@ -257,8 +257,6 @@ private struct ProgramCard: View {
                     .foregroundStyle(.secondary)
             }
         }
-        // A program not followed stays readable but steps back.
-        .opacity(program.isActive ? 1 : 0.55)
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 26))
