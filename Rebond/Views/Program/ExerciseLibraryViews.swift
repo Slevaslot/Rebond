@@ -154,7 +154,7 @@ struct LibraryPickerView: View {
         List {
             Section {
                 AddExerciseMenu(label: {
-                    Label("Ajouter un exercice", systemImage: "plus")
+                    Text("Ajouter un exercice")
                 }, onAdded: { exercise in
                     withAnimation(.snappy) { selection.append(exercise.name) }
                 }, offersPhysiotherapist: false)
@@ -272,7 +272,7 @@ struct LibraryExerciseView: View {
                         ForEach(others) { program in
                             Button(program.title) { append(to: program) }
                         }
-                        Button("Nouveau programme", systemImage: "plus") { router.newProgram(with: [exercise.name]) }
+                        Button("Nouveau programme") { router.newProgram(with: [exercise.name]) }
                     } label: {
                         Label("Ajouter à un programme", systemImage: "plus.circle")
                             .frame(maxWidth: .infinity, minHeight: 50, alignment: .leading)

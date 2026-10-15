@@ -47,7 +47,7 @@ struct ProgramTab: View {
                 .listRowBackground(Color.clear)
 
             AddExerciseMenu {
-                Label("Ajouter un exercice", systemImage: "plus")
+                Text("Ajouter un exercice")
                     .font(.headline)
                     .frame(maxWidth: .infinity, alignment: .center)
             }
@@ -68,7 +68,7 @@ struct ProgramTab: View {
                     .pageRow()
             }
             Button { router.newProgram() } label: {
-                Label("Créer un programme", systemImage: "plus")
+                Text("Créer un programme")
                     .font(.headline)
                     .frame(maxWidth: .infinity)
             }
@@ -382,7 +382,7 @@ struct NoProgramView<Header: View>: View {
             VStack(alignment: .leading, spacing: 14) {
                 header
 
-                SummaryCard(title: Text("Pour commencer"), systemImage: "plus", color: .accentColor) {
+                SummaryCard(title: Text("Pour commencer"), systemImage: "figure.mixed.cardio", color: .accentColor) {
                     EmptyView()
                 } content: {
                     VStack(alignment: .leading, spacing: 12) {
@@ -390,7 +390,7 @@ struct NoProgramView<Header: View>: View {
                             .font(.title3.weight(.semibold))
                             .fixedSize(horizontal: false, vertical: true)
                         AddExerciseMenu {
-                            Label("Ajouter un exercice", systemImage: "plus")
+                            Text("Ajouter un exercice")
                                 .font(.headline)
                                 .frame(maxWidth: .infinity)
                         }

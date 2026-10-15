@@ -189,7 +189,7 @@ struct ProgramEditorView: View {
 
     /// The same ways as when creating the séance: the physiotherapist's videos, or an exercise of the list.
     private var addMenu: some View {
-        Button("Ajouter des exercices", systemImage: "plus") { choosingExercise = true }
+        Button("Ajouter des exercices") { choosingExercise = true }
     }
 
     // MARK: Videos
