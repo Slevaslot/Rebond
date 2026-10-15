@@ -6,6 +6,13 @@ import SwiftUI
 /// Each exercise is a card: its video in a loop (or its symbol), its name, "3 × 10". Tapping it opens the wheels,
 /// its name and its video. Swipe to delete, drag to reorder. "Continuer" asks when, then saves.
 struct ProgramEditorView: View {
+    /// What to do as soon as the screen opens, from the "Ajouter une séance" choices.
+    enum Start {
+        case videos([PhotosPickerItem])
+        case recordings([URL])
+        case chooseExercise
+    }
+
     @State var program: EditableProgram
     /// The sheet that was read, to compare with while checking.
     var photo: UIImage?
@@ -18,8 +25,7 @@ struct ProgramEditorView: View {
     var opensSettings = false
     /// The patient's videos: not for a prescription, which travels by QR code.
     var allowsVideos = true
-    /// Pushed after picking the exercises: the back button goes back to them.
-    var showsCancel = true
+    var start: Start?
     let onSave: (EditableProgram) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -27,7 +33,7 @@ struct ProgramEditorView: View {
     @State private var showingPhoto = false
     /// The exercise whose wheels are open.
     @State private var expanded: EditableProgram.Exercise.ID?
-    @State private var pickingExercises = false
+    @State private var choosingExercise = false
     @State private var analyses: [EditableProgram.Exercise.ID: VideoAnalysis] = [:]
     @State private var pickingVideos = false
     @State private var pickedVideos: [PhotosPickerItem] = []
@@ -36,6 +42,7 @@ struct ProgramEditorView: View {
     /// The exercise whose video is being added or replaced; nil adds new exercises.
     @State private var videoTarget: EditableProgram.Exercise.ID?
     @State private var scheduling = false
+    @State private var started = false
 
     private var isAnalyzing: Bool {
         analyses.values.contains { if case .running = $0 { true } else { false } }
@@ -100,10 +107,8 @@ struct ProgramEditorView: View {
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            if showsCancel {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Annuler", systemImage: "xmark", role: .cancel) { dismiss() }
-                }
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Annuler", systemImage: "xmark", role: .cancel) { dismiss() }
             }
             ToolbarItem(placement: .confirmationAction) {
                 Button("Continuer") { scheduling = true }
@@ -122,12 +127,10 @@ struct ProgramEditorView: View {
                 onSave(saved)
             }
         }
-        .sheet(isPresented: $pickingExercises) {
-            NavigationStack {
-                ExercisePickerView(nextTitle: "Ajouter") { exercises in
-                    program.exercises.append(contentsOf: exercises)
-                    pickingExercises = false
-                }
+        .sheet(isPresented: $choosingExercise) {
+            ExerciseChooser { exercise in
+                program.exercises.append(exercise)
+                withAnimation(.snappy) { expanded = exercise.id }
             }
         }
         .photosPicker(isPresented: $pickingVideos, selection: $pickedVideos,
@@ -144,6 +147,16 @@ struct ProgramEditorView: View {
             addVideos(takes.map { ($0, false) })
         }) {
             RecordMovementView(allowsSeveral: videoTarget == nil) { filmed = $0 }
+        }
+        .task {
+            guard !started else { return }
+            started = true
+            switch start {
+            case .videos(let items): addVideos(items: items)
+            case .recordings(let urls): addVideos(urls.map { ($0, false) })
+            case .chooseExercise: choosingExercise = true
+            case nil: break
+            }
         }
         .sheet(isPresented: $showingPhoto) {
             if let photo {
@@ -168,9 +181,25 @@ struct ProgramEditorView: View {
         analyses.values.contains { if case .failed = $0 { true } else { false } }
     }
 
-    /// More exercises, picked among "Mes exercices" and Rebond's.
+    /// The same ways as when creating the séance: the physiotherapist's videos, or an exercise of the list.
     private var addMenu: some View {
-        Button("Ajouter des exercices", systemImage: "plus") { pickingExercises = true }
+        Menu {
+            if allowsVideos {
+                Section("Vidéos de mon kiné") {
+                    Button("Choisir mes vidéos", systemImage: "photo.on.rectangle") {
+                        videoTarget = nil
+                        pickingVideos = true
+                    }
+                    Button("Filmer", systemImage: "video") {
+                        videoTarget = nil
+                        filming = true
+                    }
+                }
+            }
+            Button("Choisir dans la liste", systemImage: "list.bullet") { choosingExercise = true }
+        } label: {
+            Label("Ajouter un exercice", systemImage: "plus")
+        }
     }
 
     // MARK: Videos
@@ -229,8 +258,6 @@ struct ProgramEditorView: View {
             }
             program.exercises[index] = exercise
             analyses[id] = nil
-            // The filmed exercise also joins "Mes exercices".
-            ExerciseLibrary.shared.reload()
         } catch ReferenceError.noBody {
             analyses[id] = .failed("Corps mal visible : filmez de face, le corps entier dans l'image.")
         } catch {
@@ -438,6 +465,87 @@ private struct ExerciseCard: View {
             .frame(height: 130)
         }
         .frame(maxWidth: .infinity)
+    }
+}
+
+/// Adding an exercise: the ones the camera follows, with their symbols, or another one counted or held.
+struct ExerciseChooser: View {
+    let onChoose: (EditableProgram.Exercise) -> Void
+    @Environment(\.dismiss) private var dismiss
+    /// An exercise Rebond doesn't know, waiting for its name.
+    @State private var naming: EditableProgram.Exercise?
+    @State private var name = ""
+    private let filmedMovements = ReferenceStore.all()
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if !filmedMovements.isEmpty {
+                Section("Vos vidéos") {
+                    ForEach(filmedMovements) { movement in
+                        Button {
+                            choose(EditableProgram.Exercise(movement))
+                        } label: {
+                            Label { Text(movement.name).foregroundStyle(.primary) } icon: { Image(systemName: ReferenceMovement.symbol) }
+                        }
+                    }
+                }
+                }
+                Section("Suivis par la caméra") {
+                    ForEach(CatalogExercise.all) { catalog in
+                        Button {
+                            choose(EditableProgram.Exercise(name: "", catalogID: catalog.id,
+                                                            sets: EditableProgram.defaultSets, reps: EditableProgram.defaultReps))
+                        } label: {
+                            Label { Text(catalog.name).foregroundStyle(.primary) } icon: { Image(systemName: catalog.symbol) }
+                        }
+                    }
+                }
+                Section("Autres") {
+                    Button {
+                        askName(EditableProgram.Exercise(name: "", catalogID: nil,
+                                                         sets: EditableProgram.defaultSets, reps: EditableProgram.defaultReps))
+                    } label: {
+                        Label { Text("Autre exercice, compté à la main").foregroundStyle(.primary) } icon: { Image(systemName: "hand.tap") }
+                    }
+                    Button {
+                        var exercise = EditableProgram.Exercise(name: "", catalogID: nil, sets: EditableProgram.defaultSets,
+                                                                reps: EditableProgram.defaultReps)
+                        exercise.mode = .hold
+                        askName(exercise)
+                    } label: {
+                        Label { Text("Position tenue (gainage, étirement…)").foregroundStyle(.primary) } icon: { Image(systemName: "timer") }
+                    }
+                }
+            }
+            .navigationTitle("Ajouter un exercice")
+            .navigationBarTitleDisplayMode(.inline)
+            .alert("Nom de l'exercice", isPresented: Binding(get: { naming != nil }, set: { if !$0 { naming = nil } })) {
+                TextField(naming?.mode == .hold ? "Ex. : Gainage" : "Ex. : Pont fessier", text: $name)
+                    .textInputAutocapitalization(.sentences)
+                Button("Ajouter") {
+                    if var exercise = naming {
+                        exercise.name = name.trimmingCharacters(in: .whitespaces)
+                        naming = nil
+                        choose(exercise)
+                    }
+                }
+                Button("Annuler", role: .cancel) { naming = nil }
+            }
+            .toolbar {
+                Button("Fermer", systemImage: "xmark", role: .close) { dismiss() }
+            }
+        }
+    }
+
+    private func askName(_ exercise: EditableProgram.Exercise) {
+        name = ""
+        naming = exercise
+    }
+
+    private func choose(_ exercise: EditableProgram.Exercise) {
+        onChoose(exercise)
+        dismiss()
     }
 }
 

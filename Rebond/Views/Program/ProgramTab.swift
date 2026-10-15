@@ -8,26 +8,29 @@ struct ProgramTab: View {
     @Query(sort: \Program.createdAt) private var programs: [Program]
     @Environment(\.modelContext) private var context
     @State private var showingSettings = false
-    @State private var path = NavigationPath()
+    @State private var path: [Program] = []
 
     var body: some View {
         NavigationStack(path: $path) {
-            content
+            Group {
+                if programs.isEmpty {
+                    NoProgramView { header }
+                } else {
+                    content
+                }
+            }
             .navigationTitle("Exercices")
             // Same top bar as the Accueil page: the large title and its controls on the same line, in the page.
             .toolbarVisibility(.hidden, for: .navigationBar)
             .navigationDestination(for: Program.self) { program in
                 ProgramDetailView(program: program, color: ProgramPalette.color(of: program, in: programs))
             }
-            .navigationDestination(for: LibraryRoute.self) { route in
-                LibraryExerciseView(id: route.id)
-            }
             .sheet(isPresented: $showingSettings) {
                 SettingsView()
             }
             // Back on this tab after visiting another one: the list of programs, not the page left open.
             .onChange(of: router.tab) {
-                if router.tab != .program { path = NavigationPath() }
+                if router.tab != .program { path = [] }
             }
         }
     }
@@ -100,28 +103,21 @@ struct ProgramTab: View {
                 .listRowSeparator(.hidden)
                 .listRowBackground(Color.clear)
 
-            if !programs.isEmpty {
-                WeekPlanCard(programs: programs).pageRow()
-            }
+            WeekPlanCard(programs: programs).pageRow()
 
-            if programs.active.isEmpty || programs.active.count == programs.count {
-                section("Mes séances", programs, empty: "Aucune séance pour l'instant.")
+            AddSessionButton().pageRow()
+
+            FreeExerciseCard().pageRow()
+
+            if programs.active.isEmpty {
+                section("Vos séances", programs, empty: nil)
             } else {
                 section("Séances suivies", programs.active, empty: nil)
-                section("Autres séances", programs.filter { !$0.isActive }, empty: nil)
+                let others = programs.filter { !$0.isActive }
+                if !others.isEmpty {
+                    section("Autres séances", others, empty: nil)
+                }
             }
-
-            Button { router.newSession() } label: {
-                Label("Nouvelle séance", systemImage: "plus")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.glass)
-            .buttonBorderShape(.capsule)
-            .controlSize(.large)
-            .pageRow()
-
-            ExerciseShelves().pageRow()
 
         }
         .listStyle(.plain)
@@ -297,47 +293,64 @@ struct TrackingBadge: View {
     }
 }
 
-/// "Mes exercices" (the filmed ones, and a tile to film a new one) and "Exercices Rebond" (to do right away).
-struct ExerciseShelves: View {
-    @Environment(ExerciseLibrary.self) private var library
+/// The three ways to add a séance, on an equal footing: the physiotherapist's videos, their sheet or message,
+/// or exercises picked in the list. All lead to the same "Ma séance" screen.
+struct AddSessionChoices: View {
     @Environment(AppRouter.self) private var router
-    @State private var shownCatalog: CatalogExercise?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            shelfTitle("Mes exercices")
-            ExerciseGrid {
-                Button { router.newExercise() } label: { ExerciseTile(content: .add) }
-                    .buttonStyle(.plain)
-                ForEach(library.movements) { movement in
-                    NavigationLink(value: LibraryRoute(id: movement.id)) {
-                        ExerciseTile(content: .filmed(movement))
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            shelfTitle("Exercices Rebond")
-            ExerciseGrid {
-                ForEach(CatalogExercise.all) { exercise in
-                    Button { shownCatalog = exercise } label: { ExerciseTile(content: .catalog(exercise)) }
-                        .buttonStyle(.plain)
-                }
-            }
+        Section("Vidéos de mon kiné") {
+            Button("Choisir mes vidéos", systemImage: "photo.on.rectangle") { router.addProgram(from: .videos) }
+            Button("Filmer", systemImage: "video") { router.addProgram(from: .film) }
         }
-        .sheet(item: $shownCatalog) { CatalogExerciseSheet(exercise: $0) }
-    }
-
-    private func shelfTitle(_ title: LocalizedStringKey) -> some View {
-        Text(title)
-            .font(.title3.bold())
-            .accessibilityAddTraits(.isHeader)
-            .padding(.horizontal, 4)
-            .padding(.top, 8)
+        Section("Feuille ou message du kiné") {
+            Button("Scanner la feuille", systemImage: "doc.viewfinder") { router.addProgram(from: .scan) }
+            Button("Photo de la feuille", systemImage: "photo") { router.addProgram(from: .photo) }
+            Button("Coller le message", systemImage: "text.bubble") { router.addProgram(from: .message) }
+        }
+        Section("Exercices") {
+            Button("Choisir mes exercices", systemImage: "list.bullet") { router.addProgram(from: .manual) }
+        }
     }
 }
 
-/// Nothing yet: what an exercise and a séance are, in two large tiles, and Rebond's exercises to try right away.
-/// The page's own header stays on top.
+/// Adding a session, in full: a large button, with the same choices as the + of the header.
+private struct AddSessionButton: View {
+    @Environment(AppRouter.self) private var router
+
+    var body: some View {
+        // The system's bubble, opening from the button: nothing darkens the page.
+        Menu {
+            AddSessionChoices()
+        } label: {
+            Text("Ajouter une séance")
+                .font(.headline)
+                .frame(maxWidth: .infinity, alignment: .center)
+        }
+        .buttonStyle(.glassProminent)
+        .buttonBorderShape(.capsule)
+        .controlSize(.extraLarge)
+        // In a list, a menu keeps its label's width: stretch the menu itself, its text centered.
+        .frame(maxWidth: .infinity, alignment: .center)
+    }
+}
+
+/// The ways to add a séance, in a Liquid Glass button.
+struct AddProgramMenu: View {
+    @Environment(AppRouter.self) private var router
+
+    var body: some View {
+        Menu {
+            AddSessionChoices()
+        } label: {
+            HeaderIcon(systemImage: "plus")
+        }
+        .accessibilityLabel("Nouvelle séance")
+    }
+}
+
+/// No program yet, in the same cards as the other pages: how to add the physiotherapist's program,
+/// and one exercise to do right away. The page's own header stays on top.
 struct NoProgramView<Header: View>: View {
     @ViewBuilder let header: Header
     @Environment(AppRouter.self) private var router
@@ -350,27 +363,34 @@ struct NoProgramView<Header: View>: View {
             VStack(alignment: .leading, spacing: 14) {
                 header
 
-                Text("Filmez vos exercices chez votre kiné, puis regroupez-les en séances.")
-                    .font(.title3.weight(.semibold))
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.horizontal, 4)
-
-                HStack(spacing: 12) {
-                    ChoiceTile(title: "Nouvel exercice", detail: "Un mouvement filmé avec votre kiné", symbol: "video.fill") {
-                        router.newExercise()
-                    }
-                    ChoiceTile(title: "Nouvelle séance", detail: "Vos exercices, vos jours", symbol: "list.bullet.rectangle") {
-                        router.newSession()
+                SummaryCard(title: Text("Ajouter une séance"), systemImage: "plus", color: .accentColor) {
+                    EmptyView()
+                } content: {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Comment votre kiné vous a-t-il donné vos exercices ?")
+                            .font(.title3.weight(.semibold))
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.bottom, 6)
+                        AddGroup(title: "Vidéos de mon kiné")
+                        AddRow(title: "Choisir mes vidéos", symbol: "photo.on.rectangle") { router.addProgram(from: .videos) }
+                        Divider().padding(.leading, 44)
+                        AddRow(title: "Filmer", symbol: "video") { router.addProgram(from: .film) }
+                        AddGroup(title: "Feuille ou message du kiné")
+                        AddRow(title: "Scanner la feuille", symbol: "doc.viewfinder") { router.addProgram(from: .scan) }
+                        Divider().padding(.leading, 44)
+                        AddRow(title: "Photo de la feuille", symbol: "photo") { router.addProgram(from: .photo) }
+                        Divider().padding(.leading, 44)
+                        AddRow(title: "Coller le message", symbol: "text.bubble") { router.addProgram(from: .message) }
+                        AddGroup(title: "Exercices")
+                        AddRow(title: "Choisir mes exercices", symbol: "list.bullet") { router.addProgram(from: .manual) }
+                        #if DEBUG
+                        Divider().padding(.leading, 44)
+                        AddRow(title: "Programme de démo", symbol: "sparkles") { DemoData.load(into: context) }
+                        #endif
                     }
                 }
 
-                ExerciseShelves()
-
-                #if DEBUG
-                Button("Charger le programme de démo", systemImage: "sparkles") { DemoData.load(into: context) }
-                    .font(.footnote)
-                    .padding(.top, 8)
-                #endif
+                FreeExerciseCard()
             }
             .padding(.horizontal)
             .padding(.bottom)
@@ -380,5 +400,46 @@ struct NoProgramView<Header: View>: View {
                 .ignoresSafeArea()
         }
         .background(Color(.systemGroupedBackground))
+    }
+}
+
+/// A group of ways in the card: "Vidéos de mon kiné".
+private struct AddGroup: View {
+    let title: LocalizedStringKey
+
+    var body: some View {
+        Text(title)
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .textCase(.uppercase)
+            .padding(.top, 12)
+            .padding(.bottom, 2)
+    }
+}
+
+/// A way to add the program, as a row of the card.
+private struct AddRow: View {
+    let title: LocalizedStringKey
+    let symbol: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: symbol)
+                    .font(.title3)
+                    .foregroundStyle(.tint)
+                    .frame(width: 32)
+                Text(title)
+                    .font(.body)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .frame(minHeight: 48)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
     }
 }

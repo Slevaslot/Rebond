@@ -4,7 +4,6 @@ import SwiftUI
 @main struct RebondApp: App {
     @State private var router = AppRouter.shared
     @State private var store = ProStore()
-    @State private var library = ExerciseLibrary.shared
 
     init() {
         // The Control Center button, the Action button and Siri start the session through the router.
@@ -17,7 +16,6 @@ import SwiftUI
             RootView()
                 .environment(router)
                 .environment(store)
-                .environment(library)
                 .task { await store.refresh() }
                 // Widgets: the snapshot they read, and the link that opens today's session.
                 .modifier(WidgetSync())
