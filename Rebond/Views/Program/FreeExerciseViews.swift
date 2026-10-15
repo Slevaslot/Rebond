@@ -114,33 +114,23 @@ private struct ExerciseStartCard: View {
                     .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
             }
 
+            // The goal, set right here: the play button starts with it.
             HStack(spacing: 12) {
-                Button {
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { showsMovement.toggle() }
-                } label: {
-                    Image(systemName: showsMovement ? "eye.slash" : "figure.stand")
-                        .cardButtonLabel(selected: showsMovement)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(Text(showsMovement ? "Masquer le mouvement" : "Voir le mouvement"))
-
-                // The goal, chosen in place: the play button starts with it.
-                Menu {
-                    Picker("Séries", selection: $sets) {
-                        ForEach(1...5, id: \.self) { Text("^[\($0) série](inflect: true)").tag($0) }
-                    }
-                    Picker("Répétitions", selection: $reps) {
-                        ForEach([5, 8, 10, 12, 15, 20], id: \.self) { Text("^[\($0) répétition](inflect: true)").tag($0) }
-                    }
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "target")
-                        Text("\(sets) × \(reps)").monospacedDigit()
-                    }
-                    .cardButtonLabel(selected: false)
-                }
-                .accessibilityLabel(Text("Objectif : \(sets) séries de \(reps) répétitions"))
+                CounterPill(title: "Séries", value: $sets, range: 1...5)
+                CounterPill(title: "Répétitions", value: $reps, range: 1...30)
             }
+
+            Button {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { showsMovement.toggle() }
+            } label: {
+                Label(showsMovement ? "Masquer le mouvement" : "Voir le mouvement",
+                      systemImage: showsMovement ? "chevron.up" : "play.rectangle")
+                    .font(.headline)
+                    .foregroundStyle(.tint)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
         }
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -148,12 +138,60 @@ private struct ExerciseStartCard: View {
     }
 }
 
-private extension View {
-    func cardButtonLabel(selected: Bool) -> some View {
-        font(.headline)
-            .foregroundStyle(selected ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.secondary))
-            .frame(maxWidth: .infinity, minHeight: 52)
-            .background(Color.accentColor.opacity(selected ? 0.25 : 0.12), in: .rect(cornerRadius: 18))
-            .contentShape(.rect(cornerRadius: 18))
+/// A number to set with − and +, its name above: obvious at a glance, usable without opening anything.
+private struct CounterPill: View {
+    let title: LocalizedStringKey
+    @Binding var value: Int
+    let range: ClosedRange<Int>
+
+    var body: some View {
+        VStack(spacing: 6) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            HStack(spacing: 0) {
+                step("minus", by: -1)
+                Text(value, format: .number)
+                    .font(.system(.title2, design: .rounded).weight(.bold))
+                    .monospacedDigit()
+                    .contentTransition(.numericText())
+                    .frame(maxWidth: .infinity)
+                step("plus", by: 1)
+            }
+        }
+        .padding(.vertical, 10)
+        .padding(.horizontal, 6)
+        .frame(maxWidth: .infinity)
+        .background(Color.accentColor.opacity(0.12), in: .rect(cornerRadius: 18))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(title))
+        .accessibilityValue(Text(value, format: .number))
+        .accessibilityAdjustableAction { direction in
+            switch direction {
+            case .increment: change(by: 1)
+            case .decrement: change(by: -1)
+            @unknown default: break
+            }
+        }
+        .sensoryFeedback(.selection, trigger: value)
+    }
+
+    private func step(_ symbol: String, by delta: Int) -> some View {
+        Button { change(by: delta) } label: {
+            Image(systemName: symbol)
+                .font(.headline)
+                .foregroundStyle(.tint)
+                .frame(width: 44, height: 44)
+                .background(Color.accentColor.opacity(0.15), in: .circle)
+        }
+        .buttonStyle(.plain)
+        .disabled(!range.contains(value + delta))
+        .opacity(range.contains(value + delta) ? 1 : 0.35)
+    }
+
+    private func change(by delta: Int) {
+        let new = value + delta
+        guard range.contains(new) else { return }
+        withAnimation(.snappy) { value = new }
     }
 }
