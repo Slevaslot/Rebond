@@ -55,10 +55,22 @@ struct ProgramDetailView: View {
                     Button(role: .destructive) {
                         confirmingDelete = true
                     } label: {
-                        Label("Supprimer la séance", systemImage: "trash")
-                            .frame(maxWidth: .infinity, minHeight: 50, alignment: .leading)
-                            .padding(.horizontal)
-                            .contentShape(.rect)
+                        HStack {
+                            Label("Supprimer la séance", systemImage: "trash")
+                                // Anchored to the words: the bubble points at them, not at the middle of the row.
+                                .confirmationDialog("Supprimer « \(program.title) » ?", isPresented: $confirmingDelete, titleVisibility: .visible) {
+                        Button("Supprimer la séance", role: .destructive) {
+                            dismiss()
+                            context.delete(program)
+                        }
+                                } message: {
+                                    Text("Vos séances passées restent dans votre suivi.")
+                                }
+                            Spacer(minLength: 0)
+                        }
+                        .frame(minHeight: 50)
+                        .padding(.horizontal)
+                        .contentShape(.rect)
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(.red)
@@ -80,14 +92,6 @@ struct ProgramDetailView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Button("Modifier") { editing = EditingItem(program: EditableProgram(program)) }
             }
-        }
-        .confirmationDialog("Supprimer « \(program.title) » ?", isPresented: $confirmingDelete, titleVisibility: .visible) {
-            Button("Supprimer la séance", role: .destructive) {
-                dismiss()
-                context.delete(program)
-            }
-        } message: {
-            Text("Vos séances passées restent dans votre suivi.")
         }
         .sheet(item: $editing) { item in
             NavigationStack {

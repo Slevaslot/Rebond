@@ -296,42 +296,24 @@ struct TrackingBadge: View {
 /// Adding a session, in full: a large button, with the same four ways as the + of the header.
 private struct AddSessionButton: View {
     @Environment(AppRouter.self) private var router
-    @State private var choosing = false
 
     var body: some View {
-        VStack(spacing: 10) {
-            Button {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { choosing.toggle() }
-            } label: {
-                Text("Ajouter une séance")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.glassProminent)
-            .buttonBorderShape(.capsule)
-            .controlSize(.extraLarge)
-
-            // The ways to add it unfold right here: no window, nothing darkens the page.
-            if choosing {
-                VStack(spacing: 0) {
-                    AddRow(title: "Coller le message du kiné", symbol: "text.bubble") { add(.message) }
-                    Divider().padding(.leading, 44)
-                    AddRow(title: "Scanner sa feuille", symbol: "doc.viewfinder") { add(.scan) }
-                    Divider().padding(.leading, 44)
-                    AddRow(title: "Choisir une photo", symbol: "photo") { add(.photo) }
-                    Divider().padding(.leading, 44)
-                    AddRow(title: "Saisir à la main", symbol: "square.and.pencil") { add(.manual) }
-                }
-                .padding(.horizontal)
-                .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 26))
-                .transition(.opacity.combined(with: .scale(scale: 0.97, anchor: .top)))
-            }
+        // The system's bubble, opening from the button: nothing darkens the page.
+        Menu {
+            Button("Coller le message du kiné", systemImage: "text.bubble") { router.addProgram(from: .message) }
+            Button("Scanner sa feuille", systemImage: "doc.viewfinder") { router.addProgram(from: .scan) }
+            Button("Choisir une photo", systemImage: "photo") { router.addProgram(from: .photo) }
+            Button("Saisir à la main", systemImage: "square.and.pencil") { router.addProgram(from: .manual) }
+        } label: {
+            Text("Ajouter une séance")
+                .font(.headline)
+                .frame(maxWidth: .infinity, alignment: .center)
         }
-    }
-
-    private func add(_ source: AppRouter.ImportSource) {
-        withAnimation { choosing = false }
-        router.addProgram(from: source)
+        .buttonStyle(.glassProminent)
+        .buttonBorderShape(.capsule)
+        .controlSize(.extraLarge)
+        // In a list, a menu keeps its label's width: stretch the menu itself, its text centered.
+        .frame(maxWidth: .infinity, alignment: .center)
     }
 }
 
