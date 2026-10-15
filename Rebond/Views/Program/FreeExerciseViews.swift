@@ -84,11 +84,14 @@ private struct ExerciseStartCard: View {
 
     @State private var showsMovement = false
     @State private var reps = 10
+    @State private var choosingReps = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top) {
                 Image(systemName: exercise.symbol)
+                    .contentShape(.rect)
+                    .onTapGesture { toggleMovement() }
                     .font(.system(size: 44))
                     .foregroundStyle(.tint)
                     .frame(height: 56, alignment: .topLeading)
@@ -108,16 +111,17 @@ private struct ExerciseStartCard: View {
                 Text(exercise.name)
                     .font(.title.bold())
                     .fixedSize(horizontal: false, vertical: true)
-                // The number of repetitions, chosen in place; the play button starts with it.
-                Menu {
-                    Picker("Répétitions", selection: $reps) {
-                        ForEach([5, 8, 10, 12, 15, 20], id: \.self) { Text("^[\($0) répétition](inflect: true)").tag($0) }
-                    }
+                    .contentShape(.rect)
+                    .onTapGesture { toggleMovement() }
+                // The number of repetitions, on the iPhone's wheel unfolded in the card; the play button starts with it.
+                Button {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { choosingReps.toggle() }
                 } label: {
                     HStack(spacing: 6) {
                         Text("^[\(reps) répétition](inflect: true)")
                             .monospacedDigit()
-                        Image(systemName: "chevron.down")
+                            .contentTransition(.numericText())
+                        Image(systemName: choosingReps ? "chevron.up" : "chevron.down")
                             .font(.caption.weight(.bold))
                     }
                     .font(.headline)
@@ -126,8 +130,17 @@ private struct ExerciseStartCard: View {
                     .frame(minHeight: 40)
                     .background(Color.accentColor.opacity(0.15), in: .capsule)
                 }
+                .buttonStyle(.plain)
                 .padding(.top, 4)
                 .accessibilityLabel(Text("Nombre de répétitions : \(reps)"))
+            }
+            if choosingReps {
+                Picker("Répétitions", selection: $reps) {
+                    ForEach(1...50, id: \.self) { Text("\($0)").tag($0) }
+                }
+                .pickerStyle(.wheel)
+                .frame(height: 150)
+                .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
             }
             if showsMovement {
                 MovementCard(catalog: exercise, symbol: exercise.symbol, height: 220)
@@ -138,12 +151,13 @@ private struct ExerciseStartCard: View {
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.accentColor.opacity(0.14), in: .rect(cornerRadius: 30))
-        .contentShape(.rect(cornerRadius: 30))
-        .onTapGesture {
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { showsMovement.toggle() }
-        }
         .accessibilityAction(named: showsMovement ? Text("Masquer le mouvement") : Text("Voir le mouvement")) {
             showsMovement.toggle()
         }
+    }
+
+    /// Tapping the exercise (its symbol or name) shows its movement in the card.
+    private func toggleMovement() {
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { showsMovement.toggle() }
     }
 }
