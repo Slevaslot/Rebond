@@ -123,23 +123,13 @@ private struct ExerciseStartCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top) {
-                Group {
-                    if let reference = exercise.reference {
-                        // Filmed at the physiotherapist's: the patient in the video, at the end of the movement.
-                        ReferenceFramesView(movement: reference, progress: 1)
-                            .frame(width: 60, height: 80)
-                            .background(Color.black)
-                            .clipShape(.rect(cornerRadius: 14))
-                    } else {
-                        Image(systemName: exercise.symbol)
-                            .font(.system(size: 44))
-                            .foregroundStyle(.tint)
-                            .frame(height: 56, alignment: .topLeading)
-                    }
-                }
-                .contentShape(.rect)
-                .onTapGesture { toggleMovement() }
-                .accessibilityHidden(true)
+                Image(systemName: exercise.symbol)
+                    .contentShape(.rect)
+                    .onTapGesture { toggleMovement() }
+                    .font(.system(size: 44))
+                    .foregroundStyle(.tint)
+                    .frame(height: 56, alignment: .topLeading)
+                    .accessibilityHidden(true)
                 Spacer()
                 Button { onStart(1, reps) } label: {
                     Image(systemName: "play.fill")
