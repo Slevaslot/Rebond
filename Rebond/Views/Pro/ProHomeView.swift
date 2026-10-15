@@ -18,6 +18,7 @@ struct ProHomeView: View {
     @State private var importing = false
     @State private var importError = false
     @State private var removing: TrackedPatient?
+    @State private var showingPatientSettings = false
 
     /// The patients with what the last report says, those needing attention first.
     private var followed: [(patient: TrackedPatient, overview: PatientOverview?)] {
@@ -36,6 +37,12 @@ struct ProHomeView: View {
         NavigationStack(path: $path) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
+                    PageHeader("Espace kiné") {
+                        Button { showingSettings = true } label: { HeaderIcon(systemImage: "gearshape") }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Réglages de l'espace kiné")
+                        ProfileButton { showingPatientSettings = true }
+                    }
                     let followed = followed
                     WeekOverviewCard(overviews: followed.compactMap(\.overview), patientCount: patients.count, hasPro: store.hasPro)
                     PrescribeCard { prescribing = PrescribingItem(program: EditableProgram()) }
@@ -78,11 +85,9 @@ struct ProHomeView: View {
             }
             .background(Color(.systemGroupedBackground))
             .navigationTitle("Espace kiné")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Réglages de l'espace kiné", systemImage: "gearshape") { showingSettings = true }
-                }
-            }
+            // Same top bar as the other tabs: the large title and its buttons in the page.
+            .toolbarVisibility(.hidden, for: .navigationBar)
+            .sheet(isPresented: $showingPatientSettings) { SettingsView() }
             .navigationDestination(for: UUID.self) { id in
                 PatientDestination(patientID: id) { stopFollowing($0) }
             }

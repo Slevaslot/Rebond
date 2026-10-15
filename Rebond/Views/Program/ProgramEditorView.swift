@@ -56,16 +56,6 @@ struct ProgramEditorView: View {
             }
 
             Section {
-                TextField("Nom (facultatif)", text: $program.name, prompt: Text(program.suggestedName))
-            } header: {
-                Text("Nom")
-            } footer: {
-                if program.name.trimmingCharacters(in: .whitespaces).isEmpty {
-                    Text("Laissez vide pour l'appeler « \(program.suggestedName) ».")
-                }
-            }
-
-            Section {
                 ForEach($program.exercises) { $exercise in
                     NavigationLink {
                         ExerciseEditorView(exercise: $exercise, defaultName: program.displayName(of: exercise))
@@ -85,6 +75,11 @@ struct ProgramEditorView: View {
                 Text("Exercices")
             } footer: {
                 Text("Seul votre kiné décide du programme.")
+            }
+
+            // Already named from what it works on: renaming is possible, never asked for.
+            Section {
+                TextField("Nom", text: $program.name, prompt: Text(program.suggestedName))
             }
         }
         .navigationTitle(title)
@@ -198,13 +193,6 @@ private struct ExerciseEditorView: View {
                 }
             }
 
-            Section {
-                TextField("Nom (facultatif)", text: $exercise.name, prompt: Text(defaultName))
-            } footer: {
-                if exercise.name.trimmingCharacters(in: .whitespaces).isEmpty {
-                    Text("Laissez vide pour garder « \(defaultName) ».")
-                }
-            }
 
             Section {
                 Stepper(value: $exercise.sets, in: 1...10) {
@@ -228,6 +216,9 @@ private struct ExerciseEditorView: View {
                     }
                     .onChange(of: exercise.holdSeconds) { exercise.guessed.remove(.holdSeconds) }
                 }
+            }
+            Section {
+                TextField("Nom", text: $exercise.name, prompt: Text(defaultName))
             }
         }
         .navigationTitle(defaultName)

@@ -49,21 +49,9 @@ struct TodayView: View {
     }
 
     private var header: some View {
-        HStack(alignment: .center) {
-            Text("Accueil")
-                .font(.largeTitle.bold())
-                .accessibilityAddTraits(.isHeader)
-            Spacer()
-            Button {
-                showingSettings = true
-            } label: {
-                ProfileBadge(name: patientName)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Réglages")
+        PageHeader("Accueil") {
+            ProfileButton { showingSettings = true }
         }
-        .padding(.top, 8)
-        .padding(.bottom, 4)
     }
 
     private var today: some View {
@@ -366,6 +354,59 @@ struct ExerciseBadge: View {
 }
 
 
+
+/// The top of every tab: the large title and its buttons on one line, in the page (Fitness style).
+/// The same height and spacing everywhere, so nothing moves when switching tabs.
+struct PageHeader<Trailing: View>: View {
+    let title: LocalizedStringKey
+    @ViewBuilder let trailing: Trailing
+
+    init(_ title: LocalizedStringKey, @ViewBuilder trailing: () -> Trailing) {
+        self.title = title
+        self.trailing = trailing()
+    }
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 10) {
+            Text(title)
+                .font(.largeTitle.bold())
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .accessibilityAddTraits(.isHeader)
+            Spacer()
+            trailing
+        }
+        .frame(height: 52)
+        .padding(.top, 8)
+        .padding(.bottom, 4)
+    }
+}
+
+/// The profile, at the same place on every tab: opens Réglages.
+struct ProfileButton: View {
+    let action: () -> Void
+    @AppStorage(PatientIdentity.nameKey) private var patientName = ""
+
+    var body: some View {
+        Button(action: action) {
+            ProfileBadge(name: patientName)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Réglages")
+    }
+}
+
+/// A round Liquid Glass button for the top of a tab, the size of the profile.
+struct HeaderIcon: View {
+    let systemImage: String
+
+    var body: some View {
+        Image(systemName: systemImage)
+            .font(.title3.weight(.semibold))
+            .frame(width: 44, height: 44)
+            .glassEffect(.regular.interactive(), in: .circle)
+    }
+}
 
 /// The patient's initials, or a person symbol, as Health's profile button:
 /// a soft gradient disc inside a Liquid Glass ring.

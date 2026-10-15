@@ -7,7 +7,6 @@ struct ProgramTab: View {
     @Environment(AppRouter.self) private var router
     @Query(sort: \Program.createdAt) private var programs: [Program]
     @Environment(\.modelContext) private var context
-    @AppStorage(PatientIdentity.nameKey) private var patientName = ""
     @State private var showingSettings = false
     @State private var path: [Program] = []
 
@@ -33,23 +32,10 @@ struct ProgramTab: View {
     }
 
     private var header: some View {
-        HStack(alignment: .center, spacing: 10) {
-            Text("Programmes")
-                .font(.largeTitle.bold())
-                .accessibilityAddTraits(.isHeader)
-            Spacer()
+        PageHeader("Programmes") {
             AddProgramMenu()
-            // The profile stays in the same place on every tab.
-            Button {
-                showingSettings = true
-            } label: {
-                ProfileBadge(name: patientName)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Réglages")
+            ProfileButton { showingSettings = true }
         }
-        .padding(.top, 8)
-        .padding(.bottom, 4)
     }
 
     /// A group of program cards. The circle on each card selects it: followed programs make the day's session.
@@ -114,7 +100,10 @@ struct ProgramTab: View {
     private var content: some View {
         // A list rather than a scroll view, for the system's swipe actions; it keeps the look of the cards.
         List {
-            header.pageRow()
+            // No top margin: the header sits exactly where it does on the Accueil page.
+            header.listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 7, trailing: 16))
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
 
             WeekPlanCard(programs: programs).pageRow()
 
@@ -133,6 +122,7 @@ struct ProgramTab: View {
                 .pageRow()
         }
         .listStyle(.plain)
+        .contentMargins(.top, 0, for: .scrollContent)
         .scrollContentBackground(.hidden)
         .background(alignment: .top) {
             // Tinted top, fading into the page, like the Accueil page.
@@ -177,17 +167,6 @@ private struct WeekPlanCard: View {
                     ForEach(ProgramSchedule.mondayFirst, id: \.self) { weekday in
                         DayColumn(weekday: weekday, programs: programs)
                             .frame(maxWidth: .infinity)
-                    }
-                }
-                if programs.active.count > 1 {
-                    VStack(alignment: .leading, spacing: 6) {
-                        ForEach(programs.active) { program in
-                            Label {
-                                Text(program.title).font(.subheadline)
-                            } icon: {
-                                Circle().fill(ProgramPalette.color(of: program, in: programs)).frame(width: 10, height: 10)
-                            }
-                        }
                     }
                 }
             }
@@ -328,10 +307,7 @@ struct AddProgramMenu: View {
             Button("Choisir une photo", systemImage: "photo") { router.addProgram(from: .photo) }
             Button("Saisir à la main", systemImage: "square.and.pencil") { router.addProgram(from: .manual) }
         } label: {
-            Image(systemName: "plus")
-                .font(.title3.weight(.semibold))
-                .frame(width: 44, height: 44)
-                .glassEffect(.regular.interactive(), in: .circle)
+            HeaderIcon(systemImage: "plus")
         }
         .accessibilityLabel("Nouveau programme")
     }
