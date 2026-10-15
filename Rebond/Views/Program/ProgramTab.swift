@@ -304,7 +304,7 @@ private struct AddSessionButton: View {
         Button {
             choosing = true
         } label: {
-            Label("Ajouter une séance", systemImage: "plus")
+            Text("Ajouter une séance")
                 .font(.headline)
                 .frame(maxWidth: .infinity)
         }
