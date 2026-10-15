@@ -114,9 +114,11 @@ final class MotionSession {
     @ObservationIgnored private var isInPlace = false
     @ObservationIgnored private var intro: Task<Void, Never>?
     @ObservationIgnored private var demonstration: Task<Void, Never>?
-    /// Movements rejected in a row: after a few, the guide shows the movement again.
-    @ObservationIgnored private var failedInARow = 0
-    private let failuresBeforeDemonstration = 2
+    /// A spoken correction waits this long after the previous one; the screen still shows each.
+    @ObservationIgnored private var lastSpokenCorrection = Date.distantPast
+    private let correctionSpeechInterval = 8.0
+    /// The return cue ("Remontez") is said on the first repetitions only, then the patient knows it.
+    private let returnCueRepetitions = 2
     @ObservationIgnored private var lastAnnouncement = ""
     @ObservationIgnored private var lastAnnouncementDate = Date.distantPast
     @ObservationIgnored private var heldFault: Correction?
@@ -315,18 +317,6 @@ final class MotionSession {
         coach.say("À vous")
     }
 
-    /// The guide does the movement once, full screen, then goes back to its card.
-    private func demonstrate() {
-        guideDisplay = .large
-        demonstrationStart = .now
-        demonstration?.cancel()
-        demonstration = Task {
-            try? await Task.sleep(for: .seconds(Self.demonstrationDuration))
-            guard !Task.isCancelled else { return }
-            guideDisplay = .corner
-        }
-    }
-
     /// The body has been missing for nearly a second: one more second, then the outline comes back.
     private func showOutlineIfStillLost() {
         lostDelay?.cancel()
@@ -349,7 +339,6 @@ final class MotionSession {
         lostDelay?.cancel()
         demonstration?.cancel()
         guideDisplay = .large
-        failedInARow = 0
         isCalibrated = false
         phase = .calibrating
         depthProgress = 0
@@ -411,7 +400,6 @@ final class MotionSession {
         case .calibrated:
             break
         case .repCompleted(let result):
-            failedInARow = 0
             repCount += 1
             bestAmplitude = max(bestAmplitude, result.amplitude)
             if repCount >= targetReps {
@@ -440,16 +428,12 @@ final class MotionSession {
         case .repIncomplete:
             incompleteCount += 1
         case .bottomReached:
-            coach.say(exercise.returnCue)
+            if repCount < returnCueRepetitions { coach.say(exercise.returnCue) }
         case .correction(let correction):
             show(Feedback(message: correction.message, isPositive: false))
             hold(correction)
-            failedInARow += 1
-            if failedInARow >= failuresBeforeDemonstration, guideDisplay == .corner {
-                failedInARow = 0
-                coach.say("\(String(localized: correction.message)). Regardez le mouvement")
-                demonstrate()
-            } else {
+            if Date.now.timeIntervalSince(lastSpokenCorrection) >= correctionSpeechInterval {
+                lastSpokenCorrection = .now
                 coach.say(correction.message)
             }
         case nil:
