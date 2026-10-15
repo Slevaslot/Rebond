@@ -84,11 +84,7 @@ struct ProHomeView: View {
                 }
             }
             .navigationDestination(for: UUID.self) { id in
-                if let patient = patients.first(where: { $0.patientID == id }) {
-                    PatientDetailView(patient: patient) { stopFollowing(patient) }
-                } else {
-                    ContentUnavailableView("Patient introuvable", systemImage: "person.crop.circle.badge.questionmark")
-                }
+                PatientDestination(patientID: id) { stopFollowing($0) }
             }
             .sheet(item: $prescribing) { item in
                 PrescribeFlow(program: item.program)
@@ -123,8 +119,9 @@ struct ProHomeView: View {
         // A report opened from another app shows its patient.
         .onChange(of: router.openedPatient, initial: true) {
             guard let id = router.openedPatient else { return }
-            path = [id]
             router.openedPatient = nil
+            // After the tab is in place: pushing while it is being built can stall navigation.
+            Task { path = [id] }
         }
     }
 
@@ -154,6 +151,25 @@ struct ProHomeView: View {
             }
         } else {
             withAnimation { context.delete(patient) }
+        }
+    }
+}
+
+/// A patient's page, found by identifier with its own query, so it follows a report imported a moment ago.
+private struct PatientDestination: View {
+    let onStopFollowing: (TrackedPatient) -> Void
+    @Query private var matches: [TrackedPatient]
+
+    init(patientID: UUID, onStopFollowing: @escaping (TrackedPatient) -> Void) {
+        self.onStopFollowing = onStopFollowing
+        _matches = Query(filter: #Predicate<TrackedPatient> { $0.patientID == patientID })
+    }
+
+    var body: some View {
+        if let patient = matches.first {
+            PatientDetailView(patient: patient) { onStopFollowing(patient) }
+        } else {
+            ContentUnavailableView("Patient introuvable", systemImage: "person.crop.circle.badge.questionmark")
         }
     }
 }

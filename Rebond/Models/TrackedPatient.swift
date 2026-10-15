@@ -68,7 +68,10 @@ final class TrackedPatient {
     static func importReport(_ data: Data, into context: ModelContext, hasPro: Bool) -> ImportResult {
         guard let reception = try? receive(data, in: context, canAddNew: canAddNew(in: context, hasPro: hasPro)) else { return .invalid }
         switch reception {
-        case .added(let patient), .updated(let patient): return .imported(patient.patientID)
+        case .added(let patient), .updated(let patient):
+            // Saved right away: the report may have opened the app, which can be closed just after.
+            try? context.save()
+            return .imported(patient.patientID)
         case .limitReached: return .limitReached
         }
     }
