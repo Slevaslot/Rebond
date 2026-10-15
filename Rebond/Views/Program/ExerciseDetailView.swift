@@ -108,6 +108,7 @@ struct ExerciseDetailView: View {
 struct MovementCard: View {
     let catalog: CatalogExercise?
     let symbol: String
+    var height: Double = 260
     @State private var start = Date.now
 
     var body: some View {
@@ -123,7 +124,7 @@ struct MovementCard: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 260)
+        .frame(height: height)
         .background(Color.accentColor.gradient, in: .rect(cornerRadius: 26))
         .accessibilityElement()
     }

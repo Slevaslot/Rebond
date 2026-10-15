@@ -39,20 +39,17 @@ struct FreeExerciseCard: View {
 }
 
 /// The exercises the camera follows, as Fitness shows its workouts: one large card each, its symbol in color,
-/// a play button to start at once (1 × 10), the movement and the goal below.
+/// a play button to start, the movement and the goal set right in the card.
 private struct FreeExercisePicker: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(AppRouter.self) private var router
-    @State private var path: [CatalogExercise.ID] = []
 
     var body: some View {
-        NavigationStack(path: $path) {
+        NavigationStack {
             ScrollView {
                 VStack(spacing: 14) {
                     ForEach(CatalogExercise.all) { exercise in
-                        ExerciseStartCard(exercise: exercise,
-                                          onStart: { start(exercise, sets: 1, reps: 10) },
-                                          onOpen: { path.append(exercise.id) })
+                        ExerciseStartCard(exercise: exercise) { sets, reps in start(exercise, sets: sets, reps: reps) }
                     }
                 }
                 .padding(.horizontal)
@@ -63,11 +60,6 @@ private struct FreeExercisePicker: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 Button("Fermer", systemImage: "xmark", role: .close) { dismiss() }
-            }
-            .navigationDestination(for: CatalogExercise.ID.self) { id in
-                if let exercise = CatalogExercise.find(id) {
-                    FreeExerciseSetup(exercise: exercise) { sets, reps in start(exercise, sets: sets, reps: reps) }
-                }
             }
         }
     }
@@ -84,11 +76,15 @@ private struct FreeExercisePicker: View {
     }
 }
 
-/// One exercise, Fitness style: symbol and play button on top, the name in large type, two buttons below.
+/// One exercise, Fitness style: symbol and play button on top, the name in large type, then two buttons that
+/// act in the card itself: show the movement, and choose the goal the play button starts with.
 private struct ExerciseStartCard: View {
     let exercise: CatalogExercise
-    let onStart: () -> Void
-    let onOpen: () -> Void
+    let onStart: (_ sets: Int, _ reps: Int) -> Void
+
+    @State private var sets = 1
+    @State private var reps = 10
+    @State private var showsMovement = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -99,7 +95,7 @@ private struct ExerciseStartCard: View {
                     .frame(height: 56, alignment: .topLeading)
                     .accessibilityHidden(true)
                 Spacer()
-                Button(action: onStart) {
+                Button { onStart(sets, reps) } label: {
                     Image(systemName: "play.fill")
                         .font(.title2.weight(.bold))
                         .foregroundStyle(.black)
@@ -107,73 +103,57 @@ private struct ExerciseStartCard: View {
                         .background(Color.accentColor, in: .circle)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(Text("Commencer : \(exercise.name)"))
+                .accessibilityLabel(Text("Commencer : \(exercise.name), \(sets) × \(reps)"))
             }
             Text(exercise.name)
                 .font(.title.bold())
                 .fixedSize(horizontal: false, vertical: true)
+
+            if showsMovement {
+                MovementCard(catalog: exercise, symbol: exercise.symbol, height: 220)
+                    .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
+            }
+
             HStack(spacing: 12) {
-                cardButton(systemImage: "figure.stand", label: "Voir le mouvement")
-                cardButton(systemImage: "target", label: "Choisir l'objectif", text: "1 × 10")
+                Button {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { showsMovement.toggle() }
+                } label: {
+                    Image(systemName: showsMovement ? "eye.slash" : "figure.stand")
+                        .cardButtonLabel(selected: showsMovement)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Text(showsMovement ? "Masquer le mouvement" : "Voir le mouvement"))
+
+                // The goal, chosen in place: the play button starts with it.
+                Menu {
+                    Picker("Séries", selection: $sets) {
+                        ForEach(1...5, id: \.self) { Text("^[\($0) série](inflect: true)").tag($0) }
+                    }
+                    Picker("Répétitions", selection: $reps) {
+                        ForEach([5, 8, 10, 12, 15, 20], id: \.self) { Text("^[\($0) répétition](inflect: true)").tag($0) }
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "target")
+                        Text("\(sets) × \(reps)").monospacedDigit()
+                    }
+                    .cardButtonLabel(selected: false)
+                }
+                .accessibilityLabel(Text("Objectif : \(sets) séries de \(reps) répétitions"))
             }
         }
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.accentColor.opacity(0.14), in: .rect(cornerRadius: 30))
     }
-
-    private func cardButton(systemImage: String, label: LocalizedStringKey, text: String? = nil) -> some View {
-        Button(action: onOpen) {
-            HStack(spacing: 6) {
-                Image(systemName: systemImage)
-                if let text { Text(text).monospacedDigit() }
-            }
-            .font(.headline)
-            .foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity, minHeight: 52)
-            .background(Color.accentColor.opacity(0.12), in: .rect(cornerRadius: 18))
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(Text(label))
-    }
 }
 
-private struct FreeExerciseSetup: View {
-    let exercise: CatalogExercise
-    let onStart: (_ sets: Int, _ reps: Int) -> Void
-
-    @State private var sets = 1
-    @State private var reps = 10
-
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 14) {
-                MovementCard(catalog: exercise, symbol: exercise.symbol)
-                VStack(spacing: 0) {
-                    Stepper("^[\(sets) série](inflect: true)", value: $sets, in: 1...5)
-                        .padding()
-                    Divider().padding(.leading)
-                    Stepper("^[\(reps) répétition](inflect: true)", value: $reps, in: 1...30)
-                        .padding()
-                }
-                .font(.headline)
-                .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 26))
-                Button {
-                    onStart(sets, reps)
-                } label: {
-                    Label("Commencer", systemImage: "play.fill")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.glassProminent)
-                .buttonBorderShape(.capsule)
-                .controlSize(.extraLarge)
-            }
-            .padding(.horizontal)
-            .padding(.bottom)
-        }
-        .background(Color(.systemGroupedBackground))
-        .navigationTitle(Text(exercise.name))
-        .navigationBarTitleDisplayMode(.inline)
+private extension View {
+    func cardButtonLabel(selected: Bool) -> some View {
+        font(.headline)
+            .foregroundStyle(selected ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.secondary))
+            .frame(maxWidth: .infinity, minHeight: 52)
+            .background(Color.accentColor.opacity(selected ? 0.25 : 0.12), in: .rect(cornerRadius: 18))
+            .contentShape(.rect(cornerRadius: 18))
     }
 }
