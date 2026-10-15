@@ -44,7 +44,7 @@ nonisolated enum Correction: Sendable {
         switch self {
         case .goLower: "Descendez encore un peu"
         case .keepBackStraight: "Gardez le buste plus droit"
-        case .slowDown: "Plus lentement"
+        case .slowDown: "Prenez votre temps"
         case .keepFeetInPlace: "Gardez les pieds en place"
         case .bendBothKnees: "Pliez les deux genoux ensemble"
         case .showBothLegs: "Je ne vois pas vos deux jambes"

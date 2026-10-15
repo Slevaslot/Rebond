@@ -30,6 +30,12 @@ nonisolated struct ReferenceMovement: Codable, Sendable, Identifiable {
     var recognizedID: String? = nil
     /// Raw name of the SF Symbol shown for it, chosen by Apple Intelligence when it was learned.
     var symbol: String? = nil
+    /// What the recognition measured and decided, in a few words (for the page of the exercise).
+    var recognitionNote: String? = nil
+    /// Sets, repetitions, rest and progression, by rules from the measurement.
+    var plan: SessionPlan? = nil
+    /// The patient's instructions, put into words from the plan.
+    var instructions: PatientInstructions? = nil
     /// The measures of the body at rest in the film: at home, the starting position is only measured close to it.
     var rest: [Double]? = nil
     /// The patient's own body at rest and at the end of the movement, in the guide's unit box.
@@ -184,6 +190,8 @@ nonisolated enum ReferenceError: Error {
     case noBody
     /// The body was seen, but no movement repeated.
     case noRepetition
+    /// The capture is too poor to measure: what to change when filming again.
+    case poorCapture(String)
 }
 
 /// What the video taught: everything of a `ReferenceMovement` but its name, and when its clearest repetition is.
@@ -203,6 +211,8 @@ nonisolated struct ReferenceAnalysis: Sendable {
     /// The catalog exercise it was recognized as, for its name and symbol.
     var recognizedID: String? = nil
     var rest: [Double] = []
+    /// The measurement of the view kept, for the recognition.
+    var measurement: MovementMeasurement? = nil
 }
 
 nonisolated enum ReferenceAnalyzer {
@@ -229,7 +239,7 @@ nonisolated enum ReferenceAnalyzer {
         // Facing the camera first, then the most repetitions.
         guard var best = results.max(by: { ($0.facing ? 1 : 0, $0.analysis.repCount) < ($1.facing ? 1 : 0, $1.analysis.repCount) })
         else { throw lastError }
-        best.analysis.recognizedID = recognize(best.samples, repetitions: best.analysis.repCount)
+        best.analysis.measurement = MovementMeasurement.measure(best.samples.map(\.measure))
         return best.analysis
     }
 
@@ -261,21 +271,6 @@ nonisolated enum ReferenceAnalyzer {
             }
         }
         return merged.map { (Array(samples[$0.range]), $0.facing) }
-    }
-
-    /// The catalog exercise whose counter finds about the same repetitions in the video, if one does.
-    static func recognize(_ samples: [ReferenceSample], repetitions: Int) -> String? {
-        var best: (id: String, count: Int)?
-        for exercise in CatalogExercise.all {
-            var counter = exercise.makeCounter()
-            var count = 0
-            for sample in samples {
-                if case .repCompleted = counter.process(sample.measure, at: sample.time).event { count += 1 }
-            }
-            guard count >= 2, count >= repetitions - 1, count <= repetitions + 1 else { continue }
-            if best == nil || abs(count - repetitions) < abs(best!.count - repetitions) { best = (exercise.id, count) }
-        }
-        return best?.id
     }
 
     private static func analyzeView(_ valid: [ReferenceSample]) throws(ReferenceError) -> ReferenceAnalysis {

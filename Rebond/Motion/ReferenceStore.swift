@@ -87,6 +87,10 @@ nonisolated enum ReferenceStore {
         // The patient is the one doing the movement.
         guard let patient = people.max(by: { ReferenceAnalyzer.motion(of: $0.samples) < ReferenceAnalyzer.motion(of: $1.samples) })
         else { throw ReferenceError.noBody }
+        // Pass 1: is the capture good enough to measure?
+        if let problem = CaptureQuality.problem(patient.samples, frameCount: frames.count) {
+            throw ReferenceError.poorCapture(problem)
+        }
         let analysis = try ReferenceAnalyzer.analyze(patient.samples)
 
         try FileManager.default.createDirectory(at: folder(id), withIntermediateDirectories: true)
@@ -101,13 +105,23 @@ nonisolated enum ReferenceStore {
         }
         let peakFrame = frameTimes.firstIndex { $0 >= analysis.bestPeak } ?? frameTimes.count / 2
         let peakIndex = min(peakFrame, max(index - 1, 0))
-        // The typed name, or the catalog exercise's; otherwise Apple Intelligence names it from the image,
-        // and without it, from what moves ("Jambes").
-        let knownName = name.isEmpty ? recognizedName(for: analysis) : name
-        let label = await MovementSymbolPicker.pick(peakImage: loadImage(frameURL(id, peakIndex)),
-                                                    movingJoints: analysis.highlightedJoints, name: knownName)
-        let symbol = label.symbol
-        let movementName = knownName ?? label.name ?? ReferenceAnalyzer.suggestedName(moving: analysis.highlightedJoints)
+        // Pass 2 and 3: which exercise of the catalog, checked against its signature; otherwise a custom one.
+        var recognition: RecognitionResult?
+        if let measurement = analysis.measurement, let catalog = ExerciseCatalogFile.bundled {
+            let keyImages = [0, peakIndex, max(index - 1, 0)].compactMap { loadImage(frameURL(id, $0)) }
+            recognition = await ExerciseRecognizer(catalog: catalog)
+                .recognize(measurement, images: keyImages, chooser: FoundationModelsChooser())
+        }
+        let movementName = name.isEmpty ? (recognition?.name ?? ReferenceAnalyzer.suggestedName(moving: analysis.highlightedJoints)) : name
+        // The session, by rules from the measurement (never from the name); the model only words the instructions.
+        let plan = analysis.measurement.map(SessionPlanner.plan)
+        var instructions: PatientInstructions?
+        if let plan, let measurement = analysis.measurement {
+            instructions = await InstructionWriter.write(name: movementName, summary: measurement.summary, plan: plan)
+        }
+        // Only the icon comes from the image: the name stays the measured one, never a catalog name by guess.
+        let symbol = await MovementSymbolPicker.pick(peakImage: loadImage(frameURL(id, peakIndex)),
+                                                     movingJoints: analysis.highlightedJoints, name: movementName).symbol
 
         try? FileManager.default.removeItem(at: videoURL(id))
         try FileManager.default.copyItem(at: video, to: videoURL(id))
@@ -118,8 +132,11 @@ nonisolated enum ReferenceStore {
             axis: analysis.axis, target: analysis.target, template: analysis.template,
             minDuration: analysis.minDuration, repCount: analysis.repCount,
             highlightedJoints: analysis.highlightedJoints,
-            recognizedID: analysis.recognizedID,
+            recognizedID: recognition?.catalogID,
             symbol: symbol.systemName,
+            recognitionNote: recognition.map(Self.note),
+            plan: plan,
+            instructions: instructions,
             rest: analysis.rest,
             restPose: analysis.restPose,
             targetPose: analysis.targetPose,
@@ -129,9 +146,14 @@ nonisolated enum ReferenceStore {
         return movement
     }
 
-    /// The catalog exercise's name when it was recognized ("Squat").
-    private static func recognizedName(for analysis: ReferenceAnalysis) -> String? {
-        analysis.recognizedID.flatMap(CatalogExercise.find).map { String(localized: $0.name) }
+    /// What the recognition decided, in a few words.
+    private static func note(_ result: RecognitionResult) -> String {
+        switch result {
+        case .recognized(_, let name, let confidence, let description):
+            "\(name) (confiance \(Int((confidence * 100).rounded())) %) : \(description)"
+        case .notRecognized(_, let reason):
+            "Exercice personnalisé. \(reason)"
+        }
     }
 
     private static func imageGenerator(for asset: AVAsset, maximumSide: Double) -> AVAssetImageGenerator {

@@ -171,9 +171,11 @@ extension EditableProgram {
 
 extension EditableProgram.Exercise {
     /// A movement filmed at the physiotherapist's, followed by the camera.
+    /// The sets and repetitions planned from the measurement, otherwise 3 × 10.
     init(_ movement: ReferenceMovement) {
         self.init(name: movement.name, catalogID: movement.catalogID,
-                  sets: EditableProgram.defaultSets, reps: EditableProgram.defaultReps)
+                  sets: movement.plan?.sets ?? EditableProgram.defaultSets,
+                  reps: movement.plan?.reps ?? EditableProgram.defaultReps)
         // Filmed on one side (one leg, one arm): both sides by default, the film serves the other one mirrored.
         bothSides = movement.filmedSide != nil
     }
