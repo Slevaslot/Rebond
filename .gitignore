@@ -19,3 +19,4 @@ build/
 Server/demo-data.json
 Tools/Replay/replay
 Tools/Catalog/catalog
+RebondTests/Fixtures/videos/*.mov

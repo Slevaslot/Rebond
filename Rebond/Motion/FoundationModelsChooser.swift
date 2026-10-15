@@ -25,14 +25,17 @@ nonisolated struct FoundationModelsChooser: RecognitionChooser {
 
         let session = LanguageModelSession(instructions: """
             Tu identifies un exercice de rééducation filmé chez le kinésithérapeute, de face. \
-            Tu choisis uniquement parmi les candidats donnés, d'après les mesures et les images. \
+            Tu choisis uniquement parmi les candidats donnés. Regarde d'abord les images (position du corps, \
+            jambe ou bras qui bouge, chaise), puis les mesures pour confirmer ; les bras peuvent bouger pendant \
+            un exercice de jambes. \
             Si aucun ne correspond vraiment, réponds nonReconnu. Ne devine pas.
             Exemples :
             - « hauteur des hanches 0,5→1,0, genoux, plan sagittal, debout avec descente, les deux côtés » sans chaise \
             → squat ; avec une chaise derrière le patient → sit-to-stand.
             - « hauteur du poignet, épaule, plan frontal, un côté » bras écarté sur le côté → shoulder-abduction ; \
             bras levé en diagonale, vers l'avant → scaption.
-            - « hauteur du genou, genou plié, un côté » → hurdle-step ; jambe tendue → leg-raise.
+            - Jambe levée devant, un côté : « genou le plus plié » sous 120° (genou plié) → hurdle-step ; \
+            au-dessus de 120° (jambe tendue) → leg-raise.
             """)
         let list = candidates.map { "- \($0.id) (\($0.name)) : \($0.summary)" }.joined(separator: "\n")
         let text = """

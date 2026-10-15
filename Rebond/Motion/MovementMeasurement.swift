@@ -305,7 +305,13 @@ nonisolated struct MovementMeasurement: Codable, Sendable, Equatable {
     /// A compact summary, e.g. « genou (côté actif) 95°→170°, hauteur des hanches 1,1→2,0, plan sagittal, debout,
     /// 3 répétitions, 2,1 s par répétition ».
     var summary: String {
-        let parts = mainChannels.map { channel -> String in
+        // The hips going down first: the surest sign seen from the front, before the arms' movements.
+        var channels = mainChannels
+        if position == .mixed {
+            channels.removeAll { $0 == .hipsHeight }
+            channels.insert(.hipsHeight, at: 0)
+        }
+        let parts = channels.map { channel -> String in
             let side = Channel.activeSide.contains(channel) && self.side != .both ? " (\(sideName))" : ""
             let format = channel.isAngle ? "%.0f°→%.0f°" : "%.1f→%.1f"
             return channel.label + side + " " + String(format: format, low[channel.rawValue], high[channel.rawValue])
@@ -320,7 +326,11 @@ nonisolated struct MovementMeasurement: Codable, Sendable, Equatable {
         case .seated: "assis"
         case .mixed: "debout, avec descente"
         }
-        return (parts + [planeName, positionName, "\(repetitions) répétition(s)",
+        // For the legs, how bent the knee gets: a knee raise bends it, a straight-leg raise doesn't.
+        let legs: [Channel] = [.activeKnee, .activeHip, .activeAnkleHeight, .activeKneeHeight, .hipsHeight]
+        let knee = channels.contains(where: legs.contains)
+            ? [String(format: "genou le plus plié : %.0f°", low[Channel.activeKnee.rawValue])] : []
+        return (parts + knee + [planeName, positionName, "\(repetitions) répétition(s)",
                          String(format: "%.1f s par répétition", repDuration)]).joined(separator: ", ")
     }
 

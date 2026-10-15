@@ -65,8 +65,15 @@ nonisolated struct ExerciseRecognizer: Sendable {
 
     /// The candidates, from both preselections: their ranks added up, the nearest first.
     func preselect(_ measurement: MovementMeasurement) -> [Preselection.Candidate] {
-        let preselection = Preselection(catalog: catalog)
-        let all = catalog.signatures.count
+        // The hips going down (or not) is the surest thing seen from the front: only the exercises that do the same.
+        var narrowed = catalog
+        let lowering = measurement.position == .mixed
+        narrowed.signatures.removeAll { ($0.position == .mixed) != lowering }
+        let kept = Set(narrowed.signatures.map(\.id))
+        narrowed.examples.removeAll { !kept.contains($0.exercise) }
+        if narrowed.signatures.isEmpty { narrowed = catalog }
+        let preselection = Preselection(catalog: narrowed)
+        let all = narrowed.signatures.count
         let byNeighbors = preselection.byNeighbors(measurement, count: all)
         let byCentroid = preselection.byCentroid(measurement, count: all)
         func rank(_ list: [Preselection.Candidate], _ id: String) -> Int { list.firstIndex { $0.id == id } ?? all }
@@ -127,9 +134,15 @@ nonisolated enum SignatureCheck {
         if s.position != .standing, m.position == .standing, s.mainChannels.contains(.hipsHeight) {
             return "les hanches ne descendent pas"
         }
-        if !s.usesBothSides, m.side == .both, s.mainChannels.contains(where: MovementMeasurement.Channel.activeSide.contains),
-           movesBothArmsOrLegsEqually(m) {
-            return "les deux côtés bougent"
+        // One side or both: not checked, patients often do one side then the other.
+        // Standing on one leg, the other knee bent or kept straight: a knee raise bends it (below 125°), a
+        // straight-leg raise keeps it straight (above 110°). Not for squats and lunges, where the knee bending
+        // toward the camera looks straighter than it is.
+        if s.position == .standing, region(of: s).contains(.activeKnee) {
+            let usual = s.low[MovementMeasurement.Channel.activeKnee.rawValue].p50
+            let measured = m.low[MovementMeasurement.Channel.activeKnee.rawValue]
+            if usual < 110, measured > 125 { return "le genou ne se plie pas assez" }
+            if usual >= 130, measured < 110 { return "le genou se plie" }
         }
         for channel in MovementMeasurement.Channel.allCases {
             let expected = s.range(channel)
@@ -171,16 +184,6 @@ nonisolated enum SignatureCheck {
         return region
     }
 
-    /// Both arms (or both legs) moving as much as each other.
-    private static func movesBothArmsOrLegsEqually(_ m: MovementMeasurement) -> Bool {
-        let pairs: [(MovementMeasurement.Channel, MovementMeasurement.Channel)] = [
-            (.activeShoulder, .otherShoulder), (.activeWristHeight, .otherWristHeight), (.activeKnee, .otherKnee),
-        ]
-        return pairs.contains { a, b in
-            let ra = m.range(a) / a.scale, rb = m.range(b) / b.scale
-            return ra > 0.5 && rb > ra * 0.75
-        }
-    }
 }
 
 /// A descriptive name for a movement outside the catalog, built from what was measured: « Flexion du genou droit,
