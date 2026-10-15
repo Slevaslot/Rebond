@@ -76,18 +76,17 @@ private struct FreeExercisePicker: View {
     }
 }
 
-/// One exercise, Fitness style: symbol and play button on top, the name in large type, then two buttons that
-/// act in the card itself: show the movement, and choose the goal the play button starts with.
+/// One exercise, Fitness style and nothing more: symbol and play button, the name in large type, what the
+/// play button starts. Tapping the card shows the movement in it.
 private struct ExerciseStartCard: View {
     let exercise: CatalogExercise
     let onStart: (_ sets: Int, _ reps: Int) -> Void
 
-    @State private var sets = 1
-    @State private var reps = 10
     @State private var showsMovement = false
+    private let reps = 10
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top) {
                 Image(systemName: exercise.symbol)
                     .font(.system(size: 44))
@@ -95,7 +94,7 @@ private struct ExerciseStartCard: View {
                     .frame(height: 56, alignment: .topLeading)
                     .accessibilityHidden(true)
                 Spacer()
-                Button { onStart(sets, reps) } label: {
+                Button { onStart(1, reps) } label: {
                     Image(systemName: "play.fill")
                         .font(.title2.weight(.bold))
                         .foregroundStyle(.black)
@@ -103,61 +102,31 @@ private struct ExerciseStartCard: View {
                         .background(Color.accentColor, in: .circle)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(Text("Commencer : \(exercise.name), \(sets) × \(reps)"))
+                .accessibilityLabel(Text("Commencer : \(exercise.name)"))
             }
-            Text(exercise.name)
-                .font(.title.bold())
-                .fixedSize(horizontal: false, vertical: true)
-
+            VStack(alignment: .leading, spacing: 4) {
+                Text(exercise.name)
+                    .font(.title.bold())
+                    .fixedSize(horizontal: false, vertical: true)
+                Label("^[\(reps) répétition](inflect: true) · suivi caméra", systemImage: "camera.viewfinder")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
             if showsMovement {
                 MovementCard(catalog: exercise, symbol: exercise.symbol, height: 220)
+                    .padding(.top, 4)
                     .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
-            }
-
-            HStack(spacing: 12) {
-                Button {
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { showsMovement.toggle() }
-                } label: {
-                    Label("Mouvement", systemImage: showsMovement ? "chevron.up" : "play.rectangle")
-                        .cardButtonLabel(selected: showsMovement)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(Text(showsMovement ? "Masquer le mouvement" : "Voir le mouvement"))
-
-                // The goal, chosen in place: the play button starts with it.
-                Menu {
-                    Picker("Séries", selection: $sets) {
-                        ForEach(1...5, id: \.self) { Text("^[\($0) série](inflect: true)").tag($0) }
-                    }
-                    Picker("Répétitions", selection: $reps) {
-                        ForEach([5, 8, 10, 12, 15, 20], id: \.self) { Text("^[\($0) répétition](inflect: true)").tag($0) }
-                    }
-                } label: {
-                    HStack(spacing: 6) {
-                        Text("Objectif")
-                        Text("\(sets) × \(reps)")
-                            .monospacedDigit()
-                            .foregroundStyle(.primary)
-                        Image(systemName: "chevron.up.chevron.down")
-                            .font(.caption.weight(.bold))
-                    }
-                    .cardButtonLabel(selected: false)
-                }
-                .accessibilityLabel(Text("Objectif : \(sets) séries de \(reps) répétitions"))
             }
         }
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.accentColor.opacity(0.14), in: .rect(cornerRadius: 30))
-    }
-}
-
-private extension View {
-    func cardButtonLabel(selected: Bool) -> some View {
-        font(.headline)
-            .foregroundStyle(selected ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.secondary))
-            .frame(maxWidth: .infinity, minHeight: 52)
-            .background(Color.accentColor.opacity(selected ? 0.25 : 0.12), in: .rect(cornerRadius: 18))
-            .contentShape(.rect(cornerRadius: 18))
+        .contentShape(.rect(cornerRadius: 30))
+        .onTapGesture {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { showsMovement.toggle() }
+        }
+        .accessibilityAction(named: showsMovement ? Text("Masquer le mouvement") : Text("Voir le mouvement")) {
+            showsMovement.toggle()
+        }
     }
 }
