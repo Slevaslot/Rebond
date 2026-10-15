@@ -291,7 +291,7 @@ struct ExerciseBadge: View {
 
 /// The patient's initials, or a person symbol, as Health's profile button:
 /// a soft gradient disc inside a Liquid Glass ring.
-private struct ProfileBadge: View {
+struct ProfileBadge: View {
     let name: String
 
     private var initials: String {

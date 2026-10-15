@@ -10,8 +10,10 @@ struct ProgramTab: View {
     @Query(sort: \Session.date, order: .reverse) private var sessions: [Session]
     @AppStorage(ProgramChange.prescriberKey) private var prescriberName = ""
     @AppStorage(ProgramChange.prescribedAtKey) private var prescribedAt: Double = 0
+    @AppStorage(PatientIdentity.nameKey) private var patientName = ""
     @State private var editing: EditableProgram?
     @State private var savedEdit = 0
+    @State private var showingSettings = false
 
     var body: some View {
         NavigationStack {
@@ -38,6 +40,9 @@ struct ProgramTab: View {
                 }
             }
             .sensoryFeedback(.success, trigger: savedEdit)
+            .sheet(isPresented: $showingSettings) {
+                SettingsView()
+            }
         }
     }
 
@@ -48,6 +53,14 @@ struct ProgramTab: View {
                 .accessibilityAddTraits(.isHeader)
             Spacer()
             AddProgramMenu()
+            // The profile stays in the same place on every tab.
+            Button {
+                showingSettings = true
+            } label: {
+                ProfileBadge(name: patientName)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Réglages")
         }
         .padding(.top, 8)
         .padding(.bottom, 4)
