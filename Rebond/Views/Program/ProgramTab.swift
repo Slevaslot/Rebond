@@ -145,8 +145,8 @@ private struct ProgramRow: View {
                     .font(.headline)
                     .multilineTextAlignment(.leading)
                 Text(program.days.isEmpty
-                     ? String(localized: "Sans jour · ^[\(program.exercises.count) exercice](inflect: true)")
-                     : "\(Self.shortDays(program.days)) · \(String(localized: "^[\(program.exercises.count) exercice](inflect: true)"))")
+                     ? String.inflected("Sans jour · ^[\(program.exercises.count) exercice](inflect: true)")
+                     : "\(Self.shortDays(program.days)) · \(String.inflected("^[\(program.exercises.count) exercice](inflect: true)"))")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
