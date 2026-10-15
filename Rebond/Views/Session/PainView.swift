@@ -1,5 +1,6 @@
 import SwiftData
 import SwiftUI
+import TipKit
 
 /// End of session: pain level from 0 to 10. From 7, a calm message, never blocking.
 struct PainView: View {
@@ -91,6 +92,10 @@ struct WorkoutSummaryView: View {
     @AppStorage(PhoneHealth.offeredKey) private var hasOfferedHealth = false
     @Query(sort: \Program.createdAt, order: .reverse) private var programs: [Program]
     private let health = PhoneHealth.shared
+    private let watch = PhoneWatchLink.shared
+    private let watchAppTip = WatchAppTip()
+    /// Shown when the summary opens: answering an offer doesn't make the tip appear under the patient's finger.
+    @State private var offersSomething = true
 
     var body: some View {
         List {
@@ -109,7 +114,16 @@ struct WorkoutSummaryView: View {
                 }
                 LabeledContent("Douleur", value: "\(session.pain) / 10")
             }
-            if !remindersEnabled, !hasOfferedReminders {
+            // A paired Apple Watch without Rebond: one suggestion at a time, so only when nothing else is offered.
+            if watch.isWatchPaired, !watch.isWatchAppInstalled, !offersSomething {
+                Section {
+                    // The tip is its own card: no list row around it.
+                    TipView(watchAppTip)
+                        .listRowInsets(EdgeInsets())
+                        .listRowBackground(Color.clear)
+                }
+            }
+            if offersReminders {
                 Section {
                     Label("Recevoir un rappel les jours de séance ?", systemImage: "bell.badge")
                     Button("Activer les rappels") {
@@ -126,6 +140,7 @@ struct WorkoutSummaryView: View {
         }
         .navigationTitle("Résumé")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear { offersSomething = offersReminders || offersHealth }
         .safeAreaBar(edge: .bottom) {
             Button(action: onDone) {
                 Text("Terminer")
@@ -140,6 +155,16 @@ struct WorkoutSummaryView: View {
 }
 
 extension WorkoutSummaryView {
+    private var offersReminders: Bool {
+        !remindersEnabled && !hasOfferedReminders
+    }
+
+    /// One offer at a time: the reminders first, Health at a later session.
+    private var offersHealth: Bool {
+        health.lastRecording == .none && PhoneHealth.isAvailable && !health.isEnabled && !hasOfferedHealth
+            && (remindersEnabled || hasOfferedReminders)
+    }
+
     /// Where the workout went in Health, or the offer to save the sessions there (once).
     @ViewBuilder
     private var healthSection: some View {
@@ -158,7 +183,7 @@ extension WorkoutSummaryView {
             }
         case .none:
             // One offer at a time: the reminders first, Health at a later session.
-            if PhoneHealth.isAvailable, !health.isEnabled, !hasOfferedHealth, remindersEnabled || hasOfferedReminders {
+            if offersHealth {
                 Section {
                     Label("Ajouter vos séances à l'app Santé ?", systemImage: "heart.text.square")
                     Button("Enregistrer dans Santé") {

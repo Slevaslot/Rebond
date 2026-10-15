@@ -1,5 +1,6 @@
 import HealthKit
 import Observation
+import TipKit
 import WatchConnectivity
 
 /// The iPhone's side of the Apple Watch link (WatchConnectivity): sends the set in progress to the watch, and
@@ -22,6 +23,8 @@ final class PhoneWatchLink: NSObject {
     /// The watch records the current session's workout in Health.
     private(set) var watchRecordsWorkout = false
     private(set) var isWatchAppInstalled = false
+    /// An Apple Watch is paired with this iPhone, with or without Rebond on it.
+    private(set) var isWatchPaired = false
 
     @ObservationIgnored private var lastSet: WatchSetState?
     @ObservationIgnored private var pendingContext: WidgetSnapshot?
@@ -111,6 +114,8 @@ final class PhoneWatchLink: NSObject {
 
     private func didActivate() {
         isWatchAppInstalled = session?.isWatchAppInstalled ?? false
+        isWatchPaired = session?.isPaired ?? false
+        if isWatchAppInstalled { WatchAppTip().invalidate(reason: .actionPerformed) }
         if let pendingContext { updateContext(pendingContext) }
     }
 }

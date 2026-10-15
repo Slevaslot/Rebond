@@ -1,5 +1,6 @@
 import SwiftData
 import SwiftUI
+import TipKit
 
 /// A full session, full screen: placement help, every set of the program, the pain level, then a summary.
 struct WorkoutView: View {
@@ -260,6 +261,7 @@ struct WorkoutView: View {
         saved = true
         PhoneHealth.shared.record(start: start, end: .now, watchRecorded: watch.watchRecordsWorkout)
         watch.sessionEnded(saved: true)
+        SiriPauseTip.sessionSaved.sendDonation()
         stage = .summary(session)
     }
 }

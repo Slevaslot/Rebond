@@ -1,5 +1,6 @@
 import AVFoundation
 import SwiftUI
+import TipKit
 
 /// Guided session: camera feed with the skeleton, repetition counter, depth gauge and corrections on top.
 struct SessionView: View {
@@ -28,6 +29,9 @@ struct SessionView: View {
     /// Long enough to breathe and walk back, short enough not to have to touch the phone.
     private static let restDuration = 20
     @State private var placement = GuidePlacement.notVisible
+    /// Paused with the button on screen: the patient walked back to the phone, the moment for the Siri tip.
+    @State private var pausedOnScreen = false
+    private let siriPauseTip = SiriPauseTip()
     @ScaledMetric private var ringSize = 64
     /// The model's card during the set: fixed, in the middle of the left edge.
     @ScaledMetric private var cardWidth = 110
@@ -150,7 +154,10 @@ struct SessionView: View {
         }
         .overlay(alignment: .bottom) {
             // While paused, only the top bar and the pause button remain.
-            if !motion.isPaused, !explainingCamera {
+            if showsSiriPauseTip {
+                TipView(siriPauseTip)
+                    .padding()
+            } else if !motion.isPaused, !explainingCamera {
                 VStack(spacing: 16) {
                     if let feedback = motion.feedback {
                         feedbackBanner(feedback)
@@ -196,6 +203,7 @@ struct SessionView: View {
                 if motion.phase != .finished, !motion.cameraUnavailable, !explainingCamera {
                     Button(motion.isPaused ? "Reprendre" : "Pause",
                            systemImage: motion.isPaused ? "play.fill" : "pause.fill") {
+                        pausedOnScreen = !motion.isPaused
                         motion.togglePause()
                     }
                 }
@@ -240,7 +248,10 @@ struct SessionView: View {
         .onDisappear { motion.stop() }
         .onChange(of: motion.repCount + motion.incompleteCount) { reportSetActivity() }
         .onChange(of: motion.repCount) { WorkoutLiveActivity.shared.update(count: motion.repCount) }
-        .onChange(of: motion.isPaused) { WorkoutLiveActivity.shared.setPaused(motion.isPaused) }
+        .onChange(of: motion.isPaused) {
+            WorkoutLiveActivity.shared.setPaused(motion.isPaused)
+            if !motion.isPaused { pausedOnScreen = false }
+        }
         .sensoryFeedback(.success, trigger: motion.repCount)
         .sensoryFeedback(.warning, trigger: motion.incompleteCount)
         .animation(.default, value: motion.phase)
@@ -285,6 +296,12 @@ struct SessionView: View {
         .padding()
         .glassEffect(in: .rect(cornerRadius: 28))
         .accessibilityElement(children: .combine)
+    }
+
+    /// Paused by touch during the set, without the Apple Watch: Siri would have spared the walk back.
+    /// Never during the placement or the calibration.
+    private var showsSiriPauseTip: Bool {
+        motion.phase == .active && motion.isPaused && pausedOnScreen && !PhoneWatchLink.shared.watchRecordsWorkout
     }
 
     /// The last set of an exercise done on its own: the patient decides whether to do another one.

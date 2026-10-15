@@ -81,6 +81,7 @@ Prévoir des données de démo (un programme et quelques séances pré-remplies)
 | Abonnement kiné | StoreKit 2 (`SubscriptionStoreView`, codes d'offre) |
 | Prescription par QR code | Core Image (QR), lien `rebond://programme` |
 | Intégration système | App Intents (Siri, Raccourcis, Spotlight, Centre de contrôle), WidgetKit, ActivityKit (Live Activity interactive) |
+| Astuces (commandes mains libres) | TipKit |
 | Apple Watch | SwiftUI pour watchOS, WatchConnectivity, WatchKit (haptique, Double Tap), WidgetKit (complications, Smart Stack) |
 | Enregistrement des séances | HealthKit (`HKWorkoutSession` sur la montre, `HKWorkoutBuilder` sur l'iPhone) |
 | Traductions | String Catalogs (`Localizable.xcstrings`) |

@@ -1,10 +1,14 @@
 import SwiftUI
+import TipKit
 
 /// The set in progress, read at a glance during the movement: the count in a ring, the set, the heart rate,
 /// and the two actions the patient can do without walking back to the iPhone.
 struct SetView: View {
     @Environment(WatchModel.self) private var model
     let set: WatchSetState
+    private let doubleTapTip = DoubleTapTip()
+    /// The tip can still be shown (TipKit): it then takes the place of the set's line.
+    @State private var doubleTapTipAvailable = false
 
     var body: some View {
         VStack(spacing: 4) {
@@ -43,17 +47,16 @@ struct SetView: View {
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(accessibilityCount)
 
-            Group {
-                if set.isSetComplete {
-                    Text("Série terminée !")
-                } else if let side = set.side {
-                    Text("Série \(set.set) sur \(set.totalSets) · \(side)")
-                } else {
-                    Text("Série \(set.set) sur \(set.totalSets)")
-                }
+            if showsDoubleTapTip, doubleTapTipAvailable {
+                TipView(doubleTapTip)
+            } else {
+                setLine
             }
-            .font(.footnote.weight(.semibold))
-            .foregroundStyle(set.isSetComplete ? .green : .secondary)
+        }
+        .task {
+            for await status in doubleTapTip.statusUpdates {
+                doubleTapTipAvailable = status == .available
+            }
         }
         .navigationTitle {
             Label(set.exercise, systemImage: set.symbol)
@@ -81,6 +84,27 @@ struct SetView: View {
             }
         }
         .disabled(!model.isPhoneReachable)
+    }
+
+    private var setLine: some View {
+        Group {
+            if set.isSetComplete {
+                Text("Série terminée !")
+            } else if let side = set.side {
+                Text("Série \(set.set) sur \(set.totalSets) · \(side)")
+            } else {
+                Text("Série \(set.set) sur \(set.totalSets)")
+            }
+        }
+        .font(.footnote.weight(.semibold))
+        .foregroundStyle(set.isSetComplete ? .green : .secondary)
+    }
+
+    /// The iPhone counts (placement and calibration are over) and the set can be paused: the moment to learn
+    /// Double Tap.
+    private var showsDoubleTapTip: Bool {
+        let set = self.set
+        return set.canPause && !set.isPaused && !set.isSetComplete && set.count >= 2
     }
 
     private var pauseTitle: LocalizedStringKey {

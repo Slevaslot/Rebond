@@ -102,6 +102,7 @@ Règles pendant la série :
 - **Confiance** : quand Vision voit mal le corps, on n'affiche ni compteur qui bouge ni correction ; on dit « Je ne vous vois plus en entier » et on montre la silhouette.
 - **Pause à distance** : paume ouverte levée environ 0,6 s. Toujours doublée par le bouton à l'écran.
 - **Aucune commande physique détournée** : pas de boutons de volume, pas de commandes AirPods (HIG *Playing audio* : ne pas détourner les contrôles audio ; App Review 2.5.9).
+- **Astuces (TipKit)** : les commandes mains libres se découvrent au bon moment, une astuce à la fois, jamais pendant le placement ou le calibrage (voir « Astuces »).
 - **Haptique** : inutile sur l'iPhone pendant la série (téléphone posé) ; c'est la montre qui tapote (voir « Apple Watch »). Sur l'iPhone, seulement dans l'interface tenue en main (sélecteur de douleur, enregistrement réussi), avec les retours système.
 
 ### Voix du coach (HIG *Playing audio*, *Writing*)
@@ -154,7 +155,7 @@ La montre sert le moment de l'exercice : le patient ne revient pas au téléphon
 - **Ouverture automatique** : au lancement d'une séance sur l'iPhone, l'app de la montre s'ouvre seule (`startWatchApp`) et démarre un entraînement. Aucune manipulation.
 - **Hors séance** : « Séance du jour » (nombre d'exercices, durée), jauge de la semaine, « Lancez la séance sur votre iPhone : votre montre suivra vos séries ».
 - **Pendant la série** : nom de l'exercice, compteur dans un anneau (« 4 sur 10 », ou « 12 sur 30 s » pour un maintien), « Série 2 sur 3 », fréquence cardiaque en haut à droite. En bas, **Pause / Reprendre** (« Commencer » avant le départ d'un maintien) et **Série suivante**. Pas de bouton pause pour le comptage manuel.
-- **Double Tap** (pincer deux fois) appuie sur le bouton principal : pause, ou série suivante quand la série est terminée ou n'a pas de pause.
+- **Double Tap** (pincer deux fois) appuie sur le bouton principal : pause, ou série suivante quand la série est terminée ou n'a pas de pause. L'astuce « Pincez deux fois pour mettre en pause » l'apprend (voir « Astuces »).
 - **Haptique**, une seule à la fois, la plus importante : un tapotement à chaque répétition (toutes les 10 s pour un maintien), « succès » à l'objectif atteint, « stop » à la pause, « départ » à la reprise, une notification à chaque nouvelle série.
 - **Placement, douleur** : « Placez-vous devant l'iPhone », puis « Séries terminées ! Indiquez votre douleur sur l'iPhone ».
 - **Fin** : « Séance terminée, bravo ! », durée, cœur moyen, calories si mesurées, « Enregistrée dans Santé ». Une séance abandonnée sur l'iPhone n'est pas enregistrée.
@@ -168,6 +169,18 @@ La montre sert le moment de l'exercice : le patient ne revient pas au téléphon
 - **Widgets** « Séance du jour » et « Régularité », qui ouvrent directement la séance.
 - **Santé** : l'offre « Ajouter vos séances à l'app Santé ? » apparaît une fois en fin de séance (après celle des rappels, jamais les deux en même temps), et un interrupteur « Enregistrer dans Santé » est dans Réglages. Le résumé indique « Enregistrée dans Santé » ou « … par votre Apple Watch ». L'autorisation n'est jamais demandée au lancement.
 - Siri AI n'est pas disponible dans l'UE avec iOS 27 : les phrases sont de simples App Shortcuts, aussi proposés dans Spotlight et Raccourcis ; aucune fonctionnalité ne repose sur Siri AI.
+
+## Astuces (HIG *Offering help*, TipKit)
+
+Trois astuces seulement, pour les commandes qu'on ne devine pas. Chacune a son écran et son moment : **jamais plus d'une à la fois**, jamais pendant le placement ou le calibrage, jamais par-dessus une offre (rappels, Santé). Titre court, message d'une phrase, vouvoiement ; la croix les ferme pour de bon.
+
+| Astuce | Où, quand | Texte |
+|---|---|---|
+| Siri | Série en cours (caméra ou maintien), quand le patient revient au téléphone mettre en pause avec le bouton, à partir de sa deuxième séance, sans montre qui suit la séance. Une fois. | « Mettez en pause à la voix » · « Dites « Dis Siri, pause dans Rebond » pour mettre en pause sans revenir au téléphone. » |
+| Apple Watch | Résumé de fin de séance, si une montre est jumelée sans l'app Rebond et qu'aucune offre n'est affichée. Deux fois au plus ; disparaît dès que l'app est installée. | « Suivez vos séries sur votre Apple Watch » · « Installez Rebond sur votre montre depuis l'app Watch : la série s'affiche à votre poignet, qui tapote à chaque répétition. » |
+| Double Tap (montre) | Écran de la série, dès que l'iPhone compte (2 répétitions ou 2 secondes), tant que la série peut être mise en pause. Remplace la ligne « Série 1 sur 3 ». Une fois. | « Pincez deux fois pour mettre en pause » (titre seul : la série doit rester lisible) |
+
+Une pause demandée par Siri ou la Live Activity retire l'astuce Siri : le patient a trouvé.
 
 ## Traduction
 

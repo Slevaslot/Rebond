@@ -1,11 +1,16 @@
 import HealthKit
 import SwiftUI
+import TipKit
 import WatchKit
 
 /// Rebond on the Apple Watch: the set in progress on the wrist while the iPhone counts with its camera.
 @main
 struct RebondWatchApp: App {
     @WKApplicationDelegateAdaptor private var delegate: WatchAppDelegate
+
+    init() {
+        WatchTips.configure()
+    }
 
     var body: some Scene {
         WindowGroup {
