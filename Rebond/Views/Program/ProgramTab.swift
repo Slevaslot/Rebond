@@ -66,25 +66,28 @@ struct ProgramTab: View {
                 .padding(.horizontal, 4)
         }
         ForEach(list) { program in
-            HStack(spacing: 10) {
+            let color = ProgramPalette.color(of: program, in: programs)
+            NavigationLink(value: program) {
+                ProgramCard(program: program, color: color)
+            }
+            .buttonStyle(.plain)
+            // The check sits in the card, in front of the name, over the link: tapping it only selects.
+            .overlay(alignment: .topLeading) {
                 Button {
                     withAnimation(.snappy) { program.isActive.toggle() }
                 } label: {
                     Image(systemName: program.isActive ? "checkmark.circle.fill" : "circle")
-                        .font(.title)
-                        .foregroundStyle(program.isActive ? AnyShapeStyle(ProgramPalette.color(of: program, in: programs)) : AnyShapeStyle(.tertiary))
+                        .font(.title2)
+                        .foregroundStyle(program.isActive ? AnyShapeStyle(color) : AnyShapeStyle(.secondary))
                         .frame(width: 44, height: 44)
+                        .contentShape(.rect)
                         .contentTransition(.symbolEffect(.replace))
                 }
                 .buttonStyle(.plain)
+                .padding(.leading, 4)
+                .padding(.top, 4)
                 .accessibilityLabel(Text(program.isActive ? "Ne plus suivre \(program.title)" : "Suivre \(program.title)"))
                 .sensoryFeedback(.selection, trigger: program.isActive)
-
-                NavigationLink(value: program) {
-                    ProgramCard(program: program, color: ProgramPalette.color(of: program, in: programs))
-                        .opacity(program.isActive ? 1 : 0.6)
-                }
-                .buttonStyle(.plain)
             }
         }
     }
@@ -177,20 +180,27 @@ private struct DayColumn: View {
             Text(Calendar.current.veryShortWeekdaySymbols[weekday - 1])
                 .font(.caption.weight(isToday ? .bold : .medium))
                 .foregroundStyle(isToday ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.secondary))
-            VStack(spacing: 3) {
+            ZStack {
                 if planned.isEmpty {
-                    Circle().fill(Color(.systemGray4)).frame(width: 5, height: 5).frame(height: 22)
+                    Circle().fill(Color(.systemGray4)).frame(width: 6, height: 6)
                 } else {
-                    ForEach(planned) { program in
-                        Capsule()
-                            .fill(ProgramPalette.color(of: program, in: programs))
-                            .frame(width: 22, height: planned.count > 1 ? 10 : 22)
+                    // One color per program planned that day, side by side in the same disc.
+                    HStack(spacing: 0) {
+                        ForEach(planned) { program in
+                            ProgramPalette.color(of: program, in: programs)
+                        }
                     }
+                    .frame(width: 26, height: 26)
+                    .clipShape(.circle)
                 }
             }
+            .frame(width: 26, height: 26)
+            // Today: a ring around the day, the same whether something is planned or not.
+            .padding(3)
+            .overlay {
+                if isToday { Circle().strokeBorder(Color.accentColor, lineWidth: 2) }
+            }
         }
-        .padding(.vertical, 6)
-        .background(isToday ? Color.accentColor.opacity(0.12) : .clear, in: .rect(cornerRadius: 12))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(Calendar.current.weekdaySymbols[weekday - 1]))
         .accessibilityValue(planned.isEmpty
@@ -207,7 +217,8 @@ private struct ProgramCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
-                Circle().fill(color).frame(width: 10, height: 10)
+                // Room for the check drawn over the card.
+                Color.clear.frame(width: 26, height: 1)
                 Text(program.title)
                     .font(.headline)
                     .foregroundStyle(.primary)
@@ -241,6 +252,8 @@ private struct ProgramCard: View {
                     .foregroundStyle(.secondary)
             }
         }
+        // A program not followed stays readable but steps back.
+        .opacity(program.isActive ? 1 : 0.55)
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 26))

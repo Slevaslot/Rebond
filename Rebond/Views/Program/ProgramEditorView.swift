@@ -56,17 +56,21 @@ struct ProgramEditorView: View {
             }
 
             Section {
-                TextField("Nom (facultatif)", text: $program.name, prompt: Text("Ex. : Genou, Dos…"))
+                TextField("Nom (facultatif)", text: $program.name, prompt: Text(program.suggestedName))
+            } header: {
+                Text("Nom")
             } footer: {
-                Text("Sans nom, le programme porte le nom de votre kiné ou sa date.")
+                if program.name.trimmingCharacters(in: .whitespaces).isEmpty {
+                    Text("Laissez vide pour l'appeler « \(program.suggestedName) ».")
+                }
             }
 
             Section {
                 ForEach($program.exercises) { $exercise in
                     NavigationLink {
-                        ExerciseEditorView(exercise: $exercise)
+                        ExerciseEditorView(exercise: $exercise, defaultName: program.displayName(of: exercise))
                     } label: {
-                        ExerciseDraftRow(exercise: exercise)
+                        ExerciseDraftRow(exercise: exercise, name: program.displayName(of: exercise))
                     }
                 }
                 .onDelete { program.exercises.remove(atOffsets: $0) }
@@ -96,7 +100,7 @@ struct ProgramEditorView: View {
         }
         .navigationDestination(item: $addedExercise) { id in
             if let index = program.exercises.firstIndex(where: { $0.id == id }) {
-                ExerciseEditorView(exercise: $program.exercises[index])
+                ExerciseEditorView(exercise: $program.exercises[index], defaultName: program.displayName(of: program.exercises[index]))
             }
         }
         .sheet(isPresented: $showingPhoto) {
@@ -122,12 +126,13 @@ struct ProgramEditorView: View {
 /// One exercise in the editor's list: its name, what to do, and a mark when something must be checked.
 private struct ExerciseDraftRow: View {
     let exercise: EditableProgram.Exercise
+    /// Its name, or the one it will get.
+    let name: String
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(exercise.name.isEmpty ? String(localized: "Nouvel exercice") : exercise.name)
+            Text(name)
                 .font(.headline)
-                .foregroundStyle(exercise.name.isEmpty ? .secondary : .primary)
             Group {
                 if exercise.mode == .hold {
                     Text("\(exercise.sets) × \(exercise.holdSeconds) s")
@@ -160,13 +165,16 @@ private struct ExerciseDraftRow: View {
 }
 
 /// One exercise: its name, repetitions or a held position, how the camera follows it, sets and amount.
+/// The exercise is picked from the list (the name comes with it); a name is only needed for another exercise,
+/// and even then it is optional.
 private struct ExerciseEditorView: View {
     @Binding var exercise: EditableProgram.Exercise
+    /// The name it gets when left empty, shown as the field's hint.
+    let defaultName: String
 
     var body: some View {
         Form {
             Section {
-                TextField("Nom de l'exercice", text: $exercise.name)
                 Picker("Type", selection: $exercise.mode) {
                     Text("Répétitions").tag(EditableProgram.Mode.reps)
                     Text("Maintien").tag(EditableProgram.Mode.hold)
@@ -176,14 +184,25 @@ private struct ExerciseEditorView: View {
 
             if exercise.mode == .reps {
                 Section {
-                    Picker("Suivi", selection: $exercise.catalogID) {
+                    Picker("Exercice", selection: $exercise.catalogID) {
                         ForEach(CatalogExercise.all) { catalog in
-                            Text(catalog.name).tag(Optional(catalog.id))
+                            Label { Text(catalog.name) } icon: { Image(systemName: catalog.symbol) }
+                                .tag(Optional(catalog.id))
                         }
-                        Text("Comptage manuel").tag(String?.none)
+                        Label("Autre exercice (comptage manuel)", systemImage: "hand.tap")
+                            .tag(String?.none)
                     }
+                    .pickerStyle(.navigationLink)
                 } footer: {
-                    Text("La caméra compte les répétitions des exercices qu'elle connaît.")
+                    Text("La caméra compte les répétitions des exercices de cette liste.")
+                }
+            }
+
+            Section {
+                TextField("Nom (facultatif)", text: $exercise.name, prompt: Text(defaultName))
+            } footer: {
+                if exercise.name.trimmingCharacters(in: .whitespaces).isEmpty {
+                    Text("Laissez vide pour garder « \(defaultName) ».")
                 }
             }
 
@@ -211,7 +230,7 @@ private struct ExerciseEditorView: View {
                 }
             }
         }
-        .navigationTitle(exercise.name.isEmpty ? String(localized: "Nouvel exercice") : exercise.name)
+        .navigationTitle(defaultName)
         .navigationBarTitleDisplayMode(.inline)
     }
 }

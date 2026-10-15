@@ -448,15 +448,23 @@ extension PlannedExercise {
     var figureSymbol: String {
         if let catalogExercise { return catalogExercise.symbol }
         let name = self.name.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+        // The workout symbols closest to the movement (checked one by one against the exercises).
         let symbols: [(words: [String], symbol: String)] = [
             (["gainage", "planche", "plank", "abdo"], "figure.core.training"),
-            (["etirement", "stretch", "souplesse"], "figure.flexibility"),
-            (["escalier", "step"], "figure.stairs"),
+            (["pont", "bassin", "bridge"], "figure.pilates"),
+            (["etirement", "stretch", "souplesse"], "figure.cooldown"),
+            (["fente", "lunge"], "figure.strengthtraining.functional"),
+            (["squat", "flexion"], "figure.cross.training"),
+            (["assis", "chaise"], "chair.fill"),
+            (["escalier", "step", "marche d"], "figure.stairs"),
             (["velo", "pedal"], "figure.indoor.cycle"),
             (["marche", "walk"], "figure.walk"),
-            (["equilibre", "unipodal", "balance"], "figure.stand"),
+            (["equilibre", "unipodal", "balance"], "figure.yoga"),
             (["respiration", "relaxation"], "figure.mind.and.body"),
-            (["bras", "epaule", "coude", "poignet"], "figure.arms.open"),
+            (["genou"], "figure.highintensity.intervaltraining"),
+            (["jambe"], "figure.kickboxing"),
+            (["rotation"], "figure.taichi"),
+            (["bras", "epaule", "coude", "poignet"], "figure.mixed.cardio"),
         ]
         if let match = symbols.first(where: { entry in entry.words.contains { name.contains($0) } }) {
             return match.symbol

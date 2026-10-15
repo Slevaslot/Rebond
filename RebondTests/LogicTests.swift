@@ -119,13 +119,18 @@ struct ProgramTests {
         #expect(ReminderScheduler.sessionDays(count: 14).count == 7)
     }
 
-    @Test func editableProgramNeedsNamedExercises() {
+    @Test func exercisesNeedNoName() {
         var program = EditableProgram()
         #expect(!program.isValid)
-        program.exercises = [.init(name: "  ", catalogID: nil, sets: 3, reps: 10)]
-        #expect(!program.isValid)
-        program.exercises[0].name = "Pont fessier"
+        program.exercises = [
+            .init(name: "  ", catalogID: nil, sets: 3, reps: 10),
+            .init(name: "", catalogID: "squat", sets: 3, reps: 10),
+        ]
         #expect(program.isValid)
+        #expect(program.displayName(of: program.exercises[0]) == "Exercice 1")
+        #expect(program.displayName(of: program.exercises[1]) == "Squat")
+        program.exercises[0].name = "Pont fessier"
+        #expect(program.displayName(of: program.exercises[0]) == "Pont fessier")
         #expect(!program.hasGuesses)
     }
 }

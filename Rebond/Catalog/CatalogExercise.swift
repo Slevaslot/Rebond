@@ -87,7 +87,7 @@ nonisolated extension CatalogExercise {
     static let squat = CatalogExercise(
         id: "squat",
         name: "Squat",
-        symbol: "figure.strengthtraining.functional",
+        symbol: "figure.cross.training",
         // Partial squat: Rebond is for rehabilitation, often for older patients (half squats reach 0.6–0.85).
         analysis: .squat(targetDepth: 0.6),
         highlightedJoints: [.leftHip, .leftKnee, .leftAnkle, .rightHip, .rightKnee, .rightAnkle],
@@ -117,7 +117,7 @@ nonisolated extension CatalogExercise {
     static let lateralRaise = CatalogExercise(
         id: "lateral-raise",
         name: "Élévation latérale des bras",
-        symbol: "figure.arms.open",
+        symbol: "figure.mixed.cardio",
         // Shoulder height is 90°: slightly below, as rehabilitation programs usually ask.
         analysis: .armRaise(targetAngle: 80),
         highlightedJoints: [.leftShoulder, .leftElbow, .leftWrist, .rightShoulder, .rightElbow, .rightWrist],
@@ -136,7 +136,7 @@ nonisolated extension CatalogExercise {
     static let shoulderAbduction = CatalogExercise(
         id: "shoulder-abduction",
         name: "Élévation latérale d'un bras",
-        symbol: "figure.arms.open",
+        symbol: "figure.wave",
         // Above shoulder height but well short of the full 180°: a partial range, as for the squat.
         // UI-PRMD shoulder abductions (one arm, front view): 99% of correct ones counted, 53% of incorrect ones
         // (range too small, torso leaning to the side).
@@ -159,7 +159,7 @@ nonisolated extension CatalogExercise {
     static let scaption = CatalogExercise(
         id: "scaption",
         name: "Élévation des bras en diagonale",
-        symbol: "figure.arms.open",
+        symbol: "figure.mixed.cardio",
         // Shoulder height, as rehabilitation programs usually ask. UI-PRMD scaptions (one arm, front view):
         // 100% of correct ones counted, 41% of incorrect ones (range too small, torso leaning to the side).
         analysis: .oneArmRaise(targetAngle: 90),
@@ -181,7 +181,7 @@ nonisolated extension CatalogExercise {
     static let sitToStand = CatalogExercise(
         id: "sit-to-stand",
         name: "Assis-debout",
-        symbol: "figure.stand",
+        symbol: "chair.fill",
         // Getting up from a chair raises the hips by about 0.8–0.9 torso lengths: 0.6 is standing up,
         // even from a high seat. UI-PRMD sit-to-stands (front view): 100% of correct ones counted,
         // 51% of incorrect ones (torso leaning to one side, chest thrown forward).
@@ -212,7 +212,7 @@ nonisolated extension CatalogExercise {
     static let legRaise = CatalogExercise(
         id: "leg-raise",
         name: "Élévation de la jambe tendue",
-        symbol: "figure.walk",
+        symbol: "figure.kickboxing",
         // Seen from hip height, 0.3 is the thigh at about 55°. UI-PRMD straight leg raises (front view, phone at
         // 2–3 m): 100% of correct ones counted, 68% of incorrect ones (standing leg bending, torso leaning).
         analysis: .legRaise(targetLift: 0.3),
@@ -235,7 +235,7 @@ nonisolated extension CatalogExercise {
     static let hurdleStep = CatalogExercise(
         id: "hurdle-step",
         name: "Montée de genou",
-        symbol: "figure.step.training",
+        symbol: "figure.highintensity.intervaltraining",
         // 0.45 is the thigh at about 60° seen from hip height, short of level: a partial range for older patients.
         // UI-PRMD hurdle steps (front view, phone at 2–3 m): 94% of correct ones counted, 41% of incorrect ones
         // (knee not high enough, standing leg bending, torso leaning).
@@ -287,7 +287,7 @@ nonisolated extension CatalogExercise {
     static let sideLunge = CatalogExercise(
         id: "side-lunge",
         name: "Fente latérale",
-        symbol: "figure.strengthtraining.functional",
+        symbol: "figure.flexibility",
         // UI-PRMD side lunges shift the hips 0.38–0.77 torso lengths. At 0.4 (front view, phone at 2–3 m):
         // 98% of correct ones counted, 43% of incorrect ones (torso leaning to the side, knee not bent).
         analysis: .sideLunge(targetShift: 0.4),
@@ -316,7 +316,7 @@ nonisolated extension CatalogExercise {
     static let shoulderRotation = CatalogExercise(
         id: "shoulder-rotation",
         name: "Rotation de l'épaule",
-        symbol: "figure.arms.open",
+        symbol: "figure.taichi",
         // 0.6 is the forearm about two thirds of the way from upright to level. UI-PRMD internal-external rotations
         // (front view, phone at 2–3 m): all correct ones counted, 42% of incorrect ones (elbow dropping,
         // torso leaning, range too small).

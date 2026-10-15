@@ -61,3 +61,51 @@ extension Array where Element == Program {
         scheduled(on: date).first ?? next(after: date)?.program ?? active.first ?? first
     }
 }
+
+/// A name for a program the patient didn't name, from what it works on: "Jambes", "Épaules et dos"…
+nonisolated enum ProgramNaming {
+    enum Area: CaseIterable {
+        case legs, shoulders, trunk, flexibility
+
+        var name: String {
+            switch self {
+            case .legs: String(localized: "Jambes")
+            case .shoulders: String(localized: "Épaules")
+            case .trunk: String(localized: "Dos")
+            case .flexibility: String(localized: "Souplesse")
+            }
+        }
+    }
+
+    static func area(name: String, catalogID: String?) -> Area? {
+        switch catalogID {
+        case "squat", "sit-to-stand", "leg-raise", "hurdle-step", "forward-lunge", "side-lunge": return .legs
+        case "lateral-raise", "shoulder-abduction", "scaption", "shoulder-rotation": return .shoulders
+        default: break
+        }
+        let name = name.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+        let words: [(Area, [String])] = [
+            (.flexibility, ["etirement", "stretch", "souplesse"]),
+            (.trunk, ["gainage", "planche", "pont", "bassin", "dos", "abdo", "lombaire"]),
+            (.shoulders, ["epaule", "bras", "coude", "poignet", "cervical"]),
+            (.legs, ["squat", "fente", "genou", "jambe", "hanche", "cheville", "mollet", "assis", "marche", "escalier", "equilibre"]),
+        ]
+        return words.first { _, keys in keys.contains { name.contains($0) } }?.0
+    }
+
+    /// The one or two areas most worked on, or "Mon programme".
+    static func suggestedName(for exercises: [(name: String, catalogID: String?)]) -> String {
+        var counts: [Area: Int] = [:]
+        for exercise in exercises {
+            if let area = area(name: exercise.name, catalogID: exercise.catalogID) { counts[area, default: 0] += 1 }
+        }
+        let top = Area.allCases.filter { counts[$0] != nil }.sorted { counts[$0]! > counts[$1]! }.prefix(2)
+        switch top.count {
+        case 0: return String(localized: "Mon programme")
+        case 1: return top[0].name
+        default:
+            let second = top[1].name
+            return String(localized: "\(top[0].name) et \(second.prefix(1).lowercased() + second.dropFirst())")
+        }
+    }
+}

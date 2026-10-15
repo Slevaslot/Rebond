@@ -83,8 +83,25 @@ nonisolated struct EditableProgram {
         }
     }
 
+    /// No name to type: an unnamed exercise takes the name of the camera exercise chosen, or a number.
     var isValid: Bool {
-        !weekdays.isEmpty && !exercises.isEmpty && exercises.allSatisfy { !$0.name.trimmingCharacters(in: .whitespaces).isEmpty }
+        !weekdays.isEmpty && !exercises.isEmpty
+    }
+
+    /// The program's name when the patient leaves it empty.
+    var suggestedName: String {
+        ProgramNaming.suggestedName(for: exercises.map { (displayName(of: $0), $0.mode == .reps ? $0.catalogID : nil) })
+    }
+
+    /// The exercise's name, or the one it gets when left empty.
+    func displayName(of exercise: Exercise) -> String {
+        let name = exercise.name.trimmingCharacters(in: .whitespaces)
+        if !name.isEmpty { return name }
+        if exercise.mode == .reps, let catalog = exercise.catalogID.flatMap(CatalogExercise.find) {
+            return String(localized: catalog.name)
+        }
+        let number = (exercises.firstIndex { $0.id == exercise.id } ?? exercises.count) + 1
+        return exercise.mode == .hold ? String(localized: "Maintien \(number)") : String(localized: "Exercice \(number)")
     }
 
     var hasGuesses: Bool {
@@ -124,7 +141,7 @@ extension Program {
         editable.exercises.enumerated().map { index, exercise in
             PlannedExercise(
                 catalogID: exercise.mode == .reps ? exercise.catalogID : nil,
-                name: exercise.name.trimmingCharacters(in: .whitespaces),
+                name: editable.displayName(of: exercise),
                 sets: exercise.sets,
                 reps: exercise.reps,
                 holdSeconds: exercise.mode == .hold ? exercise.holdSeconds : nil,

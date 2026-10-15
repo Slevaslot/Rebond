@@ -37,7 +37,7 @@ nonisolated struct ProgramTransfer: Codable, Equatable, Sendable {
         let title = program.name.trimmingCharacters(in: .whitespaces)
         t = title.isEmpty ? nil : title
         e = program.exercises.map {
-            Exercise(n: $0.name, c: $0.mode == .reps ? $0.catalogID : nil, s: $0.sets, r: $0.reps, h: $0.mode == .hold ? $0.holdSeconds : nil)
+            Exercise(n: program.displayName(of: $0), c: $0.mode == .reps ? $0.catalogID : nil, s: $0.sets, r: $0.reps, h: $0.mode == .hold ? $0.holdSeconds : nil)
         }
         let name = physiotherapist?.trimmingCharacters(in: .whitespaces)
         k = name?.isEmpty == false ? name : nil

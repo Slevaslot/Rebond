@@ -38,12 +38,11 @@ final class Program {
         days.contains(Calendar.current.component(.weekday, from: date))
     }
 
-    /// Its name, or one made up so the patient never has to type it.
+    /// Its name, or one made from what it works on ("Jambes", "Épaules et dos"), so nothing has to be typed.
     var title: String {
         let trimmed = name.trimmingCharacters(in: .whitespaces)
         if !trimmed.isEmpty { return trimmed }
-        if let prescriber, !prescriber.isEmpty { return String(localized: "Programme de \(prescriber)") }
-        return String(localized: "Programme du \(createdAt.formatted(.dateTime.day().month(.wide)))")
+        return ProgramNaming.suggestedName(for: orderedExercises.map { ($0.name, $0.catalogID) })
     }
 
     var orderedExercises: [PlannedExercise] {
