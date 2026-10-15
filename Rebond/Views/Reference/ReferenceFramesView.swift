@@ -28,7 +28,7 @@ struct ReferenceFramesView: View {
         .task(id: movement.id) {
             let id = movement.id, count = movement.frameCount
             frames = await Task.detached(priority: .userInitiated) {
-                (0..<count).compactMap { UIImage(contentsOfFile: ReferenceStore.frameURL(id, $0).path()) }
+                (0..<count).compactMap { UIImage(contentsOfFile: ReferenceStore.frameURL(id, $0).path(percentEncoded: false)) }
             }.value
         }
         .accessibilityElement()
