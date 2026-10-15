@@ -16,16 +16,37 @@ final class AppRouter {
         case physio
     }
 
-    /// Ways to add a séance: the physiotherapist's videos (picked in Photos or filmed), their message or sheet
-    /// (scanned or picked from the photos), or exercises picked in the list.
+    /// Ways to fill a séance from the physiotherapist: their message, or their sheet scanned or picked from the
+    /// photos. Picking exercises by hand is the new séance flow.
     enum ImportSource {
-        case videos
-        case film
         case message
         case scan
         case photo
-        /// Exercises picked in the list (or typed).
+        /// Exercises picked by hand: the new séance flow.
         case manual
+    }
+
+    /// What is being created: an exercise of "Mes exercices", or a séance (with exercises already picked).
+    enum Creation: Identifiable {
+        case exercise
+        case session(preselected: [String])
+
+        var id: String {
+            switch self {
+            case .exercise: "exercise"
+            case .session(let preselected): "session-\(preselected.joined(separator: ","))"
+            }
+        }
+    }
+
+    var creation: Creation?
+
+    func newExercise() {
+        creation = .exercise
+    }
+
+    func newSession(with exercises: [String] = []) {
+        creation = .session(preselected: exercises)
     }
 
     /// The physiotherapist space is the first tab shown at launch while it is turned on.
@@ -65,6 +86,10 @@ final class AppRouter {
     }
 
     func addProgram(from source: ImportSource) {
+        if source == .manual {
+            newSession()
+            return
+        }
         // Without the document scanner (simulator), pick a photo of the sheet instead.
         importSource = source == .scan && !DocumentScanner.isAvailable ? .photo : source
     }

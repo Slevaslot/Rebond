@@ -9,6 +9,7 @@ struct RootView: View {
     @Environment(AppRouter.self) private var router
     @Environment(\.modelContext) private var context
     @Environment(ProStore.self) private var store
+    @Environment(ExerciseLibrary.self) private var library
     @Query(sort: \Program.createdAt, order: .reverse) private var programs: [Program]
     @AppStorage(AppRole.key) private var role = AppRole.patient.rawValue
 
@@ -17,7 +18,7 @@ struct RootView: View {
         enum Content {
             case message
             case photo(UIImage)
-            case program(EditableProgram, notice: LocalizedStringKey?, start: ProgramEditorView.Start? = nil)
+            case program(EditableProgram, notice: LocalizedStringKey?)
         }
         let id = UUID()
         let content: Content
@@ -25,9 +26,6 @@ struct RootView: View {
 
     @State private var draft: Draft?
     @State private var pickedPhoto: PhotosPickerItem?
-    /// Videos just filmed, waiting for the camera to close to open their new séance.
-    @State private var filmed: [URL] = []
-    @State private var pickedVideos: [PhotosPickerItem] = []
     @State private var savedProgram = 0
     /// Set while the program being reviewed comes from the physiotherapist.
     @State private var prescriber: String?
@@ -48,7 +46,7 @@ struct RootView: View {
             }
             // Without a program, Accueil already offers to add one: a second tab would be the same page.
             // "Exercices": the programs, and single exercises to do on their own.
-            if !programs.isEmpty {
+            if !programs.isEmpty || !library.movements.isEmpty {
                 Tab("Exercices", systemImage: "figure.mixed.cardio", value: .program) {
                     ProgramTab()
                 }
@@ -62,7 +60,7 @@ struct RootView: View {
         .tabBarMinimizeBehavior(.never)
         // The last program deleted: its tab goes away, back to Accueil.
         .onChange(of: programs.isEmpty) {
-            if programs.isEmpty, router.tab == .program { router.tab = .today }
+            if programs.isEmpty, library.movements.isEmpty, router.tab == .program { router.tab = .today }
         }
         // Turning the space off from Réglages leaves its tab.
         .onChange(of: role) {
@@ -88,29 +86,23 @@ struct RootView: View {
             }
             .ignoresSafeArea()
         }
-        .fullScreenCover(isPresented: Binding(
-            get: { router.importSource == .film },
-            set: { if !$0 { router.importSource = nil } }
-        ), onDismiss: {
-            // Once the camera is gone: the new séance, its videos being analyzed.
-            guard !filmed.isEmpty else { return }
-            draft = Draft(content: .program(EditableProgram(), notice: nil, start: .recordings(filmed)))
-            filmed = []
-        }) {
-            RecordMovementView { filmed = $0 }
-        }
-        .photosPicker(
-            isPresented: Binding(
-                get: { router.importSource == .videos },
-                set: { if !$0 { router.importSource = nil } }
-            ),
-            selection: $pickedVideos,
-            matching: .videos
-        )
-        .onChange(of: pickedVideos) {
-            guard !pickedVideos.isEmpty else { return }
-            draft = Draft(content: .program(EditableProgram(), notice: nil, start: .videos(pickedVideos)))
-            pickedVideos = []
+        .sheet(item: $router.creation) { creation in
+            switch creation {
+            case .exercise:
+                NewExerciseView { _ in }
+            case .session(let preselected):
+                NewSessionFlow(preselected: preselected) { source in
+                    // The physiotherapist's sheet or message fills the séance instead.
+                    router.creation = nil
+                    Task {
+                        try? await Task.sleep(for: .seconds(0.5))
+                        router.addProgram(from: source)
+                    }
+                } onSave: { program in
+                    router.creation = nil
+                    save(program)
+                }
+            }
         }
         .photosPicker(
             isPresented: Binding(
@@ -121,10 +113,7 @@ struct RootView: View {
             matching: .images
         )
         .onChange(of: router.importSource) {
-            if router.importSource == .manual {
-                router.importSource = nil
-                draft = Draft(content: .program(EditableProgram(), notice: nil, start: .chooseExercise))
-            } else if router.importSource == .message {
+            if router.importSource == .message {
                 router.importSource = nil
                 draft = Draft(content: .message)
             }
@@ -145,8 +134,8 @@ struct RootView: View {
                     MessageReadingView(onSave: save)
                 case .photo(let image):
                     SheetReadingView(photo: image, onSave: save)
-                case .program(let program, let notice, let start):
-                    ProgramEditorView(program: program, notice: notice, start: start, onSave: save)
+                case .program(let program, let notice):
+                    ProgramEditorView(program: program, notice: notice, onSave: save)
                 }
             }
             .interactiveDismissDisabled()

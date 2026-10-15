@@ -26,6 +26,9 @@ struct TodayView: View {
                 }
             }
             .navigationTitle("Accueil")
+            .navigationDestination(for: LibraryRoute.self) { route in
+                LibraryExerciseView(id: route.id)
+            }
             // Fitness-style top bar: the large title and the profile on the same line, in the page.
             .toolbarVisibility(.hidden, for: .navigationBar)
             .sheet(isPresented: $showingSettings) {

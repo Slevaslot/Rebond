@@ -53,6 +53,15 @@ nonisolated enum ReferenceStore {
         try? save(movement)
     }
 
+    /// Puts a new video and what was learned from it in place of an exercise's, which keeps its identifier and name.
+    static func replace(_ id: UUID, with new: ReferenceMovement) {
+        guard let old = load(id) else { return }
+        try? FileManager.default.removeItem(at: folder(id))
+        try? FileManager.default.moveItem(at: folder(new.id), to: folder(id))
+        cache.withLock { $0[new.id] = nil }
+        try? save(new.with(id: id, name: old.name))
+    }
+
     static func delete(_ id: UUID) {
         try? FileManager.default.removeItem(at: folder(id))
         cache.withLock { $0[id] = nil }
@@ -157,6 +166,14 @@ nonisolated enum ReferenceStore {
 }
 
 nonisolated extension ReferenceMovement {
+    /// The same movement under another identifier and name.
+    func with(id: UUID, name: String) -> ReferenceMovement {
+        ReferenceMovement(id: id, name: name, createdAt: createdAt, axis: axis, target: target, template: template,
+                          minDuration: minDuration, repCount: repCount, highlightedJoints: highlightedJoints,
+                          recognizedID: recognizedID, rest: rest, restPose: restPose, targetPose: targetPose,
+                          frameCount: frameCount, peakFrame: peakFrame)
+    }
+
     /// The filmed movement as an exercise of the catalog: the session, the counter and the guide use it like
     /// any other.
     var catalogExercise: CatalogExercise {
