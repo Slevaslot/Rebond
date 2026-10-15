@@ -18,13 +18,9 @@ struct TodayView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if !programs.isEmpty {
-                    today
-                } else {
-                    NoProgramView { header }
-                }
-            }
+            // Without a program the page stays the Accueil page: no program card, an exercise to do now,
+            // and the follow-up once something was done. Adding the program is the Programme tab's job.
+            today
             .navigationTitle("Accueil")
             // Fitness-style top bar: the large title and the profile on the same line, in the page.
             .toolbarVisibility(.hidden, for: .navigationBar)
@@ -63,7 +59,10 @@ struct TodayView: View {
                 header
                 AlertsGroup(sessions: sessions, onReport: { showingReport = true }, onShowProgram: { router.tab = .program })
 
-                if todays.isEmpty {
+                if programs.isEmpty {
+                    NoProgramYetCard { router.tab = .program }
+                    FreeExerciseCard()
+                } else if todays.isEmpty {
                     RestDayCard(programs: programs)
                 } else {
                     ForEach(todays) { program in
@@ -74,7 +73,9 @@ struct TodayView: View {
                     }
                 }
 
-                FollowUpSection(sessions: sessions, sessionsPerWeek: programs.sessionsPerWeek, week: week)
+                if !programs.isEmpty || !sessions.isEmpty {
+                    FollowUpSection(sessions: sessions, sessionsPerWeek: programs.sessionsPerWeek, week: week)
+                }
             }
             .padding(.horizontal)
             .padding(.bottom)
@@ -253,6 +254,34 @@ private struct SessionCard: View {
             withAnimation { expanded.toggle() }
         }
         .sensoryFeedback(.selection, trigger: expanded)
+    }
+}
+
+/// No program yet: the day's session will appear here once the physiotherapist's program is added.
+private struct NoProgramYetCard: View {
+    let onAdd: () -> Void
+
+    var body: some View {
+        SummaryCard(title: Text("Séance du jour"), systemImage: nil, color: .accentColor, sectionHeader: true) {
+            EmptyView()
+        } content: {
+            VStack(alignment: .leading, spacing: 14) {
+                Label("Pas encore de programme", systemImage: "list.bullet.clipboard")
+                    .font(.title2.bold())
+                Text("Ajoutez celui de votre kiné : votre séance du jour apparaîtra ici.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button(action: onAdd) {
+                    Text("Ajouter mon programme")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.glassProminent)
+                .buttonBorderShape(.capsule)
+                .controlSize(.extraLarge)
+            }
+        }
     }
 }
 
