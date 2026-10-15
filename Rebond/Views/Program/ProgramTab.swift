@@ -109,12 +109,12 @@ struct ProgramTab: View {
             FreeExerciseCard().pageRow()
 
             if programs.active.isEmpty {
-                section("Vos programmes", programs, empty: nil)
+                section("Vos séances", programs, empty: nil)
             } else {
-                section("Programmes suivis", programs.active, empty: nil)
+                section("Séances suivies", programs.active, empty: nil)
                 let others = programs.filter { !$0.isActive }
                 if !others.isEmpty {
-                    section("Autres programmes", others, empty: nil)
+                    section("Autres séances", others, empty: nil)
                 }
             }
 
@@ -266,7 +266,7 @@ private struct ProgramCard: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(program.title))
         .accessibilityValue(Text("\(ProgramSchedule.describe(program.days)), ^[\(program.exercises.count) exercice](inflect: true), \(program.estimatedMinutes) minutes"))
-        .accessibilityHint(Text("Ouvre le programme"))
+        .accessibilityHint(Text("Ouvre la séance"))
     }
 }
 
@@ -307,7 +307,7 @@ struct AddProgramMenu: View {
         } label: {
             HeaderIcon(systemImage: "plus")
         }
-        .accessibilityLabel("Nouveau programme")
+        .accessibilityLabel("Nouvelle séance")
     }
 }
 

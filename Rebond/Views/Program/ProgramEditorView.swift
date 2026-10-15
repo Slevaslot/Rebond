@@ -11,7 +11,7 @@ struct ProgramEditorView: View {
     var notice: LocalizedStringKey?
     /// Symbol of the notice; by default Apple Intelligence for a sheet, the physiotherapist otherwise.
     var noticeSymbol: String?
-    var title: LocalizedStringKey = "Vérifier le programme"
+    var title: LocalizedStringKey = "Vérifier la séance"
     /// Shows a button to Settings under the notice (Apple Intelligence turned off).
     var opensSettings = false
     let onSave: (EditableProgram) -> Void
@@ -19,7 +19,9 @@ struct ProgramEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
     @State private var showingPhoto = false
-    @State private var addedExercise: EditableProgram.Exercise.ID?
+    /// The exercise whose wheels are open.
+    @State private var expanded: EditableProgram.Exercise.ID?
+    @State private var choosingExercise = false
 
     var body: some View {
         List {
@@ -57,24 +59,20 @@ struct ProgramEditorView: View {
 
             Section {
                 ForEach($program.exercises) { $exercise in
-                    NavigationLink {
-                        ExerciseEditorView(exercise: $exercise, defaultName: program.displayName(of: exercise))
-                    } label: {
-                        ExerciseDraftRow(exercise: exercise, name: program.displayName(of: exercise))
+                    ExerciseEditRow(
+                        exercise: $exercise,
+                        name: program.displayName(of: exercise),
+                        isExpanded: expanded == exercise.id
+                    ) {
+                        withAnimation(.snappy) { expanded = expanded == exercise.id ? nil : exercise.id }
                     }
                 }
                 .onDelete { program.exercises.remove(atOffsets: $0) }
                 .onMove { program.exercises.move(fromOffsets: $0, toOffset: $1) }
 
-                Button("Ajouter un exercice", systemImage: "plus") {
-                    let exercise = EditableProgram.Exercise(name: "", catalogID: nil, sets: EditableProgram.defaultSets, reps: EditableProgram.defaultReps)
-                    program.exercises.append(exercise)
-                    addedExercise = exercise.id
-                }
+                Button("Ajouter un exercice", systemImage: "plus") { choosingExercise = true }
             } header: {
                 Text("Exercices")
-            } footer: {
-                Text("Seul votre kiné décide du programme.")
             }
 
             // Already named from what it works on: renaming is possible, never asked for.
@@ -93,9 +91,10 @@ struct ProgramEditorView: View {
                     .disabled(!program.isValid)
             }
         }
-        .navigationDestination(item: $addedExercise) { id in
-            if let index = program.exercises.firstIndex(where: { $0.id == id }) {
-                ExerciseEditorView(exercise: $program.exercises[index], defaultName: program.displayName(of: program.exercises[index]))
+        .sheet(isPresented: $choosingExercise) {
+            ExerciseChooser { exercise in
+                program.exercises.append(exercise)
+                withAnimation(.snappy) { expanded = exercise.id }
             }
         }
         .sheet(isPresented: $showingPhoto) {
@@ -118,111 +117,130 @@ struct ProgramEditorView: View {
     }
 }
 
-/// One exercise in the editor's list: its name, what to do, and a mark when something must be checked.
-private struct ExerciseDraftRow: View {
-    let exercise: EditableProgram.Exercise
+/// One exercise of the program: its symbol, its name, "3 × 10"; tapping it opens the iPhone's wheels
+/// for the sets and the repetitions (or seconds) right in the list.
+private struct ExerciseEditRow: View {
+    @Binding var exercise: EditableProgram.Exercise
     /// Its name, or the one it will get.
     let name: String
+    let isExpanded: Bool
+    let onToggle: () -> Void
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(name)
-                .font(.headline)
-            Group {
-                if exercise.mode == .hold {
-                    Text("\(exercise.sets) × \(exercise.holdSeconds) s")
-                } else {
-                    Text("\(exercise.sets) séries × \(exercise.reps)")
-                }
-            }
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
-            // How the session will follow it: a symbol and a word, as on the Programme page.
-            Group {
-                if exercise.mode == .hold {
-                    Label("Minuteur", systemImage: "timer")
-                } else if exercise.catalogID.flatMap(CatalogExercise.find) != nil {
-                    Label("Suivi caméra", systemImage: "camera.viewfinder")
-                        .foregroundStyle(.tint)
-                } else {
-                    Label("Comptage manuel", systemImage: "hand.tap")
-                }
-            }
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(.secondary)
-            if !exercise.guessed.isEmpty {
-                Label("À vérifier", systemImage: "questionmark.circle.fill")
-                    .font(.caption.bold())
-                    .foregroundStyle(.orange)
-            }
-        }
+    private var symbol: String {
+        if exercise.mode == .hold { return "figure.core.training" }
+        return exercise.catalogID.flatMap(CatalogExercise.find)?.symbol ?? "figure.cooldown"
     }
-}
-
-/// One exercise: its name, repetitions or a held position, how the camera follows it, sets and amount.
-/// The exercise is picked from the list (the name comes with it); a name is only needed for another exercise,
-/// and even then it is optional.
-private struct ExerciseEditorView: View {
-    @Binding var exercise: EditableProgram.Exercise
-    /// The name it gets when left empty, shown as the field's hint.
-    let defaultName: String
 
     var body: some View {
-        Form {
-            Section {
-                Picker("Type", selection: $exercise.mode) {
-                    Text("Répétitions").tag(EditableProgram.Mode.reps)
-                    Text("Maintien").tag(EditableProgram.Mode.hold)
-                }
-                .pickerStyle(.segmented)
-            }
-
-            if exercise.mode == .reps {
-                Section {
-                    Picker("Exercice", selection: $exercise.catalogID) {
-                        ForEach(CatalogExercise.all) { catalog in
-                            Label { Text(catalog.name) } icon: { Image(systemName: catalog.symbol) }
-                                .tag(Optional(catalog.id))
+        VStack(alignment: .leading, spacing: 10) {
+            Button(action: onToggle) {
+                HStack(spacing: 12) {
+                    Image(systemName: symbol)
+                        .font(.title3)
+                        .foregroundStyle(.tint)
+                        .frame(width: 40, height: 40)
+                        .background(Color.accentColor.opacity(0.12), in: .circle)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(name)
+                            .font(.headline)
+                            .foregroundStyle(.primary)
+                        if !exercise.guessed.isEmpty {
+                            Label("À vérifier", systemImage: "questionmark.circle.fill")
+                                .font(.caption.bold())
+                                .foregroundStyle(.orange)
                         }
-                        Label("Autre exercice (comptage manuel)", systemImage: "hand.tap")
-                            .tag(String?.none)
                     }
-                    .pickerStyle(.navigationLink)
-                } footer: {
-                    Text("La caméra compte les répétitions des exercices de cette liste.")
+                    Spacer(minLength: 8)
+                    Text(exercise.mode == .hold ? "\(exercise.sets) × \(exercise.holdSeconds) s" : "\(exercise.sets) × \(exercise.reps)")
+                        .font(.headline)
+                        .monospacedDigit()
+                        .foregroundStyle(.tint)
+                        .contentTransition(.numericText())
                 }
+                .contentShape(.rect)
             }
+            .buttonStyle(.plain)
 
-
-            Section {
-                Stepper(value: $exercise.sets, in: 1...10) {
-                    GuessedValue(guessed: exercise.guessed.contains(.sets)) {
-                        Text("\(exercise.sets) séries")
+            if isExpanded {
+                HStack(spacing: 0) {
+                    wheel("Séries", selection: $exercise.sets, values: Array(1...10)) { "\($0)" }
+                    if exercise.mode == .hold {
+                        wheel("Secondes", selection: $exercise.holdSeconds, values: Array(stride(from: 5, through: 300, by: 5))) { "\($0) s" }
+                    } else {
+                        wheel("Répétitions", selection: $exercise.reps, values: Array(1...50)) { "\($0)" }
                     }
                 }
                 .onChange(of: exercise.sets) { exercise.guessed.remove(.sets) }
-                if exercise.mode == .reps {
-                    Stepper(value: $exercise.reps, in: 1...50) {
-                        GuessedValue(guessed: exercise.guessed.contains(.reps)) {
-                            Text("\(exercise.reps) répétitions")
-                        }
-                    }
-                    .onChange(of: exercise.reps) { exercise.guessed.remove(.reps) }
-                } else {
-                    Stepper(value: $exercise.holdSeconds, in: 5...600, step: 5) {
-                        GuessedValue(guessed: exercise.guessed.contains(.holdSeconds)) {
-                            Text("\(exercise.holdSeconds) secondes")
-                        }
-                    }
-                    .onChange(of: exercise.holdSeconds) { exercise.guessed.remove(.holdSeconds) }
-                }
-            }
-            Section {
-                TextField("Nom", text: $exercise.name, prompt: Text(defaultName))
+                .onChange(of: exercise.reps) { exercise.guessed.remove(.reps) }
+                .onChange(of: exercise.holdSeconds) { exercise.guessed.remove(.holdSeconds) }
+                TextField("Nom", text: $exercise.name, prompt: Text(name))
+                    .textFieldStyle(.roundedBorder)
             }
         }
-        .navigationTitle(defaultName)
-        .navigationBarTitleDisplayMode(.inline)
+        .padding(.vertical, 4)
+    }
+
+    private func wheel(_ title: LocalizedStringKey, selection: Binding<Int>, values: [Int], label: @escaping (Int) -> String) -> some View {
+        VStack(spacing: 0) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            Picker(title, selection: selection) {
+                ForEach(values, id: \.self) { Text(label($0)).tag($0) }
+            }
+            .pickerStyle(.wheel)
+            .frame(height: 130)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+/// Adding an exercise: the ones the camera follows, with their symbols, or another one counted or held.
+private struct ExerciseChooser: View {
+    let onChoose: (EditableProgram.Exercise) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("Suivis par la caméra") {
+                    ForEach(CatalogExercise.all) { catalog in
+                        Button {
+                            choose(EditableProgram.Exercise(name: "", catalogID: catalog.id,
+                                                            sets: EditableProgram.defaultSets, reps: EditableProgram.defaultReps))
+                        } label: {
+                            Label { Text(catalog.name).foregroundStyle(.primary) } icon: { Image(systemName: catalog.symbol) }
+                        }
+                    }
+                }
+                Section("Autres") {
+                    Button {
+                        choose(EditableProgram.Exercise(name: "", catalogID: nil,
+                                                        sets: EditableProgram.defaultSets, reps: EditableProgram.defaultReps))
+                    } label: {
+                        Label { Text("Autre exercice, compté à la main").foregroundStyle(.primary) } icon: { Image(systemName: "hand.tap") }
+                    }
+                    Button {
+                        var exercise = EditableProgram.Exercise(name: "", catalogID: nil, sets: EditableProgram.defaultSets,
+                                                                reps: EditableProgram.defaultReps)
+                        exercise.mode = .hold
+                        choose(exercise)
+                    } label: {
+                        Label { Text("Position tenue (gainage, étirement…)").foregroundStyle(.primary) } icon: { Image(systemName: "timer") }
+                    }
+                }
+            }
+            .navigationTitle("Ajouter un exercice")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                Button("Fermer", systemImage: "xmark", role: .close) { dismiss() }
+            }
+        }
+    }
+
+    private func choose(_ exercise: EditableProgram.Exercise) {
+        onChoose(exercise)
+        dismiss()
     }
 }
 

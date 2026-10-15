@@ -31,7 +31,7 @@ struct AlertsGroup: View {
                     AlertRow(
                         symbol: "list.bullet.clipboard.fill",
                         color: .blue,
-                        title: Text("Nouveau programme"),
+                        title: Text("Nouvelle séance"),
                         detail: changeBy.isEmpty ? Text(Date(timeIntervalSinceReferenceDate: changeDate), format: .dateTime.day().month()) : Text(changeBy),
                         message: Text(changeSummary),
                         action: onShowProgram,
@@ -143,7 +143,7 @@ enum ProgramChange {
 
     /// The change in plain words, short enough for one line: "Squat : plus de répétitions."
     static func describe(from old: EditableProgram?, to new: EditableProgram) -> String {
-        guard let old else { return String(localized: "Un programme de \(new.exercises.count) exercices.") }
+        guard let old else { return String(localized: "Une séance de \(new.exercises.count) exercices.") }
         var changes: [String] = []
         for exercise in new.exercises {
             guard let before = old.exercises.first(where: { $0.name == exercise.name }) else {
@@ -171,7 +171,7 @@ enum ProgramChange {
             changes.append(String(localized: "\(new.sessionsPerWeek) séances par semaine."))
         }
         switch changes.count {
-        case 0: return String(localized: "Votre kiné a vérifié votre programme.")
+        case 0: return String(localized: "Votre kiné a vérifié votre séance.")
         case 1: return changes[0]
         default: return String(localized: "\(changes.count) changements.")
         }

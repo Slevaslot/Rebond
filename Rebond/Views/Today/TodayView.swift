@@ -275,15 +275,15 @@ private struct RestDayCard: View {
         } content: {
             VStack(alignment: .leading, spacing: 14) {
                 if programs.active.isEmpty {
-                    Label("Aucun programme suivi", systemImage: "list.bullet.clipboard")
+                    Label("Aucune séance suivie", systemImage: "list.bullet.clipboard")
                         .font(.title2.bold())
-                    Text("Choisissez le programme à suivre dans Exercices.")
+                    Text("Choisissez la séance à suivre dans Exercices.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                     Button {
                         router.tab = .program
                     } label: {
-                        Text("Choisir un programme")
+                        Text("Choisir une séance")
                             .font(.headline)
                             .frame(maxWidth: .infinity)
                     }

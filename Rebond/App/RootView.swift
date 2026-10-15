@@ -139,9 +139,9 @@ struct RootView: View {
         if let transfer = ProgramTransfer(url: url) {
             prescriber = transfer.k ?? ""
             let notice: LocalizedStringKey = if let name = transfer.k {
-                "Programme prescrit par \(name). Vérifiez-le puis enregistrez-le."
+                "Séance prescrite par \(name). Vérifiez-la puis enregistrez-la."
             } else {
-                "Programme prescrit par votre kiné. Vérifiez-le puis enregistrez-le."
+                "Séance prescrite par votre kiné. Vérifiez-la puis enregistrez-la."
             }
             draft = Draft(content: .program(transfer.editableProgram, notice: notice))
         } else if url.isFileURL {

@@ -101,7 +101,7 @@ nonisolated enum ProgramNaming {
         }
         let top = Area.allCases.filter { counts[$0] != nil }.sorted { counts[$0]! > counts[$1]! }.prefix(2)
         switch top.count {
-        case 0: return String(localized: "Mon programme")
+        case 0: return String(localized: "Ma séance")
         case 1: return top[0].name
         default:
             let second = top[1].name

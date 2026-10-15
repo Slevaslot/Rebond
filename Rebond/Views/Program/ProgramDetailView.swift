@@ -43,7 +43,7 @@ struct ProgramDetailView: View {
                     Button {
                         program.isActive.toggle()
                     } label: {
-                        Label(program.isActive ? "Ne plus suivre ce programme" : "Suivre ce programme",
+                        Label(program.isActive ? "Ne plus suivre cette séance" : "Suivre cette séance",
                               systemImage: program.isActive ? "checkmark.circle.badge.xmark" : "checkmark.circle")
                             .frame(maxWidth: .infinity, minHeight: 50, alignment: .leading)
                             .padding(.horizontal)
@@ -55,7 +55,7 @@ struct ProgramDetailView: View {
                     Button(role: .destructive) {
                         confirmingDelete = true
                     } label: {
-                        Label("Supprimer le programme", systemImage: "trash")
+                        Label("Supprimer la séance", systemImage: "trash")
                             .frame(maxWidth: .infinity, minHeight: 50, alignment: .leading)
                             .padding(.horizontal)
                             .contentShape(.rect)
@@ -83,7 +83,7 @@ struct ProgramDetailView: View {
             }
         }
         .confirmationDialog("Supprimer « \(program.title) » ?", isPresented: $confirmingDelete, titleVisibility: .visible) {
-            Button("Supprimer le programme", role: .destructive) {
+            Button("Supprimer la séance", role: .destructive) {
                 dismiss()
                 context.delete(program)
             }
@@ -92,7 +92,7 @@ struct ProgramDetailView: View {
         }
         .sheet(item: $editing) { item in
             NavigationStack {
-                ProgramEditorView(program: item.program, title: "Modifier le programme") { saved in
+                ProgramEditorView(program: item.program, title: "Modifier la séance") { saved in
                     program.update(with: saved, in: context)
                     editing = nil
                     savedEdit += 1
@@ -122,7 +122,7 @@ struct ProgramDetailView: View {
             Button {
                 router.startWorkout(program)
             } label: {
-                Text("Commencer ce programme")
+                Text("Commencer cette séance")
                     .font(.headline)
                     .frame(maxWidth: .infinity)
             }
