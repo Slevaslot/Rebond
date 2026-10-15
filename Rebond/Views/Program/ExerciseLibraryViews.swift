@@ -10,11 +10,18 @@ struct AddExerciseMenu<Label: View>: View {
     var onAdded: (LibraryExercise) -> Void = { _ in }
     /// Offers the physiotherapist's sheet or message (not while creating a program).
     var offersPhysiotherapist = true
+    /// Once the exercise is saved, asks what next: add it to a program, or create one with it
+    /// (not while creating a program, which ticks it instead).
+    var offersProgram = true
 
     @Environment(AppRouter.self) private var router
     @Environment(\.modelContext) private var context
+    @Query(sort: \Program.createdAt) private var programs: [Program]
     @State private var filming = false
     @State private var choosingRebond = false
+    /// Saved while its sheet is still open; asked about once the sheet is gone.
+    @State private var saved: LibraryExercise?
+    @State private var created: LibraryExercise?
 
     var body: some View {
         Menu {
@@ -30,15 +37,27 @@ struct AddExerciseMenu<Label: View>: View {
         } label: {
             label
         }
-        .sheet(isPresented: $filming) {
+        .sheet(isPresented: $filming, onDismiss: askWhatNext) {
             FilmExerciseView { movement in
                 add(LibraryExercise(catalogID: movement.catalogID, name: movement.name))
             }
         }
-        .sheet(isPresented: $choosingRebond) {
+        .sheet(isPresented: $choosingRebond, onDismiss: askWhatNext) {
             RebondExercisePicker { catalogID, name, holdSeconds in
                 add(LibraryExercise(catalogID: catalogID, name: name, holdSeconds: holdSeconds))
             }
+        }
+        // An exercise alone is not in any session yet: say so, and offer the program right away.
+        .confirmationDialog("« \(created?.name ?? "") » est dans vos exercices.",
+                            isPresented: Binding(get: { created != nil }, set: { if !$0 { created = nil } }),
+                            titleVisibility: .visible, presenting: created) { exercise in
+            ForEach(programs) { program in
+                Button("Ajouter à « \(program.title) »") { exercise.append(to: program) }
+            }
+            Button("Créer un programme avec cet exercice") { router.newProgram(with: [exercise.name]) }
+            Button("Plus tard", role: .cancel) {}
+        } message: { _ in
+            Text("Ajoutez-le à un programme pour qu'il fasse partie de vos séances.")
         }
     }
 
@@ -46,6 +65,12 @@ struct AddExerciseMenu<Label: View>: View {
         context.insert(exercise)
         try? context.save()
         onAdded(exercise)
+        if offersProgram { saved = exercise }
+    }
+
+    private func askWhatNext() {
+        created = saved
+        saved = nil
     }
 }
 
@@ -157,7 +182,7 @@ struct LibraryPickerView: View {
                     Text("Ajouter un exercice")
                 }, onAdded: { exercise in
                     withAnimation(.snappy) { selection.append(exercise.name) }
-                }, offersPhysiotherapist: false)
+                }, offersPhysiotherapist: false, offersProgram: false)
             }
             Section {
                 ForEach(library) { exercise in
@@ -270,7 +295,7 @@ struct LibraryExerciseView: View {
                     Divider().padding(.leading)
                     Menu {
                         ForEach(others) { program in
-                            Button(program.title) { append(to: program) }
+                            Button(program.title) { exercise.append(to: program) }
                         }
                         Button("Nouveau programme") { router.newProgram(with: [exercise.name]) }
                     } label: {
@@ -377,14 +402,6 @@ struct LibraryExerciseView: View {
         }
         .padding()
         .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 26))
-    }
-
-    /// At the end of the program, in 3 × 10.
-    private func append(to program: Program) {
-        let next = (program.exercises.map(\.order).max() ?? -1) + 1
-        program.exercises.append(PlannedExercise(catalogID: exercise.catalogID, name: exercise.name,
-                                                 sets: EditableProgram.defaultSets, reps: EditableProgram.defaultReps,
-                                                 holdSeconds: exercise.holdSeconds, order: next))
     }
 
     private func rename() {

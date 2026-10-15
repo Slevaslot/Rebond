@@ -27,27 +27,37 @@ Deux onglets, plus Kiné si l'espace kiné est activé (HIG *Tab bars* : les ong
 | Onglet | Symbole | Contenu |
 |---|---|---|
 | **Accueil** | `house` | Séance du jour (les exercices de tous les programmes prévus ce jour-là, ou un jour de repos avec la prochaine séance), bouton « Commencer », puis « Suivi » : régularité de la semaine, amplitude, douleur et « Envoyer à mon kiné ». |
-| **Exercices** (dès qu'un programme ou un exercice est enregistré) | `figure.mixed.cardio` | La semaine (une couleur par programme), « Ajouter un exercice », « Mes programmes » et « Créer un programme », « Mes exercices ». |
+| **Exercices** (dès qu'un programme ou un exercice est enregistré) | `figure.mixed.cardio` | La semaine (une couleur par programme), « Créer un exercice », « Mes exercices », puis « Mes programmes » et « Créer un programme ». |
 | **Kiné** (seulement si l'espace kiné est activé) | `stethoscope` | Espace de travail du kiné, voir « Deux rôles ». Onglet affiché au lancement quand il est activé. |
 
-**Vocabulaire côté patient :** un *programme* regroupe des exercices sur des jours de la semaine (le patient peut en avoir plusieurs : le genou lundi, mercredi et vendredi, le dos mardi et jeudi). La *séance* est ce qu'on fait un jour donné : les exercices de tous les programmes de ce jour. *Mes exercices* rassemble les exercices connus du patient (filmés chez le kiné, exercices Rebond, lus sur une feuille).
+### Vocabulaire : l'exercice d'abord
+
+| Mot | Ce que c'est | Où on le crée |
+|---|---|---|
+| **Exercice** | Un mouvement que Rebond sait suivre : filmé (le *mouvement modèle*, l'exercice bien fait une fois) ou un exercice Rebond. C'est par lui que tout commence. « Mes exercices » contient dès le départ les exercices Rebond suivis par la caméra (une seule fois : un exercice supprimé ne revient pas). | « Créer mon exercice » (Accueil vide) ou « Créer un exercice » (onglet Exercices). |
+| **Programme** | Des exercices déjà créés, avec combien (séries × répétitions ou durée) et quels jours. Le patient peut en avoir plusieurs (le genou lundi, mercredi et vendredi, le dos mardi et jeudi). | À la fin de la création d'un exercice, ou d'un coup avec « Créer un programme » : composer moi-même (en piochant dans « Mes exercices »), coller le message du kiné, scanner ou photographier sa feuille. Le QR code du kiné apporte aussi un programme entier. |
+| **Séance** | Ce qu'on fait un jour donné : les exercices de tous les programmes de ce jour. | Jamais : elle découle des programmes. |
+
+- On crée d'abord un exercice. Une fois enregistré, l'app propose la suite : « Ajouter à « … » » pour chaque programme, « Créer un programme avec cet exercice », ou « Plus tard ». Un exercice seul n'est dans aucune séance.
+- « Créer un exercice » ne crée jamais de programme ; « Créer un programme » crée directement un programme entier, sur l'Accueil vide comme dans l'onglet Exercices.
+- **Essayer un exercice** (hors programme) n'est pas une séance : il est enregistré pour l'historique de l'exercice, mais ne compte ni dans la régularité, ni dans le suivi, ni dans le bilan envoyé au kiné (`Session.isTrial`).
 
 ### Sans programme
 
-La fonctionnalité principale : **filmer le mouvement modèle**, l'exercice bien fait une fois (chez le kiné ou ailleurs). Rebond apprend le mouvement sur cette vidéo de référence, puis le suit à la caméra. C'est la seule action mise en avant (HIG *Writing* : une seule suite claire sur un écran vide). Pas d'onglet Exercices tant que rien n'est enregistré : l'Accueil suffit.
+L'onglet Exercices est là dès le départ, avec les exercices Rebond.
 
-1. Carte « Votre programme » : « Filmez le mouvement modèle. » et une phrase qui dit ce que Rebond en fait.
-   - bouton principal **« Filmer le mouvement modèle »** ;
-   - bouton secondaire « Autres façons », un menu : vidéos déjà filmées, puis dans un même groupe composer moi-même, coller le message, scanner la feuille, photo de la feuille ;
-   - « Créer un programme avec mes exercices » si des exercices ont déjà été ajoutés seuls ;
+1. Carte « Pour commencer » : « Créez vos exercices, puis votre programme. » et deux étapes numérotées (filmer l'exercice bien fait, les exercices Rebond étant déjà là ; créer un programme avec ses exercices et ses jours).
+   - bouton principal **« Créer mon exercice »** : filmer ou choisir une vidéo, ou un exercice Rebond ; seule action mise en avant (HIG *Writing* : une seule suite claire sur un écran vide) ;
+   - bouton secondaire **« Créer un programme »**, un menu pour un programme entier d'un coup : composer moi-même, coller le message, scanner la feuille, photo de la feuille ;
    - « Charger le programme de démo », dans les builds de développement seulement.
-2. Carte « Faire un exercice » : essayer tout de suite un exercice suivi par la caméra, sans programme.
+2. Carte « Essayer un exercice » : un exercice suivi par la caméra, tout de suite, hors programme.
 
 Le QR code prescrit depuis l'espace Kiné n'a pas besoin de bouton : le patient le vise avec l'appareil photo de l'iPhone, le lien `rebond://programme` ouvre l'écran de vérification.
 
 ### Avec programme
 
-- « Ajouter un exercice » (onglet Exercices) : filmer ou choisir une vidéo, exercice Rebond, et en raccourci la feuille ou le message du kiné (qui font un programme entier).
+- Onglet Exercices : « Créer un exercice » en premier, « Mes exercices », puis « Mes programmes » et « Créer un programme » (menu : composer moi-même, coller le message, scanner la feuille, photo de la feuille, comme sur l'Accueil vide).
+- Page d'un exercice : le faire maintenant, les programmes qui l'utilisent, « Ajouter à un programme », renommer, supprimer.
 - Réglages (profil, rappels, avertissement médical, espace kiné, données de démo) derrière le bouton profil en haut à droite, pas dans un onglet.
 
 ## Premier lancement (HIG *Launching*, *Onboarding*, *Privacy*)

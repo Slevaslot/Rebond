@@ -40,6 +40,32 @@ final class LibraryExercise {
                         holdSeconds: holdSeconds, order: 0)
     }
 
+    /// Adds it at the end of a program, in 3 × 10 (or 3 × its hold).
+    func append(to program: Program) {
+        let next = (program.exercises.map(\.order).max() ?? -1) + 1
+        program.exercises.append(PlannedExercise(catalogID: catalogID, name: name,
+                                                 sets: EditableProgram.defaultSets, reps: EditableProgram.defaultReps,
+                                                 holdSeconds: holdSeconds, order: next))
+    }
+
+    /// Set once Rebond's exercises were put in "Mes exercices": one the patient deletes doesn't come back.
+    static let defaultsAddedKey = "defaultExercisesAdded"
+
+    /// "Mes exercices" starts with Rebond's exercises followed by the camera, so a program can be made right away.
+    /// Only once (see `defaultsAddedKey`), and without repeating one already there under the same name.
+    static func addDefaults(in context: ModelContext, defaults: UserDefaults = .standard) {
+        guard !defaults.bool(forKey: defaultsAddedKey) else { return }
+        let known = Set(((try? context.fetch(FetchDescriptor<LibraryExercise>())) ?? []).map(\.name))
+        // A second apart, in the catalog's order: the list is sorted by creation date.
+        let start = Date.now
+        for (index, catalog) in CatalogExercise.all.enumerated() {
+            let name = String(localized: catalog.name)
+            guard !known.contains(name) else { continue }
+            context.insert(LibraryExercise(createdAt: start.addingTimeInterval(Double(index)), catalogID: catalog.id, name: name))
+        }
+        defaults.set(true, forKey: defaultsAddedKey)
+    }
+
     /// Adds the exercises of a program that aren't in "Mes exercices" yet (same name).
     static func addMissing(_ exercises: [PlannedExercise], in context: ModelContext) {
         let known = Set(((try? context.fetch(FetchDescriptor<LibraryExercise>())) ?? []).map(\.name))

@@ -1,8 +1,8 @@
 import SwiftData
 import SwiftUI
 
-/// "Exercices": a button to add an exercise, the patient's programs (exercises ticked, with their days), and their
-/// exercises. The day's session gathers the programs planned that day.
+/// "Exercices": the week, creating an exercise, "Mes exercices", then the programs made of them (exercises ticked,
+/// with their days). The day's session gathers the programs planned that day.
 struct ProgramTab: View {
     @Environment(AppRouter.self) private var router
     @Environment(\.modelContext) private var context
@@ -50,48 +50,22 @@ struct ProgramTab: View {
                 WeekPlanCard(programs: programs).pageRow()
             }
 
-            AddExerciseMenu {
-                Text("Ajouter un exercice")
+            // Exercises first: one is created on its own, then added to a program.
+            AddExerciseMenu(label: {
+                Text("Créer un exercice")
                     .font(.headline)
                     .frame(maxWidth: .infinity, alignment: .center)
-            }
+            }, offersPhysiotherapist: false)
             .buttonStyle(.glassProminent)
             .buttonBorderShape(.capsule)
-            .controlSize(.extraLarge)
+            .controlSize(.large)
             // In a list, a menu keeps its label's width: stretch the menu itself, its text centered.
             .frame(maxWidth: .infinity, alignment: .center)
             .pageRow()
 
-            sectionTitle("Mes programmes")
-            ForEach(programs) { program in
-                Button { path.append(program) } label: {
-                    ProgramRow(program: program, color: ProgramPalette.color(of: program, in: programs))
-                }
-                    .buttonStyle(.plain)
-                    .swipeActions(edge: .trailing) {
-                        // No destructive role: with it, the list removes the row itself, then once more when the
-                        // program leaves the query, and the next row (the other program) vanished from the screen.
-                        Button("Supprimer", systemImage: "trash") {
-                            withAnimation { context.delete(program) }
-                        }
-                        .tint(.red)
-                    }
-                    .pageRow()
-            }
-            Button { router.newProgram() } label: {
-                Text("Créer un programme")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.glass)
-            .buttonBorderShape(.capsule)
-            .controlSize(.large)
-            .disabled(library.isEmpty)
-            .pageRow()
-
             sectionTitle("Mes exercices")
             if library.isEmpty {
-                Text("Ajoutez un exercice : filmé chez votre kiné, de Rebond, ou lu sur la feuille de votre kiné.")
+                Text("Filmez l'exercice bien fait, ou choisissez un exercice Rebond.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 4)
@@ -111,6 +85,37 @@ struct ProgramTab: View {
                 .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 22))
                 .pageRow()
             }
+
+            // Then the programs: the patient's exercises, with their days.
+            sectionTitle("Mes programmes")
+            ForEach(programs) { program in
+                Button { path.append(program) } label: {
+                    ProgramRow(program: program, color: ProgramPalette.color(of: program, in: programs))
+                }
+                    .buttonStyle(.plain)
+                    .swipeActions(edge: .trailing) {
+                        // No destructive role: with it, the list removes the row itself, then once more when the
+                        // program leaves the query, and the next row (the other program) vanished from the screen.
+                        Button("Supprimer", systemImage: "trash") {
+                            withAnimation { context.delete(program) }
+                        }
+                        .tint(.red)
+                    }
+                    .pageRow()
+            }
+            // A whole program at once: typed by hand, or the physiotherapist's message or sheet.
+            Menu {
+                OtherProgramWays()
+            } label: {
+                Text("Créer un programme")
+                    .font(.headline)
+                    .frame(maxWidth: .infinity, alignment: .center)
+            }
+            .buttonStyle(.glass)
+            .buttonBorderShape(.capsule)
+            .controlSize(.large)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .pageRow()
         }
         .listStyle(.plain)
         .contentMargins(.top, 0, for: .scrollContent)
@@ -391,10 +396,26 @@ struct AddProgramMenu: View {
     }
 }
 
-/// No program yet, in the same cards as the other pages. The program comes from the physiotherapist: the exercises
-/// are filmed done right once, and Rebond learns each movement from that model (one clear next step, HIG *Writing*). The other ways
-/// (videos already filmed, sheet, message, typed by hand) wait in a menu. Below, one exercise to do right away.
-/// The page's own header stays on top.
+/// The ways to make a whole program at once, in a menu: composed from "Mes exercices", the physiotherapist's message,
+/// their sheet (scanned or photographed).
+struct OtherProgramWays: View {
+    @Environment(AppRouter.self) private var router
+
+    var body: some View {
+        Section {
+            Button("Composer moi-même", systemImage: "square.and.pencil") { router.addProgram(from: .manual) }
+            Button("Coller le message", systemImage: "text.bubble") { router.addProgram(from: .message) }
+            Button("Scanner la feuille", systemImage: "doc.viewfinder") { router.addProgram(from: .scan) }
+            Button("Photo de la feuille", systemImage: "photo") { router.addProgram(from: .photo) }
+        }
+    }
+}
+
+/// No program yet, in the same cards as the other pages. Everything starts with an exercise (one clear next step,
+/// HIG *Writing*): filmed done right (the model movement Rebond learns from); Rebond's are already in "Mes exercices".
+/// Once saved, it is added to a program. "Créer un programme" makes a whole program at once (composed from
+/// "Mes exercices", or the physiotherapist's message or sheet).
+/// Below, an exercise to try right away, outside any program. The page's own header stays on top.
 struct NoProgramView<Header: View>: View {
     @ViewBuilder let header: Header
     @Environment(AppRouter.self) private var router
@@ -408,57 +429,37 @@ struct NoProgramView<Header: View>: View {
             VStack(alignment: .leading, spacing: 14) {
                 header
 
-                SummaryCard(title: Text("Votre programme"), systemImage: "video", color: .accentColor) {
+                SummaryCard(title: Text("Pour commencer"), systemImage: "figure.mixed.cardio", color: .accentColor) {
                     EmptyView()
                 } content: {
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Filmez le mouvement modèle.")
+                        Text("Créez vos exercices, puis votre programme.")
                             .font(.title3.weight(.semibold))
                             .fixedSize(horizontal: false, vertical: true)
-                        Text("Filmez une fois l'exercice bien fait : Rebond s'en sert de référence pour vous guider et compter vos répétitions.")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                        Button { router.addProgram(from: .film) } label: {
-                            Text("Filmer le mouvement modèle")
+                        VStack(alignment: .leading, spacing: 8) {
+                            ProgramStep(number: 1, text: "Filmez l'exercice bien fait : c'est le mouvement modèle. Les exercices Rebond sont déjà là.")
+                            ProgramStep(number: 2, text: "Créez un programme avec vos exercices et vos jours.")
+                        }
+                        AddExerciseMenu(label: {
+                            Text("Créer mon exercice")
                                 .font(.headline)
                                 .frame(maxWidth: .infinity)
-                        }
+                        }, offersPhysiotherapist: false)
                         .buttonStyle(.glassProminent)
                         .buttonBorderShape(.capsule)
                         .controlSize(.large)
                         .padding(.top, 4)
 
                         Menu {
-                            Button("Choisir des vidéos déjà filmées", systemImage: "photo.on.rectangle") {
-                                router.addProgram(from: .videos)
-                            }
-                            Section {
-                                Button("Composer moi-même", systemImage: "square.and.pencil") { router.addProgram(from: .manual) }
-                                Button("Coller le message", systemImage: "text.bubble") { router.addProgram(from: .message) }
-                                Button("Scanner la feuille", systemImage: "doc.viewfinder") { router.addProgram(from: .scan) }
-                                Button("Photo de la feuille", systemImage: "photo") { router.addProgram(from: .photo) }
-                            }
+                            OtherProgramWays()
                         } label: {
-                            Text("Autres façons")
+                            Text("Créer un programme")
                                 .font(.headline)
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.glass)
                         .buttonBorderShape(.capsule)
                         .controlSize(.large)
-
-                        // Exercises already added on their own: they can be grouped into a program.
-                        if !library.isEmpty {
-                            Button { router.newProgram() } label: {
-                                Text("Créer un programme avec mes exercices")
-                                    .font(.headline)
-                                    .frame(maxWidth: .infinity)
-                            }
-                            .buttonStyle(.glass)
-                            .buttonBorderShape(.capsule)
-                            .controlSize(.large)
-                        }
                         #if DEBUG
                         Button("Charger le programme de démo", systemImage: "sparkles") { DemoData.load(into: context) }
                             .font(.footnote)
@@ -476,6 +477,25 @@ struct NoProgramView<Header: View>: View {
                 .ignoresSafeArea()
         }
         .background(Color(.systemGroupedBackground))
+    }
+}
+
+/// One numbered step: "1  Filmez l'exercice bien fait…".
+private struct ProgramStep: View {
+    let number: Int
+    let text: LocalizedStringKey
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Image(systemName: "\(number).circle.fill")
+                .foregroundStyle(.tint)
+                .accessibilityHidden(true)
+            Text(text)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .accessibilityElement(children: .combine)
     }
 }
 

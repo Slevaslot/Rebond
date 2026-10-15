@@ -48,7 +48,7 @@ struct RootView: View {
                     .environment(\.workoutTransition, workoutTransition)
             }
             // Without a program, Accueil already offers to add one: a second tab would be the same page.
-            // "Exercices": the programs, and single exercises to do on their own.
+            // "Exercices": the exercises, and the programs made of them.
             if !programs.isEmpty || !library.isEmpty {
                 Tab("Exercices", systemImage: "figure.mixed.cardio", value: .program) {
                     ProgramTab()
@@ -68,6 +68,7 @@ struct RootView: View {
         // Turning the space off from Réglages leaves its tab.
         // "Mes exercices" also lists the exercises of the programs saved before it existed.
         .task {
+            LibraryExercise.addDefaults(in: context)
             LibraryExercise.addMissing(programs.flatMap(\.orderedExercises), in: context)
             // Following a program or not is gone: a program without days is simply not in the day's session.
             for program in programs where !program.isActive { program.isActive = true }

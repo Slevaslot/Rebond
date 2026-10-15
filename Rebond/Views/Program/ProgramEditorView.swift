@@ -1,4 +1,5 @@
 import PhotosUI
+import SwiftData
 import SwiftUI
 
 /// "Ma séance": the same screen to create a séance, whatever its source (videos from the physiotherapist's,
@@ -458,10 +459,12 @@ private struct ExerciseCard: View {
     }
 }
 
-/// Adding an exercise: the ones the camera follows, with their symbols, or another one counted or held.
+/// Adding an exercise: the patient's own first ("Mes exercices"), then the ones the camera follows, with their symbols,
+/// or another one counted or held.
 struct ExerciseChooser: View {
     let onChoose: (EditableProgram.Exercise) -> Void
     @Environment(\.dismiss) private var dismiss
+    @Query(sort: \LibraryExercise.createdAt) private var library: [LibraryExercise]
     /// An exercise Rebond doesn't know, waiting for its name.
     @State private var naming: EditableProgram.Exercise?
     @State private var name = ""
@@ -470,9 +473,22 @@ struct ExerciseChooser: View {
     var body: some View {
         NavigationStack {
             List {
-                if !filmedMovements.isEmpty {
+                if !library.isEmpty {
+                    Section("Mes exercices") {
+                        ForEach(library) { exercise in
+                            Button {
+                                choose(exercise.editable)
+                            } label: {
+                                Label { Text(exercise.name).foregroundStyle(.primary) } icon: { Image(systemName: exercise.planned.figureSymbol) }
+                            }
+                        }
+                    }
+                }
+                // Filmed movements not in "Mes exercices" (deleted from it): still there to pick.
+                let filmedElsewhere = filmedMovements.filter { movement in !library.contains { $0.name == movement.name } }
+                if !filmedElsewhere.isEmpty {
                 Section("Vos vidéos") {
-                    ForEach(filmedMovements) { movement in
+                    ForEach(filmedElsewhere) { movement in
                         Button {
                             choose(EditableProgram.Exercise(movement))
                         } label: {
