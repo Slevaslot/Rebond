@@ -334,8 +334,22 @@ private struct ReportPainCard: View {
 private struct SentConfirmation: View {
     let outcome: ReportView.Outcome
     @State private var appeared = false
+    @Environment(\.openURL) private var openURL
+
+    /// The Files app: its Recents list shows the report just saved on top, wherever the patient put it.
+    private static let filesApp = URL(string: "shareddocuments://")!
 
     var body: some View {
+        if outcome == .saved {
+            Button { openURL(Self.filesApp) } label: { content(opensFiles: true) }
+                .buttonStyle(.plain)
+                .accessibilityHint("Ouvre l'app Fichiers")
+        } else {
+            content(opensFiles: false)
+        }
+    }
+
+    private func content(opensFiles: Bool) -> some View {
         HStack(spacing: 12) {
             Image(systemName: outcome == .sent ? "checkmark.circle.fill" : "tray.and.arrow.down.fill")
                 .font(.title)
@@ -347,12 +361,19 @@ private struct SentConfirmation: View {
                     .font(.headline)
                 Text(outcome == .sent
                      ? "Votre kiné pourra l'ouvrir dès réception."
-                     : "Pensez à le transmettre à votre kiné.")
+                     : "Pensez à le transmettre à votre kiné. Touchez pour le retrouver dans Fichiers.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
+            if opensFiles {
+                Image(systemName: "folder")
+                    .font(.title3)
+                    .foregroundStyle(.tint)
+                    .accessibilityHidden(true)
+            }
         }
+        .contentShape(.rect)
         .padding(14)
         .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 20))
         .accessibilityElement(children: .combine)
