@@ -1,3 +1,4 @@
+import SwiftData
 import SwiftUI
 
 /// One exercise on its own, outside any program: pick it, choose how many, start.
@@ -38,18 +39,36 @@ struct FreeExerciseCard: View {
     }
 }
 
-/// The exercises the camera follows, as Fitness shows its workouts: one large card each, its symbol in color,
-/// a play button to start, the movement and the goal set right in the card.
+/// Three groups, as Fitness shows its workouts: the movements the patient filmed, Rebond's, then the ones done
+/// without the camera. One large card each, its symbol in color, a play button to start, the movement and the goal
+/// set right in the card.
 private struct FreeExercisePicker: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(AppRouter.self) private var router
+    @Query(sort: \LibraryExercise.createdAt) private var library: [LibraryExercise]
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 14) {
+                VStack(alignment: .leading, spacing: 14) {
+                    let filmed = library.filter { $0.catalogExercise?.reference != nil }
+                    if !filmed.isEmpty {
+                        header("Mes exercices filmés")
+                        ForEach(filmed) { exercise in card(exercise) }
+                    }
+                    header("Exercices Rebond")
                     ForEach(CatalogExercise.all) { exercise in
-                        ExerciseStartCard(exercise: exercise) { sets, reps in start(exercise, sets: sets, reps: reps) }
+                        ExerciseStartCard(name: String(localized: exercise.name), catalog: exercise,
+                                          holdSeconds: nil, symbol: exercise.symbol) { reps in
+                            start(WorkoutExercise(name: String(localized: exercise.name), catalogID: exercise.id,
+                                                  mode: .camera(catalogID: exercise.id), sets: 1, reps: reps))
+                        }
+                    }
+                    // Counted by hand or held: the patient's own, the camera doesn't follow them.
+                    let withoutCamera = library.filter { $0.catalogExercise == nil }
+                    if !withoutCamera.isEmpty {
+                        header("Sans caméra")
+                        ForEach(withoutCamera) { exercise in card(exercise) }
                     }
                 }
                 .padding(.horizontal)
@@ -64,9 +83,21 @@ private struct FreeExercisePicker: View {
         }
     }
 
-    private func start(_ exercise: CatalogExercise, sets: Int, reps: Int) {
-        let workout = WorkoutExercise(name: String(localized: exercise.name), catalogID: exercise.id,
-                                      mode: .camera(catalogID: exercise.id), sets: sets, reps: reps)
+    private func header(_ title: LocalizedStringKey) -> some View {
+        Text(title)
+            .font(.title3.bold())
+            .padding(.top, 10)
+            .accessibilityAddTraits(.isHeader)
+    }
+
+    private func card(_ exercise: LibraryExercise) -> some View {
+        ExerciseStartCard(name: exercise.name, catalog: exercise.catalogExercise, holdSeconds: exercise.holdSeconds,
+                          symbol: exercise.planned.figureSymbol) { reps in
+            start(exercise.workoutExercise(reps: reps))
+        }
+    }
+
+    private func start(_ workout: WorkoutExercise) {
         dismiss()
         // After the sheet is gone: the session covers the whole screen.
         Task {
@@ -79,8 +110,12 @@ private struct FreeExercisePicker: View {
 /// One exercise, Fitness style and nothing more: symbol and play button, the name in large type, what the
 /// play button starts. Tapping the card shows the movement in it.
 private struct ExerciseStartCard: View {
-    let exercise: CatalogExercise
-    let onStart: (_ sets: Int, _ reps: Int) -> Void
+    let name: String
+    /// Followed by the camera: Rebond's or filmed. Nil when counted by hand or held.
+    let catalog: CatalogExercise?
+    let holdSeconds: Int?
+    let symbol: String
+    let onStart: (_ reps: Int) -> Void
 
     @State private var showsMovement = false
     @State private var reps = 10
@@ -89,7 +124,7 @@ private struct ExerciseStartCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top) {
-                Image(systemName: exercise.symbol)
+                Image(systemName: symbol)
                     .contentShape(.rect)
                     .onTapGesture { toggleMovement() }
                     .font(.system(size: 44))
@@ -97,7 +132,7 @@ private struct ExerciseStartCard: View {
                     .frame(height: 56, alignment: .topLeading)
                     .accessibilityHidden(true)
                 Spacer()
-                Button { onStart(1, reps) } label: {
+                Button { onStart(reps) } label: {
                     Image(systemName: "play.fill")
                         .font(.title2.weight(.bold))
                         .foregroundStyle(.black)
@@ -105,34 +140,41 @@ private struct ExerciseStartCard: View {
                         .background(Color.accentColor, in: .circle)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(Text("Commencer : \(exercise.name)"))
+                .accessibilityLabel(Text("Commencer : \(name)"))
             }
             VStack(alignment: .leading, spacing: 4) {
-                Text(exercise.name)
+                Text(name)
                     .font(.title.bold())
                     .fixedSize(horizontal: false, vertical: true)
                     .contentShape(.rect)
                     .onTapGesture { toggleMovement() }
-                // The number of repetitions, on the iPhone's wheel unfolded in the card; the play button starts with it.
-                Button {
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { choosingReps.toggle() }
-                } label: {
-                    HStack(spacing: 6) {
-                        Text("^[\(reps) répétition](inflect: true)")
-                            .monospacedDigit()
-                            .contentTransition(.numericText())
-                        Image(systemName: choosingReps ? "chevron.up" : "chevron.down")
-                            .font(.caption.weight(.bold))
+                if let holdSeconds {
+                    Text("Tenir \(holdSeconds) s")
+                        .font(.headline)
+                        .foregroundStyle(.tint)
+                        .padding(.top, 4)
+                } else {
+                    // The number of repetitions, on the iPhone's wheel unfolded in the card; the play button starts with it.
+                    Button {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { choosingReps.toggle() }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Text("^[\(reps) répétition](inflect: true)")
+                                .monospacedDigit()
+                                .contentTransition(.numericText())
+                            Image(systemName: choosingReps ? "chevron.up" : "chevron.down")
+                                .font(.caption.weight(.bold))
+                        }
+                        .font(.headline)
+                        .foregroundStyle(.tint)
+                        .padding(.horizontal, 14)
+                        .frame(minHeight: 40)
+                        .background(Color.accentColor.opacity(0.15), in: .capsule)
                     }
-                    .font(.headline)
-                    .foregroundStyle(.tint)
-                    .padding(.horizontal, 14)
-                    .frame(minHeight: 40)
-                    .background(Color.accentColor.opacity(0.15), in: .capsule)
+                    .buttonStyle(.plain)
+                    .padding(.top, 4)
+                    .accessibilityLabel(Text("Nombre de répétitions : \(reps)"))
                 }
-                .buttonStyle(.plain)
-                .padding(.top, 4)
-                .accessibilityLabel(Text("Nombre de répétitions : \(reps)"))
             }
             if choosingReps {
                 Picker("Répétitions", selection: $reps) {
@@ -143,7 +185,7 @@ private struct ExerciseStartCard: View {
                 .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
             }
             if showsMovement {
-                MovementCard(catalog: exercise, symbol: exercise.symbol, height: 220)
+                MovementCard(catalog: catalog, symbol: symbol, height: 220)
                     .padding(.top, 4)
                     .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
             }

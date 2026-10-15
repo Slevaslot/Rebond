@@ -42,6 +42,13 @@ final class LibraryExercise {
                         holdSeconds: holdSeconds, order: 0)
     }
 
+    /// To do it right now, on its own: one set of `reps` (or one hold), on both sides when filmed on one.
+    func workoutExercise(reps: Int) -> WorkoutExercise {
+        let exercise = planned.workoutExercise
+        return WorkoutExercise(name: exercise.name, catalogID: exercise.catalogID, mode: exercise.mode, sets: 1,
+                               reps: reps, bothSides: editable.bothSides, firstSide: exercise.firstSide)
+    }
+
     /// Adds it at the end of a program, in 3 × 10 (or 3 × its hold).
     func append(to program: Program) {
         let next = (program.exercises.map(\.order).max() ?? -1) + 1

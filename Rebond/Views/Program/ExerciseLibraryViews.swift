@@ -2,7 +2,7 @@ import SwiftData
 import SwiftUI
 
 /// "Ajouter un exercice": every way to add one to "Mes exercices", in the system's bubble.
-/// Filmed at the physiotherapist's or one of Rebond's joins the list; the physiotherapist's sheet or message makes
+/// Filmed at the physiotherapist's or done without the camera joins the list (Rebond's are already in it); the physiotherapist's sheet or message makes
 /// a program with its exercises.
 struct AddExerciseMenu<Label: View>: View {
     @ViewBuilder let label: Label
@@ -18,7 +18,7 @@ struct AddExerciseMenu<Label: View>: View {
     @Environment(\.modelContext) private var context
     @Query(sort: \Program.createdAt) private var programs: [Program]
     @State private var filming = false
-    @State private var choosingRebond = false
+    @State private var choosingWithoutCamera = false
     /// Saved while its sheet is still open; asked about once the sheet is gone.
     @State private var saved: LibraryExercise?
     @State private var created: LibraryExercise?
@@ -26,7 +26,7 @@ struct AddExerciseMenu<Label: View>: View {
     var body: some View {
         Menu {
             Button("Filmer ou choisir une vidéo", systemImage: "video") { filming = true }
-            Button("Exercice Rebond", systemImage: "figure.mixed.cardio") { choosingRebond = true }
+            Button("Sans caméra", systemImage: "hand.tap") { choosingWithoutCamera = true }
             if offersPhysiotherapist {
                 Section("Feuille ou message du kiné") {
                     Button("Scanner la feuille", systemImage: "doc.viewfinder") { router.addProgram(from: .scan) }
@@ -42,8 +42,8 @@ struct AddExerciseMenu<Label: View>: View {
                 add(LibraryExercise(catalogID: movement.catalogID, name: movement.name))
             }
         }
-        .sheet(isPresented: $choosingRebond, onDismiss: askWhatNext) {
-            RebondExercisePicker { catalogID, name, holdSeconds in
+        .sheet(isPresented: $choosingWithoutCamera, onDismiss: askWhatNext) {
+            WithoutCameraExercisePicker { catalogID, name, holdSeconds in
                 add(LibraryExercise(catalogID: catalogID, name: name, holdSeconds: holdSeconds))
             }
         }
@@ -74,26 +74,24 @@ struct AddExerciseMenu<Label: View>: View {
     }
 }
 
-/// Rebond's exercises, followed by the camera, and the ones done without it (counted by hand, or held).
-struct RebondExercisePicker: View {
+/// An exercise done without the camera (counted by hand, or held). Rebond's exercises are in "Mes exercices" from
+/// the start; only one the patient removed is offered again here.
+struct WithoutCameraExercisePicker: View {
     let onChoose: (_ catalogID: String?, _ name: String, _ holdSeconds: Int?) -> Void
     @Environment(\.dismiss) private var dismiss
+    @Query private var library: [LibraryExercise]
     @State private var naming: Bool?
     @State private var name = ""
+
+    private var removedRebond: [CatalogExercise] {
+        let known = Set(library.compactMap(\.catalogID))
+        return CatalogExercise.all.filter { !known.contains($0.id) }
+    }
 
     var body: some View {
         NavigationStack {
             List {
-                Section("Suivis par la caméra") {
-                    ForEach(CatalogExercise.all) { exercise in
-                        Button {
-                            choose(exercise.id, String(localized: exercise.name), nil)
-                        } label: {
-                            Label { Text(exercise.name).foregroundStyle(.primary) } icon: { Image(systemName: exercise.symbol) }
-                        }
-                    }
-                }
-                Section("Sans caméra") {
+                Section {
                     Button {
                         name = ""
                         naming = false
@@ -107,8 +105,19 @@ struct RebondExercisePicker: View {
                         Label { Text("Position tenue (gainage, étirement…)").foregroundStyle(.primary) } icon: { Image(systemName: "timer") }
                     }
                 }
+                if !removedRebond.isEmpty {
+                    Section("Remettre un exercice Rebond") {
+                        ForEach(removedRebond) { exercise in
+                            Button {
+                                choose(exercise.id, String(localized: exercise.name), nil)
+                            } label: {
+                                Label { Text(exercise.name).foregroundStyle(.primary) } icon: { Image(systemName: exercise.symbol) }
+                            }
+                        }
+                    }
+                }
             }
-            .navigationTitle("Exercice Rebond")
+            .navigationTitle("Sans caméra")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 Button("Fermer", systemImage: "xmark", role: .close) { dismiss() }
@@ -387,10 +396,7 @@ struct LibraryExerciseView: View {
                 }
             }
             Button {
-                var planned = exercise.planned.workoutExercise
-                planned = WorkoutExercise(name: planned.name, catalogID: planned.catalogID, mode: planned.mode,
-                                          sets: 1, reps: reps)
-                router.startExercise(planned)
+                router.startExercise(exercise.workoutExercise(reps: reps))
             } label: {
                 Label("Faire maintenant", systemImage: "play.fill")
                     .font(.headline)
