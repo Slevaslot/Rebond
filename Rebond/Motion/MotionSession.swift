@@ -199,6 +199,7 @@ final class MotionSession {
     func togglePause() {
         guard phase != .finished else { return }
         isPaused.toggle()
+        processor.isPaused.withLock { $0 = isPaused }
         if isPaused {
             // The set resumes with the model in its card, as it normally is.
             demonstration?.cancel()
@@ -222,6 +223,7 @@ final class MotionSession {
         case .spread: expandModel()
         case .pinch: shrinkModel()
         case .thumbsUp:
+            // While paused, the detector reports any sign as the resume: a thumbs up never skips the set then.
             guard !isPaused else { return }
             onNext?()
         }
@@ -335,6 +337,7 @@ final class MotionSession {
         processor.resetCounter()
         intro?.cancel()
         isPaused = false
+        processor.isPaused.withLock { $0 = false }
         isLost = false
         lostDelay?.cancel()
         demonstration?.cancel()
@@ -498,6 +501,9 @@ nonisolated final class FrameProcessor: NSObject, AVCaptureVideoDataOutputSample
     /// Set from the main thread: blur the patient too, not only the background.
     let blursEverything = Mutex(false)
 
+    /// Set from the main thread: the set is paused, the detector waits for the sign to resume.
+    let isPaused = Mutex(false)
+
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         guard let pixelBuffer = sampleBuffer.imageBuffer else { return }
 
@@ -510,7 +516,11 @@ nonisolated final class FrameProcessor: NSObject, AVCaptureVideoDataOutputSample
             let frame = analyzer.analyze(pixelBuffer)
             let update = counter.process(frame.measure, at: time.seconds)
             onAnalysis?(frame.skeleton, update, exercise.canFollow(frame.measure))
-            if exercise.allowsHandGestures, let gesture = gestures.process(pixelBuffer, body: frame.skeleton) {
+            // While paused, the sign to resume is always looked for, whatever the exercise.
+            let paused = isPaused.withLock { $0 }
+            if exercise.allowsHandGestures || paused,
+               let gesture = gestures.process(pixelBuffer, body: frame.skeleton, isMoving: update.progress > 0.15,
+                                              isPaused: paused) {
                 onGesture?(gesture)
             }
             // The background blur keeps only this person sharp.

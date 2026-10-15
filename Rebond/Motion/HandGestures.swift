@@ -62,8 +62,11 @@ nonisolated struct HandGestureDetector {
         }
     }
 
-    /// About 0.6 s: a pause shouldn't come from a hand passing by.
-    private var palm = Hold(frames: 9)
+    /// About 1 s: a pause shouldn't come from a hand passing by.
+    private var palm = Hold(frames: 15)
+    /// About 0.4 s while paused: resuming is quicker than pausing.
+    private var resume = Hold(frames: 6)
+    private var wasPaused = false
     /// About 0.6 s as well: moving on to the next set is not undone easily.
     private var thumb = Hold(frames: 9)
 
@@ -74,9 +77,28 @@ nonisolated struct HandGestureDetector {
     private var gaps: [Double] = []
     private let gapWindow = 15
 
-    mutating func process(_ pixelBuffer: CVPixelBuffer, body: PoseSkeleton?) -> HandGesture? {
+    /// - Parameters:
+    ///   - isMoving: The patient is in a repetition: an open hand is then part of the movement, not a pause.
+    ///   - isPaused: Resuming must always be easy: any open hand of the patient, raised or not, one hand or two,
+    ///     even standing close to the phone, held a shorter moment. A thumbs up resumes too.
+    mutating func process(_ pixelBuffer: CVPixelBuffer, body: PoseSkeleton?, isMoving: Bool = false,
+                          isPaused: Bool = false) -> HandGesture? {
+        if isPaused {
+            wasPaused = true
+            let hands = anyHands(in: pixelBuffer, body: body)
+            let open = hands.contains(where: Self.isOpenPalm) || hands.contains(where: Self.isThumbUp)
+            gaps = []
+            return resume.update(open) ? .openPalm : nil
+        }
+        if wasPaused {
+            // Just resumed: the hand that resumed must come down before it can pause or skip again.
+            wasPaused = false
+            resume = Hold(frames: 6)
+            palm.consume()
+            thumb.consume()
+        }
         let (hands, raisedArms) = raisedHands(in: pixelBuffer, body: body)
-        let hand = raisedArms == 1 && hands.count == 1 ? hands[0] : nil
+        let hand = raisedArms == 1 && hands.count == 1 && !isMoving ? hands[0] : nil
 
         if palm.update(hand.map(Self.isOpenPalm) ?? false) { return .openPalm }
         let isThumbUp = hand.map(Self.isThumbUp) ?? false
@@ -143,6 +165,31 @@ nonisolated struct HandGestureDetector {
             return atRaisedWrist ? hand : nil
         }
         return (hands, raisedWrists.count)
+    }
+
+    /// The patient's hands wherever they are: near the body when it is seen, otherwise the largest ones in view
+    /// (the patient stepped close to the phone).
+    private func anyHands(in pixelBuffer: CVPixelBuffer, body: PoseSkeleton?) -> [[VNHumanHandPoseObservation.JointName: CGPoint]] {
+        let request = VNDetectHumanHandPoseRequest()
+        request.maximumHandCount = 4
+        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: orientation)
+        guard (try? handler.perform([request])) != nil else { return [] }
+        let size = body?.imageSize ?? CGSize(width: CVPixelBufferGetWidth(pixelBuffer), height: CVPixelBufferGetHeight(pixelBuffer))
+        let hands: [[VNHumanHandPoseObservation.JointName: CGPoint]] = (request.results ?? []).compactMap { observation in
+            guard let points = try? observation.recognizedPoints(.all) else { return nil }
+            let hand = points.filter { $0.value.confidence >= minimumConfidence }
+                .mapValues { CGPoint(x: $0.location.x * size.width, y: (1 - $0.location.y) * size.height) }
+            return hand[.wrist] == nil ? nil : hand
+        }
+        // With the body in view, only the hands at its wrists: not someone else's in the background.
+        guard let body, let neck = body.points[.neck], let hips = body.points[.root] else { return hands }
+        let wrists = [body.points[.leftWrist], body.points[.rightWrist]].compactMap { $0 }
+            .map { CGPoint(x: $0.x * size.width, y: $0.y * size.height) }
+        let torso = hypot((neck.x - hips.x) * size.width, (neck.y - hips.y) * size.height)
+        guard !wrists.isEmpty, torso > 0 else { return hands }
+        return hands.filter { hand in
+            wrists.contains { hypot($0.x - hand[.wrist]!.x, $0.y - hand[.wrist]!.y) < torso * 0.5 }
+        }
     }
 
     /// All four fingers stretched out and the thumb away from them.
