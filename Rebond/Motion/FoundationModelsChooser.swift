@@ -7,12 +7,14 @@ import FoundationModels
 /// Returns nil when Apple Intelligence isn't available: the nearest candidate is then chosen by distance.
 nonisolated struct FoundationModelsChooser: RecognitionChooser {
     static let notRecognized = "nonReconnu"
+    /// The answer may be "nonReconnu"; off (demo), it must be one of the candidates, which all fit the measures.
+    var allowsNotRecognized = false
 
     func choose(summary: String, candidates: [ExerciseSignature], images: [CGImage]) async -> RecognitionChoice? {
         let model = SystemLanguageModel.default
         guard case .available = model.availability, !candidates.isEmpty else { return nil }
 
-        let ids = candidates.map(\.id) + [Self.notRecognized]
+        let ids = candidates.map(\.id) + (allowsNotRecognized ? [Self.notRecognized] : [])
         let root = DynamicGenerationSchema(name: "Identification", properties: [
             .init(name: "exercice", description: "L'id d'un candidat, ou nonReconnu si aucun ne correspond.",
                   schema: DynamicGenerationSchema(name: "Exercice", anyOf: ids)),

@@ -60,11 +60,14 @@ nonisolated struct ExerciseRecognizer: Sendable {
     var minimumConfidence = 0.5
     /// Candidates handed to the final choice.
     var candidateCount = 5
+    /// For the demo: when at least one exercise of the catalog fits the measures, one is always named, never
+    /// "non reconnu". Off, a declined or unsure choice gives a custom exercise.
+    var alwaysNames = true
     /// Two seconds of movement at least.
     static let minimumFrames = 30
 
     /// The candidates, from both preselections: their ranks added up, the nearest first.
-    func preselect(_ measurement: MovementMeasurement) -> [Preselection.Candidate] {
+    func preselect(_ measurement: MovementMeasurement, count: Int? = nil) -> [Preselection.Candidate] {
         // The hips going down (or not) is the surest thing seen from the front: only the exercises that do the same.
         var narrowed = catalog
         let lowering = measurement.position == .mixed
@@ -83,42 +86,61 @@ nonisolated struct ExerciseRecognizer: Sendable {
         let ordered = scored.sorted { a, b in
             a.1 != b.1 ? a.1 < b.1 : (a.0.distance != b.0.distance ? a.0.distance < b.0.distance : a.0.id < b.0.id)
         }
-        return Array(ordered.prefix(candidateCount).map(\.0))
+        return Array(ordered.prefix(count ?? candidateCount).map(\.0))
     }
 
     func recognize(_ measurement: MovementMeasurement, images: [CGImage] = [],
                    chooser: (any RecognitionChooser)? = nil) async -> RecognitionResult {
-        let candidates = preselect(measurement)
-        let signatures = candidates.compactMap { candidate in catalog.signatures.first { $0.id == candidate.id } }
-        let distances = Dictionary(uniqueKeysWithValues: candidates.map { ($0.id, $0.distance) })
-        let preselection = Preselection(catalog: catalog)
-        let agreement = preselection.byNeighbors(measurement, count: 1).first?.id
-            == preselection.byCentroid(measurement, count: 1).first?.id
-        let fallback = DistanceChooser(distances: distances, agreement: agreement)
-        let choice: RecognitionChoice?
-        if let chooser {
-            if let chosen = await chooser.choose(summary: measurement.summary, candidates: signatures, images: images) {
-                choice = chosen
-            } else {
-                choice = await fallback.choose(summary: measurement.summary, candidates: signatures, images: images)
-            }
-        } else {
-            choice = await fallback.choose(summary: measurement.summary, candidates: signatures, images: images)
-        }
         let custom = CustomExerciseName.make(for: measurement, avoiding: catalog.signatures.map(\.name))
         // A movement of a moment (someone walking back to the phone) is not an exercise to name.
         guard measurement.frames >= Self.minimumFrames else {
             return .notRecognized(name: custom, reason: "Mouvement trop court pour être reconnu.")
         }
 
+        // Pass 3 before the choice: the candidates the measures contradict are set aside first, so the final choice
+        // is only among exercises that fit (a straight knee can't be a knee raise).
+        let ranked = preselect(measurement, count: catalog.signatures.count)
+        var rejected: [String] = []
+        var valid: [(Preselection.Candidate, ExerciseSignature)] = []
+        for candidate in ranked {
+            guard let signature = catalog.signatures.first(where: { $0.id == candidate.id }) else { continue }
+            if let problem = SignatureCheck.mismatch(measurement, signature) {
+                rejected.append("\(signature.name) : \(problem)")
+            } else {
+                valid.append((candidate, signature))
+            }
+        }
+        valid = Array(valid.prefix(candidateCount))
+        guard !valid.isEmpty else {
+            return .notRecognized(name: custom, reason: "Aucun exercice du catalogue ne correspond (\(rejected.prefix(2).joined(separator: " ; "))).")
+        }
+        let signatures = valid.map(\.1)
+
+        let distances = Dictionary(uniqueKeysWithValues: valid.map { ($0.0.id, $0.0.distance) })
+        let preselection = Preselection(catalog: catalog)
+        let agreement = preselection.byNeighbors(measurement, count: 1).first?.id
+            == preselection.byCentroid(measurement, count: 1).first?.id
+        let fallback = DistanceChooser(distances: distances, agreement: agreement)
+        var choice: RecognitionChoice?
+        if let chooser {
+            choice = await chooser.choose(summary: measurement.summary, candidates: signatures, images: images)
+        }
+        if choice == nil {
+            choice = await fallback.choose(summary: measurement.summary, candidates: signatures, images: images)
+        }
+
+        if alwaysNames {
+            // Demo: an exercise that fits always gets its name; the nearest one if the choice declined.
+            let id = choice?.id ?? signatures[0].id
+            let signature = signatures.first { $0.id == id } ?? signatures[0]
+            return .recognized(id: signature.id, name: signature.name, confidence: choice?.confidence ?? 0,
+                               description: choice?.description ?? measurement.summary)
+        }
         guard let choice, let id = choice.id, let signature = signatures.first(where: { $0.id == id }) else {
             return .notRecognized(name: custom, reason: "Aucun exercice du catalogue ne correspond.")
         }
         guard choice.confidence >= minimumConfidence else {
             return .notRecognized(name: custom, reason: "Pas assez sûr : \(signature.name) ?")
-        }
-        if let problem = SignatureCheck.mismatch(measurement, signature) {
-            return .notRecognized(name: custom, reason: "Ne ressemble pas à « \(signature.name) » : \(problem).")
         }
         return .recognized(id: signature.id, name: signature.name, confidence: choice.confidence,
                            description: choice.description)
