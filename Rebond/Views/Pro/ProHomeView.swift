@@ -195,25 +195,21 @@ private struct WeekOverviewCard: View {
     let overviews: [PatientOverview]
     let patientCount: Int
     let hasPro: Bool
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         let attention = overviews.filter { $0.attention != .none }.count
         let painful = overviews.filter { $0.attention == .highPain }.count
         let recent = overviews.filter { $0.daysSinceReport < 7 }.count
-        let layout = dynamicTypeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
-                                                         : AnyLayout(HStackLayout(alignment: .top, spacing: 12))
 
-        SummaryCard(title: Text("Cette semaine"), systemImage: "calendar", color: .accentColor) {
+        SummaryCard(title: Text("Cette semaine"), systemImage: nil, color: .accentColor, sectionHeader: true) {
             EmptyView()
         } content: {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 6) {
                 Group {
                     if patientCount == 0 {
                         Text("Vos patients apparaîtront ici avec leurs bilans.")
                     } else if painful > 0 {
                         Text("^[\(painful) patient](inflect: true) signale une douleur forte.")
-                            .foregroundStyle(.orange)
                     } else if attention > 0 {
                         Text("^[\(attention) patient](inflect: true) à regarder.")
                     } else {
@@ -222,17 +218,10 @@ private struct WeekOverviewCard: View {
                 }
                 .font(.title3.weight(.semibold))
                 .fixedSize(horizontal: false, vertical: true)
-                Divider()
-                layout {
-                    MetricTile(title: "Patients", symbol: "person.2.fill", color: .accentColor,
-                               value: "\(patientCount)", unit: hasPro ? "suivis" : "sur \(ProStore.freePatientLimit)",
-                               accessibilityValue: Text("\(patientCount) patients suivis"))
-                    MetricTile(title: "À regarder", symbol: "exclamationmark.circle.fill", color: .orange,
-                               value: "\(attention)", unit: "",
-                               accessibilityValue: Text("\(attention) patients à regarder"))
-                    MetricTile(title: "Bilans", symbol: "tray.and.arrow.down.fill", color: .teal,
-                               value: "\(recent)", unit: "reçus",
-                               accessibilityValue: Text("\(recent) bilans reçus ces 7 derniers jours"))
+                if patientCount > 0 {
+                    Text("^[\(patientCount) patient](inflect: true) · ^[\(recent) bilan](inflect: true) reçus en 7 jours")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                 }
             }
         }

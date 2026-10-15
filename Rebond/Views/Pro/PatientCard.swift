@@ -9,10 +9,10 @@ struct PatientCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 14) {
-                InitialsBadge(name: name, size: 52)
+                InitialsBadge(name: name, size: 48)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(name)
-                        .font(.title3.bold())
+                        .font(.headline)
                     if let overview {
                         AttentionLabel(overview: overview)
                     } else {
@@ -28,7 +28,9 @@ struct PatientCard: View {
                     .accessibilityHidden(true)
             }
             if let overview {
-                PatientMetrics(overview: overview)
+                Text(overview.summaryLine)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
             }
         }
         .padding(18)
@@ -55,11 +57,11 @@ struct AttentionLabel: View {
                 Label("Pas de nouveau bilan depuis \(overview.daysSinceReport) jours", systemImage: "clock.badge.exclamationmark")
                     .foregroundStyle(.secondary)
             case .none:
-                Label("Rien à signaler cette semaine", systemImage: "checkmark.circle")
+                Text("Rien à signaler")
                     .foregroundStyle(.secondary)
             }
         }
-        .font(.subheadline.weight(.semibold))
+        .font(.subheadline)
     }
 }
 
@@ -114,9 +116,9 @@ struct MetricTile: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Label(title, systemImage: symbol)
+            Text(title)
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(color)
+                .foregroundStyle(.secondary)
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(value)
                     .font(.title2.weight(.semibold))
@@ -158,5 +160,15 @@ struct InitialsBadge: View {
         .frame(width: size, height: size)
         .background(Color.accentColor.opacity(0.15), in: .circle)
         .accessibilityHidden(true)
+    }
+}
+
+extension PatientOverview {
+    /// "1 séance sur 3 · douleur 8/10 · amplitude 73 %": the week in one quiet line.
+    var summaryLine: String {
+        var parts = [String(localized: "\(sessionsDone) séances sur \(sessionsPlanned)")]
+        if let lastPain { parts.append(String(localized: "douleur \(lastPain)/10")) }
+        if let amplitude { parts.append(String(localized: "amplitude \(Int(amplitude.rounded())) %")) }
+        return parts.joined(separator: " · ")
     }
 }

@@ -87,7 +87,7 @@ struct PatientDetailView: View {
                     }
                 }
 
-                SummaryCard(title: Text("Régularité"), systemImage: "calendar", color: .teal) {
+                SummaryCard(title: Text("Régularité"), systemImage: "calendar", color: .accentColor) {
                     Text("7 derniers jours")
                 } content: {
                     VStack(alignment: .leading, spacing: 12) {
@@ -97,7 +97,7 @@ struct PatientDetailView: View {
                     }
                 }
 
-                SummaryCard(title: Text("Douleur"), systemImage: "bandage.fill", color: .orange) {
+                SummaryCard(title: Text("Douleur"), systemImage: "bandage.fill", color: .accentColor) {
                     Text("Après chaque séance")
                 } content: {
                     VStack(alignment: .leading, spacing: 12) {
@@ -120,7 +120,7 @@ struct PatientDetailView: View {
                 }
 
                 if !week.exercises.isEmpty {
-                    SummaryCard(title: Text("Exercices de la semaine"), systemImage: "figure.strengthtraining.functional", color: .purple) {
+                    SummaryCard(title: Text("Exercices de la semaine"), systemImage: "figure.strengthtraining.functional", color: .accentColor) {
                         EmptyView()
                     } content: {
                         VStack(alignment: .leading, spacing: 0) {
@@ -133,7 +133,7 @@ struct PatientDetailView: View {
                 }
 
                 if !progress.amplitude.isEmpty {
-                    SummaryCard(title: Text("Amplitude"), systemImage: "arrow.up.and.down", color: .blue) {
+                    SummaryCard(title: Text("Amplitude"), systemImage: "arrow.up.and.down", color: .accentColor) {
                         Text("% de l'objectif")
                     } content: {
                         AmplitudeChart(data: progress)
@@ -182,11 +182,11 @@ private struct ExerciseLineView: View {
                 if let last = line.lastAmplitude {
                     Text("Amplitude : \(Int(first.rounded())) % puis \(Int(last.rounded())) %")
                         .font(.subheadline)
-                        .foregroundStyle(.blue)
+                        .foregroundStyle(.secondary)
                 } else {
                     Text("Amplitude : \(Int(first.rounded())) %")
                         .font(.subheadline)
-                        .foregroundStyle(.blue)
+                        .foregroundStyle(.secondary)
                 }
             }
         }
