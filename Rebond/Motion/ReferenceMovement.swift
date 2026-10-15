@@ -573,10 +573,11 @@ nonisolated struct ReferenceCounter: MovementCounter {
         if case .repCompleted(let rep) = event {
             // How close to the film: the repetition just ended, or the one going on.
             let points = finished.flatMap { time - $0.time < 1.5 ? $0.points : nil } ?? trajectory
-            let score = points.count >= 3 ? MovementFeatures.resemblance(points, to: movement.template) : rep.amplitude
+            let score = points.count >= 3 ? MovementFeatures.resemblance(points, to: movement.template) : nil
             // Too fast compared with the film's own pace (15 measures per second).
             let tooFast = points.count >= 3 ? Double(points.count) / 15 < movement.minDuration : rep.tooFast
-            result = .repCompleted(RepResult(amplitude: score, tooFast: tooFast))
+            // The range stays the amplitude (saved, in the report); the resemblance is only the live feedback.
+            result = .repCompleted(RepResult(amplitude: rep.amplitude, tooFast: tooFast, resemblance: score))
             finished = nil
         }
         if calibratedNow, case .none = result { result = .calibrated }

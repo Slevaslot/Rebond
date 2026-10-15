@@ -52,7 +52,9 @@ extension WidgetSnapshot {
                 Exercise(name: $0.name, symbol: $0.symbol, sets: $0.sets, reps: $0.reps, holdSeconds: $0.holdSeconds)
             },
             estimatedMinutes: exercises.estimatedMinutes,
-            sessionDates: sessions.map(\.date).filter { $0 >= oldest }.sorted(by: >)
+            sessionDates: sessions.map(\.date).filter { $0 >= oldest }.sorted(by: >),
+            // The exercises are today's, or those of the next day with a session (rest day).
+            sessionDay: programs.exercises(on: now).isEmpty ? programs.next(after: now)?.day : now
         )
     }
 }

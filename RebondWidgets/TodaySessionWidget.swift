@@ -41,7 +41,7 @@ struct TodaySessionView: View {
         } else if entry.doneToday {
             Label("Séance faite · \(entry.week.done)/\(entry.week.planned)", systemImage: "checkmark.circle")
         } else {
-            Label("Séance du jour · \(entry.snapshot.estimatedMinutes) min", systemImage: "figure.cooldown")
+            Label("\(entry.sessionTitle) · \(entry.snapshot.estimatedMinutes) min", systemImage: "figure.cooldown")
         }
     }
 }
@@ -131,7 +131,7 @@ private struct TodayStatus: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else {
-                Text("Séance du jour")
+                Text(entry.sessionTitle)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
                     .textCase(.uppercase)
@@ -236,7 +236,7 @@ private struct RectangularView: View {
                 Text(entry.week.isComplete ? "Objectif de la semaine atteint" : "\(entry.week.done) sur \(entry.week.planned) cette semaine")
                     .font(.caption)
             } else {
-                Text("Séance du jour")
+                Text(entry.sessionTitle)
                     .font(.headline)
                 Text("^[\(entry.snapshot.exercises.count) exercice](inflect: true) · \(entry.snapshot.estimatedMinutes) min")
                     .font(.caption)

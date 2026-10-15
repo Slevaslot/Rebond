@@ -45,7 +45,7 @@ struct TodayView: View {
                             .font(.headline)
                             .foregroundStyle(.green)
                     } else {
-                        Text("Séance du jour")
+                        Text(snapshot.sessionTitle(on: .now))
                             .font(.headline)
                         Text("\(snapshot.exercises.count) exercices · \(snapshot.estimatedMinutes) min")
                             .foregroundStyle(.secondary)

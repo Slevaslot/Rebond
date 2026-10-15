@@ -9,10 +9,12 @@ nonisolated struct RebondEntry: TimelineEntry {
 
     var doneToday: Bool { snapshot.isDone(on: date) }
     var week: WidgetSnapshot.Week { snapshot.week(containing: date) }
+    /// "Séance du jour", or the next session's day on a rest day.
+    var sessionTitle: String { snapshot.sessionTitle(on: date) }
 
-    /// Smart Stack of the watch: brought up while the day's session is still to do.
+    /// Smart Stack of the watch: brought up while the day's session is still to do (not on a rest day).
     var relevance: TimelineEntryRelevance? {
-        TimelineEntryRelevance(score: snapshot.hasProgram && !doneToday ? 50 : 0)
+        TimelineEntryRelevance(score: snapshot.hasProgram && snapshot.hasSession(on: date) && !doneToday ? 50 : 0)
     }
 }
 

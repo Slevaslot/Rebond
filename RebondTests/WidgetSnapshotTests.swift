@@ -110,4 +110,14 @@ struct WidgetSnapshotTests {
         // Two different days in the week, whatever the number of programs.
         #expect(snapshot.sessionsPerWeek == 2)
     }
+
+    @Test func restDayShowsTheNextSession() {
+        var snapshot = WidgetSnapshot.sample
+        snapshot.sessionDay = date(15)
+        #expect(snapshot.hasSession(on: date(15), calendar: calendar))
+        #expect(snapshot.sessionTitle(on: date(15), calendar: calendar) == "Séance du jour")
+        #expect(!snapshot.hasSession(on: date(14), calendar: calendar))
+        #expect(snapshot.sessionTitle(on: date(14), calendar: calendar) == "Prochaine séance demain")
+        #expect(snapshot.sessionTitle(on: date(13), calendar: calendar).hasPrefix("Prochaine séance "))
+    }
 }

@@ -85,9 +85,12 @@ nonisolated extension Correction {
 }
 
 nonisolated struct RepResult: Sendable {
-    /// Range of motion reached, as a fraction of the exercise's target (1 = target reached).
+    /// Range of motion reached, as a fraction of the exercise's target (1 = target reached). For a filmed
+    /// movement, the target is the film's own range: 1 = as far as in the video. Saved and sent to the physiotherapist.
     let amplitude: Double
     let tooFast: Bool
+    /// For a filmed movement: how close the whole repetition was to the film's, 0 to 1. Shown live only.
+    var resemblance: Double? = nil
 }
 
 nonisolated enum RepEvent: Sendable {

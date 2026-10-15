@@ -417,10 +417,10 @@ final class MotionSession {
                 } else {
                     coach.say("\(repCount)")
                 }
-            } else if exercise.reference != nil {
+            } else if exercise.reference != nil, let resemblance = result.resemblance {
                 // A filmed movement: how close it was to the video, in percent.
-                let percent = Int((result.amplitude * 100).rounded())
-                let tier = AmplitudeTier(amplitude: min(1, result.amplitude / 0.9))
+                let percent = Int((resemblance * 100).rounded())
+                let tier = AmplitudeTier(amplitude: min(1, resemblance / 0.9))
                 show(Feedback(message: "\(percent) % comme sur la vidéo", isPositive: true, tier: tier))
                 coach.say("\(repCount)")
             } else {

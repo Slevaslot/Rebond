@@ -24,6 +24,8 @@ nonisolated struct WidgetSnapshot: Codable, Equatable, Sendable {
     var estimatedMinutes: Int
     /// Dates of the recent sessions (the last few weeks), most recent first.
     var sessionDates: [Date]
+    /// The day of `exercises`: today, or the next day with a session on a rest day. Nil in older files.
+    var sessionDay: Date? = nil
 
     static let empty = WidgetSnapshot(hasProgram: false, sessionsPerWeek: 0, exercises: [], estimatedMinutes: 0, sessionDates: [])
 
@@ -31,6 +33,22 @@ nonisolated struct WidgetSnapshot: Codable, Equatable, Sendable {
     static let keptDays = 14
 
     // MARK: Derived values
+
+    /// The exercises are the ones of `date` (always true for older files, without `sessionDay`).
+    func hasSession(on date: Date, calendar: Calendar = .current) -> Bool {
+        sessionDay.map { calendar.isDate($0, inSameDayAs: date) } ?? true
+    }
+
+    /// "Séance du jour" when the exercises are today's; "Prochaine séance demain", or "… mercredi", on a rest day.
+    func sessionTitle(on date: Date, calendar: Calendar = .current) -> String {
+        guard let sessionDay, !hasSession(on: date, calendar: calendar) else {
+            return String(localized: "Séance du jour")
+        }
+        if let tomorrow = calendar.date(byAdding: .day, value: 1, to: date), calendar.isDate(sessionDay, inSameDayAs: tomorrow) {
+            return String(localized: "Prochaine séance demain")
+        }
+        return String(localized: "Prochaine séance \(sessionDay.formatted(.dateTime.weekday(.wide)))")
+    }
 
     /// A session was saved that day.
     func isDone(on day: Date, calendar: Calendar = .current) -> Bool {

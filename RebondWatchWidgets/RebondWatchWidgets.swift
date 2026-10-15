@@ -103,7 +103,7 @@ struct TodayComplicationView: View {
                     Text("\(week.done) sur \(week.planned) cette semaine")
                         .foregroundStyle(.secondary)
                 } else {
-                    Text("\(snapshot.exercises.count) exercices · \(snapshot.estimatedMinutes) min")
+                    Text("\(entry.sessionTitle) · \(snapshot.estimatedMinutes) min")
                     Text("\(week.done) sur \(week.planned) cette semaine")
                         .foregroundStyle(.secondary)
                 }
