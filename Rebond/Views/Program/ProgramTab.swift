@@ -106,6 +106,8 @@ struct ProgramTab: View {
 
             WeekPlanCard(programs: programs).pageRow()
 
+            AddSessionButton().pageRow()
+
             FreeExerciseCard().pageRow()
 
             if programs.active.isEmpty {
@@ -290,6 +292,27 @@ struct TrackingBadge: View {
             .padding(.vertical, 5)
             .background(followed ? AnyShapeStyle(Color.accentColor.opacity(0.14)) : AnyShapeStyle(Color(.tertiarySystemFill)),
                         in: .capsule)
+    }
+}
+
+/// Adding a session, in full: a large button, with the same four ways as the + of the header.
+private struct AddSessionButton: View {
+    @Environment(AppRouter.self) private var router
+
+    var body: some View {
+        Menu {
+            Button("Coller le message du kiné", systemImage: "text.bubble") { router.addProgram(from: .message) }
+            Button("Scanner sa feuille", systemImage: "doc.viewfinder") { router.addProgram(from: .scan) }
+            Button("Choisir une photo", systemImage: "photo") { router.addProgram(from: .photo) }
+            Button("Saisir à la main", systemImage: "square.and.pencil") { router.addProgram(from: .manual) }
+        } label: {
+            Label("Ajouter une séance", systemImage: "plus")
+                .font(.headline)
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.glassProminent)
+        .buttonBorderShape(.capsule)
+        .controlSize(.extraLarge)
     }
 }
 
