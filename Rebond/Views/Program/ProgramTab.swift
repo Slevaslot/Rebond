@@ -403,7 +403,8 @@ struct OtherProgramWays: View {
 
     var body: some View {
         Section {
-            Button("Composer moi-même", systemImage: "square.and.pencil") { router.addProgram(from: .manual) }
+            // One page at a time: tick the exercises of "Mes exercices", then set the program.
+            Button("Composer moi-même", systemImage: "square.and.pencil") { router.newProgram() }
             Button("Coller le message", systemImage: "text.bubble") { router.addProgram(from: .message) }
             Button("Scanner la feuille", systemImage: "doc.viewfinder") { router.addProgram(from: .scan) }
             Button("Photo de la feuille", systemImage: "photo") { router.addProgram(from: .photo) }
