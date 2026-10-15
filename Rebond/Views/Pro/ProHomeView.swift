@@ -76,14 +76,10 @@ struct ProHomeView: View {
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
 
-                    SearchField(text: $search)
-                        .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 10, trailing: 0))
-                        .listRowBackground(Color.clear)
-                        .listRowSeparator(.hidden)
                 }
                 .listSectionSeparator(.hidden)
 
-                let followed = followed.filter { search.isEmpty || $0.patient.name.localizedStandardContains(search) }
+                let followed = followed
                 Section {
                     if patients.isEmpty {
                         VStack(alignment: .leading, spacing: 10) {
@@ -96,7 +92,8 @@ struct ProHomeView: View {
                         }
                         .padding(.vertical, 6)
                     } else {
-                        ForEach(followed, id: \.patient.patientID) { item in
+                        ForEach(followed.filter { search.isEmpty || $0.patient.name.localizedStandardContains(search) },
+                                id: \.patient.patientID) { item in
                             NavigationLink(value: item.patient.patientID) {
                                 PatientRow(name: item.patient.name, overview: item.overview)
                             }
@@ -105,6 +102,26 @@ struct ProHomeView: View {
                             }
                         }
                     }
+                } header: {
+                    // Searching only helps with many patients: a field in the list header then, nothing before.
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(alignment: .firstTextBaseline) {
+                            Text("Mes patients")
+                                .font(.title2.bold())
+                                .foregroundStyle(Color(.label))
+                            Text("\(patients.count)")
+                                .font(.title3.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                        }
+                        if patients.count > 6 {
+                            SearchField(text: $search)
+                        }
+                    }
+                    .textCase(nil)
+                    .padding(.leading, 4)
+                    .padding(.top, 14)
+                    .padding(.bottom, 6)
+                    .listRowInsets(EdgeInsets())
                 } footer: {
                     Button {
                         showingPaywall = true
