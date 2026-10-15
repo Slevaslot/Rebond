@@ -40,13 +40,9 @@ struct ProHomeView: View {
             List {
                 Section {
                     PageHeader("Espace kiné") {
-                        Menu {
-                            Button("Importer un bilan", systemImage: "square.and.arrow.down") { importing = true }
-                            Button("Réglages de l'espace kiné", systemImage: "gearshape") { showingSettings = true }
-                        } label: {
-                            HeaderIcon(systemImage: "ellipsis")
-                        }
-                        .accessibilityLabel("Plus d'options")
+                        Button { showingSettings = true } label: { HeaderIcon(systemImage: "gearshape") }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Réglages de l'espace kiné")
                         ProfileButton { showingPatientSettings = true }
                     }
                     // The list's own margin already insets the rows: none more, so the title sits as on the other tabs.
@@ -55,14 +51,25 @@ struct ProHomeView: View {
                     .listRowSeparator(.hidden)
 
                     // The main action, as « Ajouter une séance » on the patient's side.
-                    Button {
-                        prescribing = PrescribingItem(program: EditableProgram())
-                    } label: {
-                        Text("Prescrire un programme")
-                            .font(.headline)
-                            .frame(maxWidth: .infinity)
+                    // The two things a physiotherapist does here: send a program, receive a report.
+                    HStack(spacing: 12) {
+                        Button {
+                            prescribing = PrescribingItem(program: EditableProgram())
+                        } label: {
+                            Text("Prescrire")
+                                .font(.headline)
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.glassProminent)
+                        Button {
+                            importing = true
+                        } label: {
+                            Text("Importer un bilan")
+                                .font(.headline)
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.glass)
                     }
-                    .buttonStyle(.glassProminent)
                     .buttonBorderShape(.capsule)
                     .controlSize(.extraLarge)
                     .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
@@ -114,6 +121,7 @@ struct ProHomeView: View {
                 }
             }
             .listStyle(.insetGrouped)
+            .listSectionSpacing(8)
             .contentMargins(.top, 0, for: .scrollContent)
             .scrollContentBackground(.hidden)
             .background(alignment: .top) {
