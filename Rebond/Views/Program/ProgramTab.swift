@@ -433,12 +433,12 @@ struct NoProgramView<Header: View>: View {
                             Button("Choisir des vidéos déjà filmées", systemImage: "photo.on.rectangle") {
                                 router.addProgram(from: .videos)
                             }
-                            Section("Feuille ou message du kiné") {
+                            Section {
+                                Button("Composer moi-même", systemImage: "square.and.pencil") { router.addProgram(from: .manual) }
+                                Button("Coller le message", systemImage: "text.bubble") { router.addProgram(from: .message) }
                                 Button("Scanner la feuille", systemImage: "doc.viewfinder") { router.addProgram(from: .scan) }
                                 Button("Photo de la feuille", systemImage: "photo") { router.addProgram(from: .photo) }
-                                Button("Coller le message", systemImage: "text.bubble") { router.addProgram(from: .message) }
                             }
-                            Button("Composer moi-même", systemImage: "square.and.pencil") { router.addProgram(from: .manual) }
                         } label: {
                             Text("Autres façons")
                                 .font(.headline)

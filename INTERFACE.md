@@ -38,7 +38,7 @@ La fonctionnalité principale : **filmer le mouvement modèle**, l'exercice bien
 
 1. Carte « Votre programme » : « Filmez le mouvement modèle. » et une phrase qui dit ce que Rebond en fait.
    - bouton principal **« Filmer le mouvement modèle »** ;
-   - bouton secondaire « Autres façons », un menu : vidéos déjà filmées, scanner ou photographier la feuille, coller le message, composer moi-même ;
+   - bouton secondaire « Autres façons », un menu : vidéos déjà filmées, puis dans un même groupe composer moi-même, coller le message, scanner la feuille, photo de la feuille ;
    - « Créer un programme avec mes exercices » si des exercices ont déjà été ajoutés seuls ;
    - « Charger le programme de démo », dans les builds de développement seulement.
 2. Carte « Faire un exercice » : essayer tout de suite un exercice suivi par la caméra, sans programme.
