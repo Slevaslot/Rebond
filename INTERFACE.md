@@ -40,6 +40,7 @@ Deux onglets, plus Kiné si l'espace kiné est activé (HIG *Tab bars* : les ong
 
 - On crée d'abord un exercice. Une fois enregistré, l'app propose la suite : « Ajouter à « … » » pour chaque programme, « Créer un programme avec cet exercice », ou « Plus tard ». Un exercice seul n'est dans aucune séance.
 - « Créer un exercice » ne crée jamais de programme ; « Créer un programme » crée directement un programme entier, sur l'Accueil vide comme dans l'onglet Exercices.
+- **Des deux côtés** (réglage de chaque exercice d'un programme) : chaque série se fait d'un côté puis de l'autre, avec un seul film ou modèle, montré en miroir pour le second côté. Activé par défaut pour un exercice filmé d'un seul côté (une jambe, un bras). La séance affiche « Série 1 sur 3 · côté gauche », la fin de série annonce « Côté droit ». La caméra compte les deux côtés avec le même film.
 - **Essayer un exercice** (hors programme) n'est pas une séance : il est enregistré pour l'historique de l'exercice, mais ne compte ni dans la régularité, ni dans le suivi, ni dans le bilan envoyé au kiné (`Session.isTrial`).
 
 ### Sans programme

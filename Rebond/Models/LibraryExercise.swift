@@ -31,6 +31,8 @@ final class LibraryExercise {
             exercise.mode = .hold
             exercise.holdSeconds = holdSeconds
         }
+        // Filmed on one side: both sides by default, the film mirrored for the other one.
+        exercise.bothSides = holdSeconds == nil && catalogID.flatMap(CatalogExercise.find)?.reference?.filmedSide != nil
         return exercise
     }
 

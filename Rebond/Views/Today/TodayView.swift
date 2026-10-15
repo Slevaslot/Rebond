@@ -514,8 +514,14 @@ struct WeekProgress {
 extension PlannedExercise {
     /// "3 séries de 10 répétitions" or "2 séries de 30 s de maintien".
     var prescriptionDetail: LocalizedStringKey {
-        if let holdSeconds { return "^[\(sets) série](inflect: true) de \(holdSeconds) s de maintien" }
-        return "^[\(sets) série](inflect: true) de ^[\(reps) répétition](inflect: true)"
+        if let holdSeconds {
+            return bothSides
+                ? "^[\(sets) série](inflect: true) de \(holdSeconds) s de maintien, de chaque côté"
+                : "^[\(sets) série](inflect: true) de \(holdSeconds) s de maintien"
+        }
+        return bothSides
+            ? "^[\(sets) série](inflect: true) de ^[\(reps) répétition](inflect: true), de chaque côté"
+            : "^[\(sets) série](inflect: true) de ^[\(reps) répétition](inflect: true)"
     }
 
     /// "Suivi caméra", "Comptage manuel" or "Minuteur", with its symbol.
@@ -570,7 +576,7 @@ nonisolated extension Array where Element == PlannedExercise {
     var estimatedMinutes: Int {
         let seconds = reduce(0) { total, exercise in
             let perSet = exercise.holdSeconds ?? exercise.reps * 4
-            return total + exercise.sets * (perSet + 30)
+            return total + exercise.sets * (exercise.bothSides ? 2 : 1) * (perSet + 30)
         }
         return Swift.max(1, Int((Double(seconds) / 60).rounded()))
     }

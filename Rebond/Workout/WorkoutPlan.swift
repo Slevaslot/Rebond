@@ -10,6 +10,13 @@ nonisolated enum WorkoutMode: Hashable, Sendable {
     case hold(seconds: Int)
 }
 
+/// A side of the body, as the patient names it (their own left and right).
+nonisolated enum BodySide: Hashable, Sendable {
+    case right, left
+
+    var other: BodySide { self == .right ? .left : .right }
+}
+
 /// One exercise of the program, copied from SwiftData so the session logic stays pure.
 nonisolated struct WorkoutExercise: Hashable, Sendable {
     let name: String
@@ -17,6 +24,13 @@ nonisolated struct WorkoutExercise: Hashable, Sendable {
     let mode: WorkoutMode
     let sets: Int
     let reps: Int
+    /// Done on one side, then the other, at each set: a single film or model serves both, mirrored.
+    var bothSides = false
+    /// The side shown by the film or the model: done first, the other one mirrored.
+    var firstSide = BodySide.right
+
+    /// Sides done at each set.
+    var sideCount: Int { bothSides ? 2 : 1 }
 }
 
 /// One set to do: the screen shown during the session.
@@ -25,6 +39,11 @@ nonisolated struct WorkoutStep: Hashable, Sendable {
     let exercise: WorkoutExercise
     /// 1-based.
     let set: Int
+    /// For an exercise done on both sides: which one, this time. Nil otherwise.
+    var side: BodySide? = nil
+
+    /// The film or the model is shown mirrored: the side opposite to the one it shows.
+    var isMirrored: Bool { side != nil && side != exercise.firstSide }
 }
 
 /// What one set produced.
@@ -58,7 +77,13 @@ nonisolated struct WorkoutPlan: Sendable {
     init(exercises: [WorkoutExercise]) {
         self.exercises = exercises
         steps = exercises.enumerated().flatMap { index, exercise in
-            (1...max(1, exercise.sets)).map { WorkoutStep(exerciseIndex: index, exercise: exercise, set: $0) }
+            (1...max(1, exercise.sets)).flatMap { set -> [WorkoutStep] in
+                guard exercise.bothSides else { return [WorkoutStep(exerciseIndex: index, exercise: exercise, set: set)] }
+                // Both sides at each set: the patient keeps the same position, one side then the other.
+                return [exercise.firstSide, exercise.firstSide.other].map {
+                    WorkoutStep(exerciseIndex: index, exercise: exercise, set: set, side: $0)
+                }
+            }
         }
         tallies = Array(repeating: ExerciseTally(), count: exercises.count)
     }
@@ -117,10 +142,14 @@ nonisolated struct WorkoutPlan: Sendable {
         let index = last.exerciseIndex
         let old = exercises[index]
         let exercise = WorkoutExercise(name: old.name, catalogID: old.catalogID, mode: old.mode,
-                                       sets: old.sets + 1, reps: old.reps)
+                                       sets: old.sets + 1, reps: old.reps, bothSides: old.bothSides, firstSide: old.firstSide)
         exercises[index] = exercise
-        steps = steps.map { $0.exerciseIndex == index ? WorkoutStep(exerciseIndex: index, exercise: exercise, set: $0.set) : $0 }
-            + [WorkoutStep(exerciseIndex: index, exercise: exercise, set: exercise.sets)]
+        let added = exercise.bothSides
+            ? [exercise.firstSide, exercise.firstSide.other].map { WorkoutStep(exerciseIndex: index, exercise: exercise, set: exercise.sets, side: $0) }
+            : [WorkoutStep(exerciseIndex: index, exercise: exercise, set: exercise.sets)]
+        steps = steps.map {
+            $0.exerciseIndex == index ? WorkoutStep(exerciseIndex: index, exercise: exercise, set: $0.set, side: $0.side) : $0
+        } + added
     }
 
     /// Stops early: the remaining sets are left undone.

@@ -19,6 +19,8 @@ nonisolated struct EditableProgram {
         var holdSeconds = 30
         /// Values the model didn't find on the sheet and that were filled in by default: to check.
         var guessed: Set<Field> = []
+        /// One side then the other at each set (one leg, one arm…), from a single film or model.
+        var bothSides = false
     }
 
     enum Field: Hashable {
@@ -78,7 +80,8 @@ nonisolated struct EditableProgram {
                 sets: $0.sets,
                 mode: $0.holdSeconds == nil ? .reps : .hold,
                 reps: $0.reps,
-                holdSeconds: $0.holdSeconds ?? Self.defaultHoldSeconds
+                holdSeconds: $0.holdSeconds ?? Self.defaultHoldSeconds,
+                bothSides: $0.bothSides
             )
         }
     }
@@ -146,7 +149,8 @@ extension Program {
                 sets: exercise.sets,
                 reps: exercise.reps,
                 holdSeconds: exercise.mode == .hold ? exercise.holdSeconds : nil,
-                order: index
+                order: index,
+                bothSides: exercise.bothSides
             )
         }
     }
@@ -159,7 +163,8 @@ extension EditableProgram {
         weekdays = programs.allDays
         exercises = programs.active.filter { !$0.days.isEmpty }.flatMap(\.orderedExercises).map {
             Exercise(name: $0.name, catalogID: $0.catalogID, sets: $0.sets, mode: $0.holdSeconds == nil ? .reps : .hold,
-                     reps: $0.reps, holdSeconds: $0.holdSeconds ?? EditableProgram.defaultHoldSeconds)
+                     reps: $0.reps, holdSeconds: $0.holdSeconds ?? EditableProgram.defaultHoldSeconds,
+                     bothSides: $0.bothSides)
         }
     }
 }
@@ -169,5 +174,7 @@ extension EditableProgram.Exercise {
     init(_ movement: ReferenceMovement) {
         self.init(name: movement.name, catalogID: movement.catalogID,
                   sets: EditableProgram.defaultSets, reps: EditableProgram.defaultReps)
+        // Filmed on one side (one leg, one arm): both sides by default, the film serves the other one mirrored.
+        bothSides = movement.filmedSide != nil
     }
 }

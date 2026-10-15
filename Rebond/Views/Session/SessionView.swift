@@ -12,6 +12,8 @@ struct SessionView: View {
     var onAnotherSet: ((SetResult) -> Void)?
     /// Without the camera: the rest of this exercise counted by hand.
     var onCountByHand: (() -> Void)?
+    /// The other side of an exercise done on both: the film or the model is shown mirrored.
+    var mirrorsModel = false
     let onFinish: (SetResult) -> Void
 
     @State private var motion: MotionSession
@@ -38,9 +40,11 @@ struct SessionView: View {
         nextTitle: LocalizedStringKey? = nil,
         onAnotherSet: ((SetResult) -> Void)? = nil,
         onCountByHand: (() -> Void)? = nil,
+        mirrorsModel: Bool = false,
         onFinish: @escaping (SetResult) -> Void
     ) {
         self.onCountByHand = onCountByHand
+        self.mirrorsModel = mirrorsModel
         self.exercise = exercise
         self.setTitle = setTitle
         self.nextTitle = nextTitle
@@ -373,6 +377,8 @@ struct SessionView: View {
                     ReferenceFramesView(movement: reference,
                                         progress: guideInCard ? motion.depthProgress : nil,
                                         contentMode: guideInCard ? .fill : .fit)
+                        // The other side: the same film, as in a mirror.
+                        .scaleEffect(x: mirrorsModel ? -1 : 1, y: 1)
                         .frame(width: card.width, height: card.height)
                         .clipShape(.rect(cornerRadius: guideInCard ? 20 : 0))
                         .position(x: card.midX, y: card.midY)
@@ -386,7 +392,8 @@ struct SessionView: View {
                         lineWidth: guideInCard ? 3 / scale : 6
                     )
                     .frame(width: large.width, height: large.height)
-                    .scaleEffect(scale)
+                    // The other side: the same model, as in a mirror.
+                    .scaleEffect(x: mirrorsModel ? -scale : scale, y: scale)
                     .position(x: figure.midX, y: figure.midY)
                 }
             }
