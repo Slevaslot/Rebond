@@ -57,6 +57,11 @@ struct ProgramDetailView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu("Options", systemImage: "ellipsis") {
+                    // Followed programs make the day's session; the check on the Programmes page does the same.
+                    Button(program.isActive ? "Ne plus suivre" : "Suivre ce programme",
+                           systemImage: program.isActive ? "checkmark.circle.badge.xmark" : "checkmark.circle") {
+                        program.isActive.toggle()
+                    }
                     Button("Modifier", systemImage: "pencil") { editing = EditingItem(program: EditableProgram(program)) }
                     Button("Supprimer", systemImage: "trash", role: .destructive) { confirmingDelete = true }
                 }
@@ -94,16 +99,6 @@ struct ProgramDetailView: View {
                     .foregroundStyle(.secondary)
             }
             DaysStrip(days: program.days, color: color)
-            Toggle(isOn: Binding(get: { program.isActive }, set: { program.isActive = $0 })) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Suivre ce programme")
-                        .font(.headline)
-                    Text(program.isActive ? "Il fait partie de vos séances du jour." : "Il reste prêt, sans apparaître dans vos séances.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .tint(color)
             if let prescriber = program.prescriber, !prescriber.isEmpty {
                 Label("Prescrit par \(prescriber)", systemImage: "stethoscope")
                     .font(.subheadline)
