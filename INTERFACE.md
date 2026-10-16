@@ -102,10 +102,37 @@ Règles pendant la série :
 - **Retours multimodaux** : voix + texte + symbole. La couleur ne porte jamais seule l'information.
 - **Ne pas surcharger** : une seule correction à la fois, la plus importante ; « Plus lentement » au plus une fois toutes les 3 répétitions.
 - **Confiance** : quand Vision voit mal le corps, on n'affiche ni compteur qui bouge ni correction ; on dit « Je ne vous vois plus en entier » et on montre la silhouette.
-- **Pause à distance** : paume ouverte levée environ 0,6 s. Toujours doublée par le bouton à l'écran.
+- **Commandes à distance** : des signes de la main, sans revenir au téléphone (tableau ci-dessous). Chacun est toujours doublé par un bouton à l'écran.
 - **Aucune commande physique détournée** : pas de boutons de volume, pas de commandes AirPods (HIG *Playing audio* : ne pas détourner les contrôles audio ; App Review 2.5.9).
 - **Astuces (TipKit)** : les commandes mains libres se découvrent au bon moment, une astuce à la fois, jamais pendant le placement ou le calibrage (voir « Astuces »).
 - **Haptique** : inutile sur l'iPhone pendant la série (téléphone posé) ; c'est la montre qui tapote (voir « Apple Watch »). Sur l'iPhone, seulement dans l'interface tenue en main (sélecteur de douleur, enregistrement réussi), avec les retours système.
+
+### Signes de la main (HIG *Gestures*, *Feedback*)
+
+Le patient est à 2–3 m : chaque commande de la séance a son signe, distinct des autres et des mouvements des exercices. Tous passent par `SessionRemote`, comme les boutons, Siri et la montre : un même signe fait la même chose partout, et seulement ce qui a du sens à ce moment.
+
+| Signe | Comment le faire | Ce qu'il fait | Où |
+|---|---|---|---|
+| Paume ouverte (`hand.raised.fill`) | Une main levée à hauteur d'épaule, paume vers le téléphone, l'autre main plus basse, tenue ~0,9 s | Pause ; avant un maintien, lance le minuteur | Série caméra (placement, démonstration, série), maintien, repos |
+| Paume ouverte, en pause | N'importe quelle main ouverte du patient, à n'importe quelle hauteur, même tout près du téléphone, ~0,4 s | Reprendre | Toute pause |
+| Pouce levé (`hand.thumbsup.fill`) | Poing fermé, pouce vers le haut, main au-dessus du milieu du buste (devant la poitrine suffit), une main ou les deux, ~0,6 s | « Suivant » : série suivante, fin du repos, « Je suis prêt » après le film ; confirme la fin de séance | Partout, en pause aussi (la série se termine avec ce qui a été fait) |
+| V, deux doigts (`hand.point.up.fill`) | Index et majeur tendus, annulaire et auriculaire repliés, main au-dessus du milieu du buste, ~0,8 s | Exercice suivant (s'il n'y en a plus : terminer la séance, demandé à nouveau) | Partout, en pause aussi |
+| Bras croisés (`xmark`) | Les deux avant-bras croisés devant la poitrine, ~1,2 s, sans bouger | Terminer la séance : « Terminer la séance ? Pouce levé pour confirmer » (8 s) | Partout |
+| Pincer / écarter | Pouce et index qui se rejoignent ou s'écartent, main levée | Le modèle en grand, ou de retour dans sa carte | Série caméra |
+
+Règles :
+- **Éviter les déclenchements accidentels** : un signe compte seulement tenu immobile (le poignet bouge de moins de 0,15 longueur de buste), le corps immobile ; une main qui traverse la forme pendant un exercice ne compte pas. Mains jointes devant la poitrine (squat) : aucun signe. Après un signe, ou une pause et une reprise (quelle qu'en soit l'origine), la main doit redescendre avant qu'un autre compte.
+- **Confirmer de loin** : chaque signe reconnu est confirmé à l'écran (symbole et texte, `SessionAction.confirmation`) et à la voix ; un signe sans effet à ce moment ne fait rien.
+- **Montrer qu'ils existent** : chaque écran de la séance affiche une petite légende des signes qui y marchent (symbole + texte court : « Pause · Série suivante »), le signe reconnu s'y allume un instant.
+- **Écrans sans caméra de séance** (film de l'exercice filmé, maintien) : la caméra frontale tourne sans aperçu pour voir les signes (`GestureCamera`), seulement si l'accès à la caméra est déjà accordé ; ces écrans ne le demandent jamais. Sans accès, ni légende ni signe : les boutons restent.
+
+| Écran | Signes de la légende |
+|---|---|
+| Film de l'exercice | Pouce : « Je suis prêt » · Bras croisés : terminer |
+| Maintien, avant le minuteur | Paume : « Commencer » |
+| Maintien en cours | Paume : « Pause » · Pouce : « Série suivante » |
+| Maintien en pause | Paume : « Reprendre » · Pouce : « Série suivante » · V : exercice suivant · Bras croisés : terminer |
+| Maintien terminé | Pouce : « Continuer » · Bras croisés : terminer |
 
 ### Voix du coach (HIG *Playing audio*, *Writing*)
 

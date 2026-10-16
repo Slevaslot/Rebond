@@ -91,6 +91,9 @@ struct ReferenceExampleView: View {
 
     @State private var player: AVQueuePlayer?
     @State private var looper: AVPlayerLooper?
+    /// The patient may already stand back from the phone: a thumbs up goes on, without walking back.
+    @State private var gestures = GestureCamera()
+    @Environment(\.skipRequest) private var skipRequest
 
     var body: some View {
         ZStack {
@@ -116,14 +119,22 @@ struct ReferenceExampleView: View {
             .padding()
         }
         .overlay(alignment: .bottom) {
-            Button(action: onReady) {
-                Text("Je suis prêt")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
+            VStack(spacing: 12) {
+                if gestures.isRunning {
+                    GestureLegend(items: [
+                        .init(gesture: .thumbsUp, title: "Je suis prêt"),
+                        .init(gesture: .crossedArms, title: "Bras croisés : terminer"),
+                    ], recognized: gestures.recognized)
+                }
+                Button(action: onReady) {
+                    Text("Je suis prêt")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.glassProminent)
+                .buttonBorderShape(.capsule)
+                .controlSize(.extraLarge)
             }
-            .buttonStyle(.glassProminent)
-            .buttonBorderShape(.capsule)
-            .controlSize(.extraLarge)
             .padding()
         }
         .navigationTitle(movement.name)
@@ -136,11 +147,16 @@ struct ReferenceExampleView: View {
             self.player = player
             try? AVAudioSession.sharedInstance().setCategory(.playback)
             player.play()
+            gestures.start()
         }
         .onDisappear {
             player?.pause()
             looper = nil
+            gestures.stop()
         }
+        .sessionScreen(.example)
+        // A thumbs up, Siri, the watch or the Passer menu: the patient is ready.
+        .onChange(of: skipRequest) { if skipRequest != nil { onReady() } }
     }
 }
 

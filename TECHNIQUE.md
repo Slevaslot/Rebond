@@ -88,7 +88,7 @@ Risque : écriture manuscrite mal lue. Parades : scanner de documents (image red
 ```
 Caméra frontale (AVFoundation), 720p, miroir
   → images sur la file vidéo, 15 analyses / s
-  → Vision : points du corps + confiance ; mains seulement si un poignet est levé
+  → Vision : points du corps + confiance ; mains seulement si un poignet est au-dessus du milieu du buste (ou en pause)
   → mesure de l'exercice (descente ou angle), lissée sur quelques images
   → machine à états : calibrage → repos → aller → objectif atteint → retour → +1
   → événements vers l'interface (MainActor)
@@ -103,7 +103,7 @@ repCompleted(count, amplitude)
 repIncomplete(count)
 correction(fault)      défaut en cours, déjà filtré (persiste ≥ 3 images)
 bodyLost / bodyFound
-gesture(.pause)
+gesture(HandGesture)   signe de la main tenu → SessionCommand → SessionRemote
 ```
 
 Règles :
@@ -114,6 +114,24 @@ Règles :
 - **Amplitude** : extrême atteint à chaque répétition, en % de l'objectif ; la meilleure de la série est enregistrée.
 - **Flou** : masque de personne (Vision), seul le patient reste net.
 - **Tests** : le moteur reçoit des suites de points enregistrées depuis les vidéos de l'équipe ; les tests vérifient comptage, incomplètes et rejets.
+
+Signes de la main (`HandGestureDetector`, `HandGestures.swift`) : la géométrie (forme de la main, hauteur sur le corps, bras croisés) est dans des fonctions statiques ; `update(hands:body:isMoving:isPaused:at:)` décide à partir des points d'une image, `process` y ajoute Vision. Tenues en secondes, quel que soit le rythme d'analyse (15 / s en série caméra, 10 / s ailleurs).
+
+| Signe | Forme | Où est la main | Tenue |
+|---|---|---|---|
+| Paume ouverte (pause) | 4 doigts tendus (bout du doigt > 1,15 × articulation du milieu, depuis le poignet), pouce écarté de l'index | Un seul poignet levé (au-dessus de la ligne des épaules + 0,15 buste) | 0,9 s |
+| Paume ouverte (reprise) | Même forme | N'importe quelle main du patient, ou toutes si le corps n'est pas vu | 0,4 s, sans exigence d'immobilité |
+| Pouce levé | ≥ 3 doigts repliés (bout < 1,05 × articulation du milieu), pouce vers le haut, son bout au-dessus de tous les autres | Une main ou deux, poignet au-dessus du milieu du buste | 0,6 s |
+| V | Index et majeur tendus vers le haut, annulaire et auriculaire repliés | Idem | 0,8 s |
+| Bras croisés | Corps seul : chaque poignet de l'autre côté de l'axe du corps (> 0,1 buste), entre épaules et hanches, coudes de leur côté, épaules de face | — | 1,2 s |
+| Écarter / pincer | Écart pouce-index < 0,35 puis > 0,8 paume (ou l'inverse) en moins d'1 s, jamais depuis un poing | La main levée de la pause | 2 images |
+
+- **Immobilité** : la tenue repart de zéro si le poignet s'éloigne de plus de 0,15 longueur de buste de là où le signe a commencé (0,8 paume sans corps) ; aucun signe pendant que le corps bouge (`isMoving`), sauf en pause ; une détection manquée < 0,3 s ne relâche pas le signe.
+- **Relâcher** : après un signe, ou à chaque passage en pause ou en reprise, tous les signes attendent que la main redescende (0,3 s sans le signe) : la paume qui a mis en pause ne reprend pas aussitôt.
+- **Rejets** : seulement les mains aux poignets du patient (< 0,4 buste, 0,5 en pause) ; bras croisés ou mains jointes : aucun signe de la main (les poings croisés ressemblent à des pouces levés).
+- **En pause**, un pouce levé reste « suivant » (`thumbsUp`), jamais une reprise : paume = pause / reprise, pouce = suivant, partout.
+- **`GestureCamera`** : caméra frontale sans aperçu pour les écrans sans caméra de séance (film, maintien), 720p, 10 analyses / s sur une file vidéo, démarrée seulement si l'accès est déjà accordé (`authorizationStatus`), arrêtée à la disparition. Le corps « bouge » (`BodyMotion`) quand le cou et les hanches se déplacent de plus de 0,02 buste par analyse, lissé : les bras, qui font les signes, n'y entrent pas.
+- **À valider sur iPhone** : Vision ne tourne pas dans le simulateur, les tests portent sur des points synthétiques. Points à vérifier : pouce levé et V reconnus à 2–3 m, bras croisés vus par Vision (poignets masqués), aucun signe pendant les exercices d'un bras.
 
 ## Séance (Workout)
 

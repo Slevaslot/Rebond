@@ -152,7 +152,7 @@ Tous les tests existants doivent rester verts, sans nouvel avertissement.
 Le simulateur n'a pas de caméra : tester sur un iPhone, posé à hauteur de hanche à 2–3 m.
 - Dix bonnes répétitions : toutes comptées ?
 - Les défauts principaux : signalés, avec la bonne consigne ?
-- La pause par la paume ouverte ne doit pas se déclencher pendant l'exercice (attention aux exercices d'un bras : une main levée à hauteur d'épaule ressemble au geste).
+- Les signes de la main (paume = pause, pouce = suivant, V = exercice suivant, bras croisés = terminer, voir `INTERFACE.md` › « Signes de la main ») ne doivent pas se déclencher pendant l'exercice : ils exigent un corps immobile et un poignet immobile ~0,6 à 1,2 s, mais un mouvement lent ou tenu peut y ressembler (exercice d'un bras : main levée à hauteur d'épaule ; mains devant la poitrine ; avant-bras croisés). Si c'est le cas, le noter et désactiver les signes pour cet exercice (`allowsHandGestures`) plutôt que de durcir les seuils pour tous. Vérifier aussi que chaque signe marche à 2–3 m, debout immobile, entre deux séries.
 - Lumière faible, vêtements amples, une autre personne dans la pièce.
 
 ## Étape 9 · Terminer

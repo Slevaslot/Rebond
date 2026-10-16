@@ -92,6 +92,8 @@ struct HoldSetView: View {
     /// Paused with the button on screen: the patient walked back to the phone, the moment for the Siri tip.
     @State private var pausedOnScreen = false
     private let siriPauseTip = SiriPauseTip()
+    /// The phone stands away while the patient holds the position: hand signs to start, pause, resume, go on.
+    @State private var gestures = GestureCamera()
 
     private var remaining: Int { max(0, targetSeconds - Int(elapsed)) }
 
@@ -109,6 +111,10 @@ struct HoldSetView: View {
             Text(phase == .done ? "Terminé, bravo !" : "Tenez la position")
                 .font(.title3)
                 .foregroundStyle(.secondary)
+            if gestures.isRunning {
+                GestureLegend(items: gestureItems, recognized: gestures.recognized)
+                    .padding(.top, 8)
+            }
             Spacer()
             // Without the Apple Watch: Siri would have spared the walk back.
             if phase == .paused, pausedOnScreen, !PhoneWatchLink.shared.watchRecordsWorkout {
@@ -123,12 +129,16 @@ struct HoldSetView: View {
         }
         .animation(.default, value: remaining)
         .animation(.default, value: phase)
-        .onChange(of: skipRequest) { if skipRequest != nil { onFinish(SetResult(heldSeconds: Int(elapsed))) } }
+        .onChange(of: skipRequest) {
+            if skipRequest != nil { onFinish(SetResult(heldSeconds: phase == .done ? targetSeconds : Int(elapsed))) }
+        }
         .onChange(of: Int(elapsed)) { WorkoutLiveActivity.shared.update(count: Int(elapsed)) }
         .onChange(of: phase) {
             WorkoutLiveActivity.shared.setPaused(phase == .paused)
             if phase != .paused { pausedOnScreen = false }
         }
+        .onChange(of: phase, initial: true) { gestures.isPaused = phase == .paused }
+        .sessionScreen(screen)
         // The pause button of the Apple Watch: starts, pauses or resumes the timer.
         .onChange(of: pauseRequest) {
             switch phase {
@@ -157,9 +167,40 @@ struct HoldSetView: View {
         }
         .task(id: phase) { await tick() }
         .onChange(of: phase) { if phase != .ready { reportSetActivity() } }
-        .onAppear { try? AVAudioSession.sharedInstance().setActive(true) }
-        .onDisappear { try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation) }
+        .onAppear {
+            try? AVAudioSession.sharedInstance().setActive(true)
+            gestures.start()
+        }
+        .onDisappear {
+            gestures.stop()
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        }
         .sensoryFeedback(.success, trigger: phase == .done)
+    }
+
+    /// The screen, for the commands from afar (hand signs, Siri, the watch).
+    private var screen: SessionScreen {
+        switch phase {
+        case .ready: .holdReady
+        case .running: .holding
+        case .paused: .paused
+        case .done: .resting
+        }
+    }
+
+    /// The signs that do something now, the main one first.
+    private var gestureItems: [GestureLegend.Item] {
+        switch phase {
+        case .ready:
+            [.init(gesture: .openPalm, title: "Commencer")]
+        case .running:
+            [.init(gesture: .openPalm, title: "Pause"), .init(gesture: .thumbsUp, title: "Série suivante")]
+        case .paused:
+            [.init(gesture: .openPalm, title: "Reprendre"), .init(gesture: .thumbsUp, title: "Série suivante"),
+             .init(gesture: .twoFingers, title: "V : exercice suivant"), .init(gesture: .crossedArms, title: "Bras croisés : terminer")]
+        case .done:
+            [.init(gesture: .thumbsUp, title: "Continuer"), .init(gesture: .crossedArms, title: "Bras croisés : terminer")]
+        }
     }
 
     /// One main action at a time, in the bottom bar; a second, quieter one when paused.
