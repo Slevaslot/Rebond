@@ -106,6 +106,8 @@ nonisolated struct CounterUpdate: Sendable {
     let event: RepEvent?
     /// Posture problem visible right now, to highlight on the body.
     var posture: Correction? = nil
+    /// A filmed movement done on the other side than in the video: the highlighted joints switch sides.
+    var sidesSwapped = false
 }
 
 /// Counts the repetitions of one exercise from a stream of 2D measures.

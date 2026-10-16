@@ -473,6 +473,8 @@ nonisolated struct ReferenceCounter: MovementCounter {
     private var recent: [(features: [Double?], torso: Double)] = []
     private var trajectory: [[Double]] = []
     private var collecting = false
+    /// The side being done, kept from the last clear movement (at rest, both sides look alike).
+    private var sidesSwapped = false
     /// The last repetition cut like the film's, and when it ended.
     private var finished: (points: [[Double]], time: Double)?
     private let stillFrames = 10
@@ -526,6 +528,7 @@ nonisolated struct ReferenceCounter: MovementCounter {
         let direct = MovementFeatures.dot(deviation, movement.axis)
         let mirrored = MovementFeatures.dot(MovementFeatures.swapped(deviation), movement.axis)
         let value = max(direct, mirrored)
+        if value >= movement.target * ReferenceAnalyzer.startFraction { sidesSwapped = mirrored > direct }
 
         var (event, posture) = cycle.advance(value, fault: nil, at: time)
         let progress = min(1, max(0, value / movement.target))
@@ -575,7 +578,7 @@ nonisolated struct ReferenceCounter: MovementCounter {
             finished = nil
         }
         if calibratedNow, case .none = result { result = .calibrated }
-        return CounterUpdate(progress: progress, event: result, posture: posture)
+        return CounterUpdate(progress: progress, event: result, posture: posture, sidesSwapped: sidesSwapped)
     }
 
     /// The body part furthest from the film's body at the same point of the movement, if far enough to show.

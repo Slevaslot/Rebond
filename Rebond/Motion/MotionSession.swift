@@ -57,6 +57,8 @@ final class MotionSession {
     private(set) var skeleton: PoseSkeleton?
     /// 0 at rest, 1 when the target depth is reached.
     private(set) var depthProgress = 0.0
+    /// A filmed movement done on the other side than in the video: its joints are highlighted on that side.
+    private(set) var sidesSwapped = false
     private(set) var repCount = 0
     private(set) var incompleteCount = 0
     /// Best completed repetition, as a fraction of the exercise's target.
@@ -415,6 +417,7 @@ final class MotionSession {
         // Nothing counts during a pause, while watching the model, nor until the patient is back in place.
         guard phase == .active, !isPaused, !isLost, !isWatching else { return }
         depthProgress = update.progress
+        if sidesSwapped != update.sidesSwapped { sidesSwapped = update.sidesSwapped }
         faultToHighlight = update.posture ?? heldFault
 
         switch update.event {
