@@ -95,7 +95,9 @@ struct SessionView: View {
                     self.placement = placement
                     motion.updatePlacement(placement)
                 }
-                .opacity(isFarEnough ? 1 : 0)
+                // A filmed movement shows no drawn figure, only its video: the placement is still measured, and
+                // guided by the written hints.
+                .opacity(isFarEnough && exercise.reference == nil ? 1 : 0)
                 .animation(.smooth(duration: 0.6), value: isFarEnough)
             }
         }
