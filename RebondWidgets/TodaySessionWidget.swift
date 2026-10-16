@@ -85,21 +85,25 @@ private struct SmallView: View {
 
 private struct MediumView: View {
     let entry: RebondEntry
+    /// With the button below them, all the right column has room for.
+    static let shownExercises = 2
 
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
             SmallView(entry: entry)
             if entry.snapshot.hasProgram {
-                VStack(alignment: .leading, spacing: 8) {
-                    ForEach(Array(entry.snapshot.exercises.prefix(3).enumerated()), id: \.offset) { _, exercise in
+                // Two exercises and the button fit the widget's height with its margins; more would push the
+                // content past the edges.
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(Array(entry.snapshot.exercises.prefix(Self.shownExercises).enumerated()), id: \.offset) { _, exercise in
                         ExerciseRow(exercise: exercise, done: entry.doneToday)
                     }
-                    if entry.snapshot.exercises.count > 3 {
-                        Text("+ ^[\(entry.snapshot.exercises.count - 3) exercice](inflect: true)")
-                            .font(.caption)
+                    if entry.snapshot.exercises.count > Self.shownExercises {
+                        Text("+ ^[\(entry.snapshot.exercises.count - Self.shownExercises) exercice](inflect: true)")
+                            .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
-                    Spacer(minLength: 0)
+                    Spacer(minLength: 4)
                     // Only while today's session is to do: on a rest day or once done, the widget opens Accueil.
                     if entry.destination == .session {
                         ActionCapsule(title: "Commencer", systemImage: "play.fill", destination: .session)
@@ -130,11 +134,11 @@ private struct ActionCapsule: View {
     var body: some View {
         Link(destination: destination.url) {
             Label(title, systemImage: systemImage)
-                .font(.subheadline.bold())
+                .font(.footnote.bold())
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 6)
+                .padding(.vertical, 7)
                 .foregroundStyle(.white)
                 .background(Color.accentColor, in: .capsule)
         }
@@ -162,10 +166,13 @@ private struct TodayStatus: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else {
+                // "Prochaine séance mercredi" on a rest day: one line, smaller if needed.
                 Text(entry.sessionTitle)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
                     .textCase(.uppercase)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
                 Text("^[\(entry.snapshot.exercises.count) exercice](inflect: true)")
                     .font(.headline)
                 Text("Environ \(entry.snapshot.estimatedMinutes) min")
@@ -183,8 +190,8 @@ private struct ExerciseRow: View {
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: exercise.symbol)
-                .font(.footnote)
-                .frame(width: 22, height: 22)
+                .font(.caption)
+                .frame(width: 24, height: 24)
                 .foregroundStyle(Color.accentColor)
                 .background(Color.accentColor.opacity(0.15), in: .circle)
                 .widgetAccentable()
@@ -271,6 +278,8 @@ private struct RectangularView: View {
             } else {
                 Text(entry.sessionTitle)
                     .font(.headline)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
                 Text("^[\(entry.snapshot.exercises.count) exercice](inflect: true) · \(entry.snapshot.estimatedMinutes) min")
                     .font(.caption)
             }
