@@ -119,8 +119,10 @@ nonisolated enum ReferenceStore {
         if let plan, let measurement = analysis.measurement {
             instructions = await InstructionWriter.write(name: movementName, summary: measurement.summary, plan: plan)
         }
-        let symbol = await MovementSymbolPicker.pick(peakImage: loadImage(frameURL(id, peakIndex)),
-                                                     movingJoints: analysis.highlightedJoints, name: movementName)
+        // A recognized exercise takes its icon from the catalog; only the others need one chosen.
+        let symbol: MovementSymbol? = recognition?.catalogID != nil ? nil
+            : await MovementSymbolPicker.pick(peakImage: loadImage(frameURL(id, peakIndex)),
+                                              movingJoints: analysis.highlightedJoints, name: movementName)
 
         try? FileManager.default.removeItem(at: videoURL(id))
         try FileManager.default.copyItem(at: video, to: videoURL(id))
@@ -132,7 +134,7 @@ nonisolated enum ReferenceStore {
             minDuration: analysis.minDuration, repCount: analysis.repCount,
             highlightedJoints: analysis.highlightedJoints,
             recognizedID: recognition?.catalogID,
-            symbol: symbol.systemName,
+            symbol: symbol?.systemName,
             recognitionNote: recognition.map(Self.note),
             plan: plan,
             instructions: instructions,
@@ -200,8 +202,9 @@ nonisolated extension ReferenceMovement {
         return CatalogExercise(
             id: catalogID,
             name: LocalizedStringResource(stringLiteral: name),
-            // Movements learned before Apple Intelligence chose a symbol: the rule from what moves.
-            symbol: symbol ?? recognizedID.flatMap(CatalogExercise.find)?.symbol
+            // Recognized: the icon of that exercise in Rebond, precise and the same for all its videos. Otherwise
+            // the one Apple Intelligence chose, or the rule from what moves (movements learned before it chose).
+            symbol: recognizedID.flatMap(CatalogExercise.find)?.symbol ?? symbol
                 ?? MovementSymbolPicker.rule(movingJoints: highlightedJoints).systemName,
             analysis: .recorded(self),
             highlightedJoints: Set(highlightedJoints.map { VNHumanBodyPoseObservation.JointName(rawValue: VNRecognizedPointKey(rawValue: $0)) }),
