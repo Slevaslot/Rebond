@@ -238,7 +238,7 @@ Point de synchro : le catalogue (`catalogId`) et les événements Motion ci-dess
 
 - [ ] Relire le règlement du Build Challenge : le code écrit avant l'événement est-il autorisé ?
 - [ ] Compte développeur actif ; **une** équipe propriétaire de l'app, ajoutée sur les deux Mac.
-- [x] Identifiant d'app : `com.mwm.rebond` (équipe MWM), `com.rebond.app` étant pris. Fiche App Store Connect à créer avec cet identifiant.
+- [x] Identifiant d'app : `ai.mwm.build.challenge.team.09`, celui de la fiche « Build Challenge Team 09 » créée par les organisateurs (équipe MWM).
 - [ ] URL de politique de confidentialité prête.
 - [ ] `main` à jour avec la branche `technique`.
 - [ ] Sur un vrai iPhone : Foundation Models lit une feuille test avec image.
