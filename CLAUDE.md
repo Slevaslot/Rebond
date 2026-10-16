@@ -109,7 +109,7 @@ Tout ce qui concerne l'interface (structure, séance, scan, autorisations, Liqui
 ## Soumission App Store
 
 - Chaîne d'autorisation caméra dans Info.plist, avec un texte clair sur l'usage (scan et séance). `PhotosPicker` ne demande pas d'autorisation. Chaînes Santé (`NSHealthShareUsageDescription`, `NSHealthUpdateUsageDescription`) sur l'iPhone et la montre, capacité HealthKit sur les deux cibles.
-- Identifiants : `com.rebond.app.watchkitapp` (montre) et `com.rebond.app.watchkitapp.widgets` (complications), à créer avec l'App Group `group.com.rebond.app` et HealthKit. Captures d'écran Apple Watch à fournir dans App Store Connect.
+- Identifiants (équipe MWM, `ZUQ3ZP29N4`) : `com.mwm.rebond` (app), `com.mwm.rebond.widgets`, `com.mwm.rebond.watchkitapp` (montre) et `com.mwm.rebond.watchkitapp.widgets` (complications), avec l'App Group `group.com.mwm.rebond` et HealthKit. `com.rebond.app` est pris par une équipe personnelle gratuite : ne plus l'utiliser, et ne jamais signer avec une équipe personnelle (elle réserverait ces identifiants). Captures d'écran Apple Watch à fournir dans App Store Connect.
 - Privacy manifest (`PrivacyInfo.xcprivacy`) à jour, y compris les API à justification (`UserDefaults`, dates de fichiers…) si elles sont utilisées.
 - Étiquettes de confidentialité App Store Connect : « Aucune donnée collectée ».
 - URL de politique de confidentialité (obligatoire), même courte : à publier, puis mettre à jour `AppLinks.privacyPolicy`.

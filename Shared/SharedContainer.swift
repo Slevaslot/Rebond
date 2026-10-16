@@ -4,7 +4,7 @@ import Foundation
 
 /// The App Group shared by the app and its widgets. Nothing in it leaves the iPhone.
 nonisolated enum SharedContainer {
-    static let appGroup = "group.com.rebond.app"
+    static let appGroup = "group.com.mwm.rebond"
 
     /// Nil when the App Group is missing from the entitlements (misconfigured signing).
     static var url: URL? {
