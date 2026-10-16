@@ -9,6 +9,10 @@ struct ExerciseDetailView: View {
 
     @Environment(AppRouter.self) private var router
     @Query(sort: \Session.date, order: .reverse) private var sessions: [Session]
+    /// The filmed movement being checked ("Vérifier le mouvement").
+    @State private var checking: ReferenceMovement?
+    /// Bumped after a check: the movement may have been learned again, its images changed.
+    @State private var movementRevision = 0
 
     private var exercise: PlannedExercise? {
         let exercises = program.orderedExercises
@@ -31,6 +35,7 @@ struct ExerciseDetailView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     MovementCard(catalog: exercise.catalogExercise, symbol: exercise.figureSymbol)
+                        .id(movementRevision)
                         .accessibilityLabel(Text("Mouvement : \(exercise.name)"))
 
                     VStack(alignment: .leading, spacing: 10) {
@@ -41,6 +46,11 @@ struct ExerciseDetailView: View {
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
+                        if let reference = exercise.catalogExercise?.reference {
+                            Button("Vérifier le mouvement", systemImage: "eye") { checking = reference }
+                                .buttonStyle(.glass)
+                                .padding(.top, 4)
+                        }
                     }
                     .padding()
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -69,6 +79,7 @@ struct ExerciseDetailView: View {
             .navigationTitle(exercise.name)
             // Exercise names are long: in the bar, on two lines if needed, rather than cut in large type.
             .navigationBarTitleDisplayMode(.inline)
+            .sheet(item: $checking, onDismiss: { movementRevision += 1 }) { MovementCheckSheet(movement: $0) }
         } else {
             ContentUnavailableView("Exercice introuvable", systemImage: "questionmark.circle")
         }

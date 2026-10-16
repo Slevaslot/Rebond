@@ -289,7 +289,8 @@ struct NewProgramFlow: View {
     }
 }
 
-/// One exercise of "Mes exercices": the movement, do it now, the programs it is in, rename or delete it.
+/// One exercise of "Mes exercices": the movement, do it now, the programs it is in, check the filmed movement,
+/// rename or delete it.
 struct LibraryExerciseView: View {
     let exercise: LibraryExercise
 
@@ -304,6 +305,10 @@ struct LibraryExerciseView: View {
     @State private var renaming = false
     @State private var newName = ""
     @State private var confirmingDelete = false
+    /// The filmed movement being checked ("Vérifier le mouvement").
+    @State private var checking: ReferenceMovement?
+    /// Bumped after a check: the movement may have been learned again, its images changed.
+    @State private var movementRevision = 0
 
     var body: some View {
         let using = programs.filter { $0.exercises.contains { $0.name == exercise.name } }
@@ -311,6 +316,7 @@ struct LibraryExerciseView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 MovementCard(catalog: exercise.catalogExercise, symbol: exercise.planned.figureSymbol)
+                    .id(movementRevision)
                     .accessibilityLabel(Text("Mouvement : \(exercise.name)"))
 
                 doNow
@@ -341,6 +347,17 @@ struct LibraryExerciseView: View {
                 .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 26))
 
                 VStack(spacing: 0) {
+                    if let reference = exercise.catalogExercise?.reference {
+                        Button { checking = reference } label: {
+                            Label("Vérifier le mouvement", systemImage: "eye")
+                                .frame(maxWidth: .infinity, minHeight: 50, alignment: .leading)
+                                .padding(.horizontal)
+                                .contentShape(.rect)
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.tint)
+                        Divider().padding(.leading)
+                    }
                     Button {
                         newName = exercise.name
                         renaming = true
@@ -382,6 +399,7 @@ struct LibraryExerciseView: View {
         .background(Color(.systemGroupedBackground))
         .navigationTitle(exercise.name)
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(item: $checking, onDismiss: { movementRevision += 1 }) { MovementCheckSheet(movement: $0) }
         .alert("Renommer l'exercice", isPresented: $renaming) {
             TextField("Nom", text: $newName)
                 .textInputAutocapitalization(.sentences)

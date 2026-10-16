@@ -2,7 +2,7 @@ import PhotosUI
 import SwiftUI
 
 /// "Filmer un exercice": a video of the patient doing the movement, filmed now or picked in Photos. Rebond learns
-/// it, then one screen to check it and name it. The exercise can then be done on its own, without a séance.
+/// it, then one screen to check it (start and end, a try with the camera) and name it. The exercise can then be done on its own, without a séance.
 struct FilmExerciseView: View {
     let onDone: (ReferenceMovement) -> Void
 
@@ -95,34 +95,15 @@ struct FilmExerciseView: View {
         }
     }
 
+    /// What was learned, to check (and swap the start and the end, or try it) before saving it.
     private func review(_ movement: ReferenceMovement) -> some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                ReferenceFramesView(movement: movement)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 380)
-                    .background(Color.black)
-                    .clipShape(.rect(cornerRadius: 26))
-                Label("^[\(movement.repCount) répétition repérée](inflect: true)", systemImage: "checkmark.circle.fill")
-                    .font(.headline)
-                    .foregroundStyle(.green)
-                TextField("Nom", text: $name, prompt: Text(movement.name))
-                    .font(.title3.weight(.semibold))
-                    .padding()
-                    .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 16))
-                Button { save(movement) } label: {
-                    Text("Enregistrer l'exercice")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.glassProminent)
-                .buttonBorderShape(.capsule)
-                .controlSize(.extraLarge)
-                Button("Choisir une autre vidéo") { retry() }
-                    .buttonStyle(.glass)
-                    .controlSize(.large)
-            }
-            .padding()
+        LearnedMovementReview(
+            movement: Binding(get: { movement }, set: { stage = .review($0) }),
+            name: $name,
+            saveTitle: "Enregistrer l'exercice",
+            onChooseOtherVideo: retry
+        ) {
+            save(movement)
         }
     }
 
@@ -146,6 +127,8 @@ struct FilmExerciseView: View {
         Task {
             do {
                 stage = .review(try await ReferenceStore.learn(from: video, name: "", mirrored: mirrored))
+            } catch ReferenceError.poorCapture(let advice) {
+                stage = .failed("\(advice)")
             } catch ReferenceError.noBody {
                 stage = .failed("Rebond n'a pas bien vu le corps. Filmez de face, le corps entier dans l'image, pieds compris.")
             } catch {
