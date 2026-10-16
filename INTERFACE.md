@@ -38,7 +38,7 @@ Deux onglets, plus Kiné si l'espace kiné est activé (HIG *Tab bars* : les ong
 | **Programme** | Des exercices déjà créés, avec combien (séries × répétitions ou durée) et quels jours. Le patient peut en avoir plusieurs (le genou lundi, mercredi et vendredi, le dos mardi et jeudi). | À la fin de la création d'un exercice, ou d'un coup avec « Créer un programme » : composer moi-même (en piochant dans « Mes exercices »), coller le message du kiné, scanner ou photographier sa feuille. Le QR code du kiné apporte aussi un programme entier. |
 | **Séance** | Ce qu'on fait un jour donné : les exercices de tous les programmes de ce jour. | Jamais : elle découle des programmes. |
 
-- On crée d'abord un exercice. Une fois enregistré, l'app propose la suite : « Ajouter à « … » » pour chaque programme, « Créer un programme avec cet exercice », ou « Plus tard ». Un exercice seul n'est dans aucune séance.
+- On crée d'abord un exercice. Une fois enregistré, l'app propose la suite : « Ajouter à « … » » pour chaque programme, « Créer un programme avec cet exercice », ou « Non, juste l'exercice ». Un exercice seul n'est dans aucune séance, mais se fait déjà avec « Essayer un exercice ».
 - « Créer un exercice » ne crée jamais de programme ; « Créer un programme » crée directement un programme entier, sur l'Accueil vide comme dans l'onglet Exercices.
 - **Des deux côtés** (réglage de chaque exercice d'un programme) : chaque série se fait d'un côté puis de l'autre, avec un seul film ou modèle, montré en miroir pour le second côté. Activé par défaut pour un exercice filmé d'un seul côté (une jambe, un bras). La séance affiche « Série 1 sur 3 · côté gauche », la fin de série annonce « Côté droit ». La caméra compte les deux côtés avec le même film.
 - **Essayer un exercice** (hors programme) n'est pas une séance : il est enregistré pour l'historique de l'exercice, mais ne compte ni dans la régularité, ni dans le suivi, ni dans le bilan envoyé au kiné (`Session.isTrial`).
@@ -51,7 +51,7 @@ L'onglet Exercices est là dès le départ, avec les exercices Rebond.
    - bouton principal **« Créer mon exercice »** : filmer ou choisir une vidéo, ou un exercice sans caméra ; seule action mise en avant (HIG *Writing* : une seule suite claire sur un écran vide) ;
    - bouton secondaire **« Créer un programme »**, un menu pour un programme entier d'un coup : composer moi-même, coller le message, scanner la feuille, photo de la feuille ;
    - « Charger le programme de démo », dans les builds de développement seulement.
-2. Carte « Essayer un exercice » : un exercice tout de suite, hors programme. « Choisir un exercice » les range en trois groupes : « Mes exercices filmés », « Exercices Rebond », « Sans caméra » (comptés à la main ou tenus). Un groupe vide n'apparaît pas, sauf « Exercices Rebond », toujours là.
+2. Carte « Essayer un exercice » : un exercice tout de suite, hors programme. « Choisir un exercice » les range en trois groupes : « Mes exercices filmés », « Exercices Rebond », « Sans caméra » (« Compter à la main » et « Minuteur » pour n'importe quel mouvement, puis les exercices comptés ou tenus du patient). « Composer moi-même » range « Mes exercices » dans les mêmes trois groupes, avec « Compté à la main ou minuteur » pour en ajouter un sans quitter la page.
 
 Le QR code prescrit depuis l'espace Kiné n'a pas besoin de bouton : le patient le vise avec l'appareil photo de l'iPhone, le lien `rebond://programme` ouvre l'écran de vérification.
 

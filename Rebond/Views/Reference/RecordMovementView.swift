@@ -43,20 +43,29 @@ struct RecordMovementView: View {
                     .shadow(radius: 12)
             }
         }
-        .overlay(alignment: .top) { topCard.padding() }
-        .overlay(alignment: .bottom) { controls.padding() }
-        .overlay(alignment: .topLeading) {
-            if stage == .ready || stage == .saved || stage == .failed {
-                Button(takes.isEmpty ? "Annuler" : "Terminé", systemImage: "xmark") { finish() }
-                    .labelStyle(.iconOnly)
-                    .font(.title3.weight(.semibold))
-                    .frame(width: 44, height: 44)
-                    .glassEffect(in: .circle)
-                    .padding()
-                    .padding(.top, 60)
+        .overlay(alignment: .top) {
+            // The close button on its own row, above the card: the row stays while filming, so the card doesn't move.
+            VStack(spacing: 12) {
+                HStack {
+                    if stage == .ready || stage == .saved || stage == .failed {
+                        Button(takes.isEmpty ? "Annuler" : "Terminé", systemImage: "xmark") { finish() }
+                            .labelStyle(.iconOnly)
+                            .font(.title3.weight(.semibold))
+                            .frame(width: 44, height: 44)
+                            .glassEffect(.regular.interactive(), in: .circle)
+                            .buttonStyle(.plain)
+                    }
+                    Spacer()
+                }
+                .frame(height: 44)
+                topCard
             }
+            .padding()
         }
+        .overlay(alignment: .bottom) { controls.padding() }
         .animation(.smooth, value: stage)
+        // Over the camera's image, like the session: glass and text in dark.
+        .environment(\.colorScheme, .dark)
         .task { await camera.start() }
         .onDisappear { camera.stop() }
         .task(id: stage == .recording) {
@@ -89,7 +98,6 @@ struct RecordMovementView: View {
                 .padding(.vertical, 12)
                 .glassEffect(in: .capsule)
             }
-            .padding(.top, 56)
         case .saved:
             card(title: "^[\(takes.count) exercice filmé](inflect: true)",
                  detail: "Filmez l'exercice suivant, ou terminez : Rebond analyse les vidéos.")
@@ -110,7 +118,6 @@ struct RecordMovementView: View {
         .padding()
         .frame(maxWidth: .infinity)
         .glassEffect(in: .rect(cornerRadius: 26))
-        .padding(.top, 56)
     }
 
     @ViewBuilder

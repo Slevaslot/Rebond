@@ -55,9 +55,9 @@ struct AddExerciseMenu<Label: View>: View {
                 Button("Ajouter à « \(program.title) »") { exercise.append(to: program) }
             }
             Button("Créer un programme avec cet exercice") { router.newProgram(with: [exercise.name]) }
-            Button("Plus tard", role: .cancel) {}
+            Button("Non, juste l'exercice", role: .cancel) {}
         } message: { _ in
-            Text("Ajoutez-le à un programme pour qu'il fasse partie de vos séances.")
+            Text("Vous pouvez déjà le faire seul (Accueil › Essayer un exercice). Ajoutez-le à un programme pour qu'il fasse partie de vos séances.")
         }
     }
 
@@ -180,9 +180,11 @@ struct LibraryPickerView: View {
     let onNext: ([EditableProgram.Exercise]) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var context
     @Query(sort: \LibraryExercise.createdAt) private var library: [LibraryExercise]
     /// Names of the ticked exercises, in order.
     @State private var selection: [String] = []
+    @State private var addingWithoutCamera = false
 
     var body: some View {
         List {
@@ -193,27 +195,30 @@ struct LibraryPickerView: View {
                     withAnimation(.snappy) { selection.append(exercise.name) }
                 }, offersPhysiotherapist: false, offersProgram: false)
             }
+            // Three groups, as in "Choisir un exercice": filmed, Rebond's, then without the camera.
+            let filmed = library.filter(\.isFilmed)
+            if !filmed.isEmpty {
+                Section("Mes exercices filmés") { rows(filmed) }
+            }
+            let rebond = library.filter(\.isRebond)
+            if !rebond.isEmpty {
+                Section("Exercices Rebond") { rows(rebond) }
+            }
             Section {
-                ForEach(library) { exercise in
-                    Button {
-                        withAnimation(.snappy) {
-                            if let index = selection.firstIndex(of: exercise.name) {
-                                selection.remove(at: index)
-                            } else {
-                                selection.append(exercise.name)
-                            }
-                        }
-                    } label: {
-                        LibraryExerciseRow(exercise: exercise, isSelected: selection.contains(exercise.name))
-                    }
-                    .buttonStyle(.plain)
-                }
+                rows(library.filter { $0.catalogExercise == nil })
+                Button("Compté à la main ou minuteur", systemImage: "plus") { addingWithoutCamera = true }
             } header: {
-                Text("Mes exercices")
+                Text("Sans caméra")
             } footer: {
-                if library.isEmpty {
-                    Text("Ajoutez d'abord un exercice : filmé chez votre kiné, ou de Rebond.")
-                }
+                Text("Pour un exercice que la caméra ne suit pas : vous comptez vous-même, ou un minuteur pour une position tenue.")
+            }
+        }
+        .sheet(isPresented: $addingWithoutCamera) {
+            WithoutCameraExercisePicker { catalogID, name, holdSeconds in
+                let exercise = LibraryExercise(catalogID: catalogID, name: name, holdSeconds: holdSeconds)
+                context.insert(exercise)
+                try? context.save()
+                withAnimation(.snappy) { selection.append(exercise.name) }
             }
         }
         .navigationTitle("Choisir les exercices")
@@ -230,6 +235,23 @@ struct LibraryPickerView: View {
         }
         .onAppear { if selection.isEmpty { selection = preselected } }
         .sensoryFeedback(.selection, trigger: selection)
+    }
+
+    private func rows(_ exercises: [LibraryExercise]) -> some View {
+        ForEach(exercises) { exercise in
+            Button {
+                withAnimation(.snappy) {
+                    if let index = selection.firstIndex(of: exercise.name) {
+                        selection.remove(at: index)
+                    } else {
+                        selection.append(exercise.name)
+                    }
+                }
+            } label: {
+                LibraryExerciseRow(exercise: exercise, isSelected: selection.contains(exercise.name))
+            }
+            .buttonStyle(.plain)
+        }
     }
 
     private var chosen: [EditableProgram.Exercise] {

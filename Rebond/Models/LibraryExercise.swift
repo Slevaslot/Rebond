@@ -42,12 +42,20 @@ final class LibraryExercise {
                         holdSeconds: holdSeconds, order: 0)
     }
 
-    /// To do it right now, on its own: one set of `reps` (or one hold), on both sides when filmed on one.
-    func workoutExercise(reps: Int) -> WorkoutExercise {
+    /// To do it right now, on its own: one set of `reps` (or one hold of `holdSeconds`), on both sides when filmed
+    /// on one.
+    func workoutExercise(reps: Int, holdSeconds: Int? = nil) -> WorkoutExercise {
         let exercise = planned.workoutExercise
-        return WorkoutExercise(name: exercise.name, catalogID: exercise.catalogID, mode: exercise.mode, sets: 1,
+        let mode: WorkoutMode = if case .hold = exercise.mode, let holdSeconds { .hold(seconds: holdSeconds) } else { exercise.mode }
+        return WorkoutExercise(name: exercise.name, catalogID: exercise.catalogID, mode: mode, sets: 1,
                                reps: reps, bothSides: editable.bothSides, firstSide: exercise.firstSide)
     }
+
+    /// Filmed (the patient's model movement), followed by the camera.
+    var isFilmed: Bool { catalogExercise?.reference != nil }
+
+    /// One of Rebond's, followed by the camera.
+    var isRebond: Bool { !isFilmed && catalogExercise != nil }
 
     /// Adds it at the end of a program, in 3 × 10 (or 3 × its hold).
     func append(to program: Program) {
