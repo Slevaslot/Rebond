@@ -43,7 +43,8 @@ final class ExerciseResult {
     /// For a held exercise: seconds planned over all sets, and seconds actually held.
     var plannedSeconds: Int = 0
     var heldSeconds: Int = 0
-    /// Best repetition, in percent of the exercise's target. Nil when not measured by the camera.
+    /// The usual repetition (median of those the camera measured), in percent of the exercise's target. Nil when
+    /// nothing was measured (counted by hand, timer, joints not seen): unavailable, never zero.
     var amplitude: Double?
 
     init(exerciseName: String, catalogID: String?, order: Int = 0, plannedReps: Int, completedReps: Int, incompleteReps: Int,

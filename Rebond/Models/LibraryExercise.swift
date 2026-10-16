@@ -43,13 +43,22 @@ final class LibraryExercise {
     }
 
     /// To do it right now, on its own: one set of `reps` (or one hold of `holdSeconds`), on both sides when filmed
-    /// on one.
-    func workoutExercise(reps: Int, holdSeconds: Int? = nil) -> WorkoutExercise {
+    /// on one, unless the patient chose one side (`sides`).
+    func workoutExercise(reps: Int, holdSeconds: Int? = nil, sides: SideChoice = .both) -> WorkoutExercise {
         let exercise = planned.workoutExercise
         let mode: WorkoutMode = if case .hold = exercise.mode, let holdSeconds { .hold(seconds: holdSeconds) } else { exercise.mode }
         return WorkoutExercise(name: exercise.name, catalogID: exercise.catalogID, mode: mode, sets: 1,
-                               reps: reps, bothSides: editable.bothSides, firstSide: exercise.firstSide)
+                               reps: reps, bothSides: sides == .both && editable.bothSides, firstSide: exercise.firstSide,
+                               mirrored: sides == .mirrored)
     }
+
+    /// For a movement filmed on one side: both sides, the filmed one, or the other one in mirror.
+    enum SideChoice: Hashable {
+        case both, filmed, mirrored
+    }
+
+    /// The side the film shows, when it shows one (one arm, one leg).
+    var filmedSide: BodySide? { catalogExercise?.reference?.filmedSide }
 
     /// Filmed (the patient's model movement), followed by the camera.
     var isFilmed: Bool { catalogExercise?.reference != nil }

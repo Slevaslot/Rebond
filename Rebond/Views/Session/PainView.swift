@@ -225,7 +225,7 @@ struct ResultRow: View {
                 }
             }
             if let amplitude = result.amplitude {
-                Text("Meilleure amplitude : \(Int(amplitude.rounded())) % de l'objectif")
+                Text("Amplitude habituelle : \(Int(amplitude.rounded())) % de l'objectif")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }

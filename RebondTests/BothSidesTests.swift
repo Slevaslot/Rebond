@@ -16,6 +16,23 @@ struct BothSidesTests {
         #expect(plan.steps.map(\.isMirrored) == [false, true, false, true])
     }
 
+    @Test func oneSideInMirror() {
+        // Filmed on the left leg, done on the right one only: named, shown in mirror, every set.
+        var mirrored = leftLeg
+        mirrored.bothSides = false
+        mirrored.mirrored = true
+        var plan = WorkoutPlan(exercises: [mirrored])
+        #expect(plan.steps.map(\.side) == [.right, .right])
+        #expect(plan.steps.allSatisfy { $0.isMirrored })
+        plan.record(SetResult(completedReps: 8))
+        plan.addSet()
+        #expect(plan.steps.last?.isMirrored == true)
+        // As filmed: no side named, nothing mirrored.
+        var asFilmed = leftLeg
+        asFilmed.bothSides = false
+        #expect(WorkoutPlan(exercises: [asFilmed]).steps.allSatisfy { !$0.isMirrored && $0.side == nil })
+    }
+
     @Test func bothSidesAddUp() {
         var plan = WorkoutPlan(exercises: [leftLeg])
         for reps in [8, 7, 8, 6] { plan.record(SetResult(completedReps: reps)) }

@@ -15,7 +15,7 @@ nonisolated struct WeeklyReport {
         let incompleteReps: Int
         let plannedSeconds: Int
         let heldSeconds: Int
-        /// Best amplitude of the first and last session of the week, in percent of the target.
+        /// Usual amplitude (median of the measured repetitions) of the first and last session of the week, in percent of the target.
         let firstAmplitude: Double?
         let lastAmplitude: Double?
     }

@@ -69,7 +69,7 @@ struct RegularityChart: View {
     }
 }
 
-/// Best amplitude per session, in percent of the target, for each exercise followed by the camera.
+/// Usual amplitude per session (median of the measured repetitions), in percent of the target, for each exercise followed by the camera.
 struct AmplitudeChart: View {
     let data: ProgressData
 

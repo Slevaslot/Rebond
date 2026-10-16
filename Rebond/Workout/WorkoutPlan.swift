@@ -35,6 +35,9 @@ nonisolated struct WorkoutExercise: Hashable, Sendable {
     var bothSides = false
     /// The side shown by the film or the model: done first, the other one mirrored.
     var firstSide = BodySide.right
+    /// Done on one side only, the other one than the film's: the film or the model shown as in a mirror, and the
+    /// camera follows that side.
+    var mirrored = false
 
     /// Sides done at each set.
     var sideCount: Int { bothSides ? 2 : 1 }
@@ -108,7 +111,11 @@ nonisolated struct WorkoutPlan: Sendable {
         self.exercises = exercises
         steps = exercises.enumerated().flatMap { index, exercise in
             (1...max(1, exercise.sets)).flatMap { set -> [WorkoutStep] in
-                guard exercise.bothSides else { return [WorkoutStep(exerciseIndex: index, exercise: exercise, set: set)] }
+                guard exercise.bothSides else {
+                    // One side only, the other one than the film's: named, and shown mirrored.
+                    return [WorkoutStep(exerciseIndex: index, exercise: exercise, set: set,
+                                        side: exercise.mirrored ? exercise.firstSide.other : nil)]
+                }
                 // Both sides at each set: the patient keeps the same position, one side then the other.
                 return [exercise.firstSide, exercise.firstSide.other].map {
                     WorkoutStep(exerciseIndex: index, exercise: exercise, set: set, side: $0)
@@ -170,11 +177,13 @@ nonisolated struct WorkoutPlan: Sendable {
         let index = last.exerciseIndex
         let old = exercises[index]
         let exercise = WorkoutExercise(name: old.name, catalogID: old.catalogID, mode: old.mode,
-                                       sets: old.sets + 1, reps: old.reps, bothSides: old.bothSides, firstSide: old.firstSide)
+                                       sets: old.sets + 1, reps: old.reps, bothSides: old.bothSides, firstSide: old.firstSide,
+                                       mirrored: old.mirrored)
         exercises[index] = exercise
         let added = exercise.bothSides
             ? [exercise.firstSide, exercise.firstSide.other].map { WorkoutStep(exerciseIndex: index, exercise: exercise, set: exercise.sets, side: $0) }
-            : [WorkoutStep(exerciseIndex: index, exercise: exercise, set: exercise.sets)]
+            : [WorkoutStep(exerciseIndex: index, exercise: exercise, set: exercise.sets,
+                           side: exercise.mirrored ? exercise.firstSide.other : nil)]
         steps = steps.map {
             $0.exerciseIndex == index ? WorkoutStep(exerciseIndex: index, exercise: exercise, set: $0.set, side: $0.side) : $0
         } + added

@@ -299,6 +299,8 @@ struct LibraryExerciseView: View {
     @Query(sort: \Program.createdAt) private var programs: [Program]
     @State private var reps = EditableProgram.defaultReps
     @State private var choosingReps = false
+    /// A movement filmed on one side: which side to do now.
+    @State private var sides = LibraryExercise.SideChoice.both
     @State private var renaming = false
     @State private var newName = ""
     @State private var confirmingDelete = false
@@ -417,8 +419,18 @@ struct LibraryExerciseView: View {
                     .frame(height: 150)
                 }
             }
+            if let filmed = exercise.filmedSide {
+                // Filmed on one side: both, as filmed, or the other side with the film in mirror.
+                Picker("Côté", selection: $sides) {
+                    Text("Les deux").tag(LibraryExercise.SideChoice.both)
+                    Text(filmed == .right ? "Droit" : "Gauche").tag(LibraryExercise.SideChoice.filmed)
+                    Text(filmed == .right ? "Gauche (miroir)" : "Droit (miroir)").tag(LibraryExercise.SideChoice.mirrored)
+                }
+                .pickerStyle(.segmented)
+                .accessibilityHint(Text("Le côté miroir montre la vidéo retournée et suit l'autre côté du corps."))
+            }
             Button {
-                router.startExercise(exercise.workoutExercise(reps: reps))
+                router.startExercise(exercise.workoutExercise(reps: reps, sides: sides))
             } label: {
                 Label("Faire maintenant", systemImage: "play.fill")
                     .font(.headline)
