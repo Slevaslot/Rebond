@@ -43,11 +43,11 @@ final class MotionSession {
 
     let exercise: CatalogExercise
     let targetReps: Int
+    /// A held position followed by the camera (a filmed hold): the seconds to hold. Nil for repetitions.
+    let targetSeconds: Int?
     /// The guide shows the movement before the set: only before the first set of an exercise.
     let showsDemonstration: Bool
     let liveFrame = LiveFrame()
-    /// Called when the patient asks for the next set, with a thumbs up from where they stand.
-    @ObservationIgnored var onNext: (() -> Void)?
 
     private(set) var cameraUnavailable = false
     /// Access was refused, as opposed to a device without a front camera.
@@ -57,6 +57,11 @@ final class MotionSession {
     private(set) var skeleton: PoseSkeleton?
     /// 0 at rest, 1 when the target depth is reached.
     private(set) var depthProgress = 0.0
+    /// The joints the movement needs are seen on the last frames: otherwise the gauge doesn't pretend to follow.
+    private(set) var isMeasuring = true
+    /// A held position: seconds held so far, and whether the patient is in the position right now.
+    private(set) var heldSeconds = 0.0
+    private(set) var isHolding = false
     private(set) var repCount = 0
     private(set) var incompleteCount = 0
     /// Each counted repetition's amplitude, as a fraction of the exercise's target.
@@ -135,13 +140,16 @@ final class MotionSession {
     @ObservationIgnored private var hasSaidTempoReminder = false
     private let tempoReminderInterval = 3
 
-    init(exercise: CatalogExercise, targetReps: Int, showsDemonstration: Bool = true) {
+    /// - Parameter side: For a filmed movement, the side of the body asked: as filmed, or the other one (mirror).
+    init(exercise: CatalogExercise, targetReps: Int, targetSeconds: Int? = nil, side: MovementSide = .asFilmed,
+         showsDemonstration: Bool = true) {
         self.exercise = exercise
         self.targetReps = targetReps
+        self.targetSeconds = targetSeconds
         self.showsDemonstration = showsDemonstration
         // A later set of the same exercise: the patient is already in place, no outline to fit again.
         isInPlace = !showsDemonstration
-        processor = FrameProcessor(exercise: exercise)
+        processor = FrameProcessor(exercise: exercise, side: side)
         processor.onImage = { [weak self] image in
             Task { @MainActor [self] in self?.liveFrame.image = image }
         }
@@ -224,19 +232,10 @@ final class MotionSession {
         processor.blursEverything.withLock { $0 = blurred }
     }
 
-    /// Hand gestures, from where the patient stands: palm to pause, spread or pinch to open or close the model.
+    /// Hand signs, from where the patient stands: the same commands as the buttons, Siri and the watch, resolved
+    /// for the screen on display (`SessionRemote`).
     private func handle(_ gesture: HandGesture) {
-        switch gesture {
-        case .openPalm: togglePause()
-        case .spread: expandModel()
-        case .pinch: shrinkModel()
-        case .thumbsUp:
-            // While paused, the detector reports any sign as the resume: a thumbs up never skips the set then.
-            guard !isPaused else { return }
-            onNext?()
-        case .twoFingers, .crossedArms:
-            SessionRemote.shared.send(SessionCommand(gesture), from: .gesture)
-        }
+        SessionRemote.shared.send(SessionCommand(gesture), from: .gesture)
     }
 
     /// Spoken instructions need an active audio session; other audio is lowered while the coach talks.
@@ -249,7 +248,8 @@ final class MotionSession {
     }
 
     var result: SetResult {
-        SetResult(
+        if targetSeconds != nil { return SetResult(heldSeconds: Int(heldSeconds)) }
+        return SetResult(
             completedReps: repCount,
             incompleteReps: incompleteCount,
             amplitudes: amplitudes.map { $0 * 100 }
@@ -364,6 +364,9 @@ final class MotionSession {
         repCount = 0
         incompleteCount = 0
         amplitudes = []
+        heldSeconds = 0
+        isHolding = false
+        lastHoldTime = nil
         feedbackDismissal?.cancel()
         feedback = nil
         heldFault = nil
@@ -415,9 +418,18 @@ final class MotionSession {
             beginSet(announce: false)
         }
         // Nothing counts during a pause, while watching the model, nor until the patient is back in place.
-        guard phase == .active, !isPaused, !isLost, !isWatching else { return }
-        depthProgress = update.progress
-        faultToHighlight = update.posture ?? heldFault
+        guard phase == .active, !isPaused, !isLost, !isWatching else {
+            lastHoldTime = nil
+            return
+        }
+        isMeasuring = update.isMeasured
+        // Joints not seen: the gauge stays where it was measured last, nothing is advised on a guess.
+        if update.isMeasured { depthProgress = update.progress }
+        faultToHighlight = update.isMeasured ? (update.posture ?? heldFault) : nil
+        if let targetSeconds {
+            applyHold(update, target: targetSeconds)
+            return
+        }
 
         switch update.event {
         case .calibrated:
@@ -471,6 +483,41 @@ final class MotionSession {
         }
     }
 
+    @ObservationIgnored private var lastHoldTime: Date?
+    @ObservationIgnored private var saidTenSeconds = false
+
+    /// A held position: the time adds up only while the patient is in it, seen by the camera.
+    private func applyHold(_ update: CounterUpdate, target: Int) {
+        let now = Date.now
+        let holding = update.isHolding ?? false
+        if holding, let last = lastHoldTime {
+            // At most a quarter of a second between two frames: a stall of the camera adds nothing.
+            heldSeconds += min(0.25, now.timeIntervalSince(last))
+        }
+        lastHoldTime = holding ? now : nil
+        isHolding = holding
+        switch update.event {
+        case .bottomReached:
+            coach.say(heldSeconds < 1 ? "Tenez la position" : "On reprend", urgency: .immediate)
+        case .correction(let correction):
+            show(Feedback(message: correction.message, isPositive: false))
+            coach.say(correction.message, urgency: .immediate)
+        default:
+            break
+        }
+        let remaining = Double(target) - heldSeconds
+        if target > 15, remaining <= 10, !saidTenSeconds {
+            saidTenSeconds = true
+            coach.say("Plus que 10 secondes")
+        }
+        if remaining <= 0 {
+            phase = .finished
+            isHolding = false
+            depthProgress = 0
+            coach.say("Terminé, bravo !")
+        }
+    }
+
     /// Keeps a rejected movement's fault highlighted for a moment, so the patient sees what went wrong.
     private func hold(_ fault: Correction) {
         heldFault = fault
@@ -503,6 +550,7 @@ nonisolated final class FrameProcessor: NSObject, AVCaptureVideoDataOutputSample
     var onGesture: (@Sendable (HandGesture) -> Void)?
 
     private let exercise: CatalogExercise
+    private let side: MovementSide
     private let analyzer = PoseAnalyzer()
     private var gestures = HandGestureDetector()
     private let blur = BackgroundBlur()
@@ -513,10 +561,14 @@ nonisolated final class FrameProcessor: NSObject, AVCaptureVideoDataOutputSample
     /// 15 analyses per second are enough to follow the movement.
     private let minAnalysisInterval = CMTime(value: 1, timescale: 15)
 
-    init(exercise: CatalogExercise) {
+    init(exercise: CatalogExercise, side: MovementSide) {
         self.exercise = exercise
-        counter = exercise.makeCounter()
+        self.side = side
+        counter = exercise.makeCounter(side: side)
     }
+
+    /// The last measured progress values (about 0.7 s): the body is really moving when they spread.
+    private var recentProgress: [Double] = []
 
     /// Called from the main thread: the counter itself is replaced on the video queue, at the next analysis.
     func resetCounter() {
@@ -538,15 +590,22 @@ nonisolated final class FrameProcessor: NSObject, AVCaptureVideoDataOutputSample
         if time - lastAnalysisTime >= minAnalysisInterval {
             lastAnalysisTime = time
             if resetRequested.withLock({ requested in defer { requested = false }; return requested }) {
-                counter = exercise.makeCounter()
+                counter = exercise.makeCounter(side: side)
             }
             let frame = analyzer.analyze(pixelBuffer)
             let update = counter.process(frame.measure, at: time.seconds)
             onAnalysis?(frame.skeleton, update, exercise.canFollow(frame.measure))
+            // Signs are left out only while the body really moves (the progress changes), never because the
+            // progress is high: a starting position measured wrong must not block the commands.
+            if update.isMeasured {
+                recentProgress.append(update.progress)
+                if recentProgress.count > 10 { recentProgress.removeFirst() }
+            }
+            let isMoving = (recentProgress.max() ?? 0) - (recentProgress.min() ?? 0) > 0.15
             // While paused, the sign to resume is always looked for, whatever the exercise.
             let paused = isPaused.withLock { $0 }
             if exercise.allowsHandGestures || paused,
-               let gesture = gestures.process(pixelBuffer, body: frame.skeleton, isMoving: update.progress > 0.15,
+               let gesture = gestures.process(pixelBuffer, body: frame.skeleton, isMoving: isMoving,
                                               isPaused: paused) {
                 onGesture?(gesture)
             }

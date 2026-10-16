@@ -16,6 +16,8 @@ struct SessionView: View {
     /// The other side of an exercise done on both: the film or the model is shown mirrored.
     var mirrorsModel = false
     let onFinish: (SetResult) -> Void
+    /// A held position followed by the camera: the seconds to hold, instead of repetitions.
+    var targetSeconds: Int?
 
     @State private var motion: MotionSession
     @Environment(\.openURL) private var openURL
@@ -24,6 +26,11 @@ struct SessionView: View {
     @Environment(\.reportSetActivity) private var reportSetActivity
     @Environment(\.skipRequest) private var skipRequest
     @Environment(\.pauseRequest) private var pauseRequest
+    @Environment(\.modelRequest) private var modelRequest
+    /// Inside a whole session, `WorkoutView` carries out the commands; on its own (a trial), this screen does.
+    @Environment(\.handlesSessionRequests) private var requestsHandledAbove
+    /// The rest before the next set is paused: the patient takes their time.
+    @State private var restPaused = false
     /// Seconds before the next set starts on its own, once this one is finished.
     @State private var restRemaining = SessionView.restDuration
     /// Long enough to breathe and walk back, short enough not to have to touch the phone.
@@ -46,16 +53,20 @@ struct SessionView: View {
         onAnotherSet: ((SetResult) -> Void)? = nil,
         onCountByHand: (() -> Void)? = nil,
         mirrorsModel: Bool = false,
+        targetSeconds: Int? = nil,
+        side: MovementSide = .asFilmed,
         onFinish: @escaping (SetResult) -> Void
     ) {
         self.onCountByHand = onCountByHand
         self.mirrorsModel = mirrorsModel
+        self.targetSeconds = targetSeconds
         self.exercise = exercise
         self.setTitle = setTitle
         self.nextTitle = nextTitle
         self.onAnotherSet = onAnotherSet
         self.onFinish = onFinish
-        _motion = State(initialValue: MotionSession(exercise: exercise, targetReps: targetReps, showsDemonstration: showsDemonstration))
+        _motion = State(initialValue: MotionSession(exercise: exercise, targetReps: targetReps, targetSeconds: targetSeconds,
+                                                    side: side, showsDemonstration: showsDemonstration))
     }
 
     var body: some View {
@@ -142,6 +153,8 @@ struct SessionView: View {
             if motion.phase == .active, motion.bodyVisible, !motion.isPaused, !motion.isLost, !isWatching {
                 DepthGauge(progress: motion.depthProgress, fillsUpward: exercise.fillsGaugeUpward)
                     .containerRelativeFrame(.vertical) { height, _ in height * 0.4 }
+                    // Joints not seen right now: the gauge fades rather than pretend to follow.
+                    .opacity(motion.isMeasuring ? 1 : 0.35)
                     .padding()
                     .transition(.opacity)
             }
@@ -220,28 +233,38 @@ struct SessionView: View {
         }
         .task(id: explainingCamera) {
             guard !explainingCamera else { return }
-            // Thumbs up from where the patient stands: next set.
-            let session = motion
-            session.onNext = { [weak session] in
-                guard let session else { return }
-                onFinish(session.result)
-            }
             await motion.start()
         }
         .onChange(of: skipRequest) { if skipRequest != nil { onFinish(motion.result) } }
-        // The pause button of the Apple Watch.
-        .onChange(of: pauseRequest) {
-            if motion.phase != .finished, !motion.cameraUnavailable { motion.togglePause() }
+        // Pause from anywhere (hand sign, Siri, the Apple Watch, the Live Activity), through `WorkoutView`.
+        .onChange(of: pauseRequest) { togglePause() }
+        .onChange(of: modelRequest) {
+            guard let modelRequest else { return }
+            if modelRequest.expand { motion.expandModel() } else { motion.shrinkModel() }
         }
+        // On its own (a trial outside a session), the commands come here directly.
+        .onChange(of: SessionRemote.shared.request) { _, request in
+            guard !requestsHandledAbove, let request else { return }
+            switch request.action {
+            case .pause, .resume, .startTimer: togglePause()
+            case .expandModel: motion.expandModel()
+            case .shrinkModel: motion.shrinkModel()
+            case .finishSet, .skipExercise, .endSession: onFinish(motion.result)
+            case .ignored: break
+            }
+        }
+        .sessionScreen(screen)
+        .onDisappear { if !requestsHandledAbove { SessionRemote.shared.screen = .none } }
         .task(id: motion.phase == .finished) {
             // The next set starts on its own after a short rest: no need to walk back to the phone.
-            // Not when the patient chooses between one more set and stopping.
+            // Not when the patient chooses between one more set and stopping. The rest can be paused.
             guard motion.phase == .finished, !offersAnotherSet else { return }
             restRemaining = Self.restDuration
+            restPaused = false
             while restRemaining > 0 {
                 try? await Task.sleep(for: .seconds(1))
                 guard !Task.isCancelled, motion.phase == .finished else { return }
-                restRemaining -= 1
+                if !restPaused { restRemaining -= 1 }
             }
             onFinish(motion.result)
         }
@@ -259,7 +282,47 @@ struct SessionView: View {
         .animation(.default, value: motion.isLost)
     }
 
+    @ViewBuilder
     private var counter: some View {
+        if let targetSeconds {
+            holdCounter(target: targetSeconds)
+        } else {
+            repetitionCounter
+        }
+    }
+
+    /// A held position: the time left, and whether it runs (the patient is in the position).
+    private func holdCounter(target: Int) -> some View {
+        let remaining = max(0, target - Int(motion.heldSeconds))
+        return HStack(spacing: 16) {
+            ZStack {
+                Circle()
+                    .stroke(.white.opacity(0.25), lineWidth: 6)
+                Circle()
+                    .trim(from: 0, to: min(1, motion.heldSeconds / Double(target)))
+                    .stroke(.green, style: StrokeStyle(lineWidth: 6, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                Image(systemName: motion.isHolding ? "timer" : "pause.fill")
+                    .font(.title2.bold())
+                    .contentTransition(.symbolEffect(.replace))
+            }
+            .frame(width: ringSize, height: ringSize)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(Duration.seconds(remaining), format: .time(pattern: .minuteSecond))
+                    .font(.title.bold())
+                    .monospacedDigit()
+                    .contentTransition(.numericText(countsDown: true))
+                Text(motion.isHolding ? "Tenez la position" : "Prenez la position du modèle")
+                    .font(.headline)
+            }
+        }
+        .padding()
+        .glassEffect(in: .rect(cornerRadius: 28))
+        .animation(.default, value: remaining)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var repetitionCounter: some View {
         HStack(spacing: 16) {
             ZStack {
                 Circle()
@@ -319,16 +382,17 @@ struct SessionView: View {
 
     /// The hand signs, from where the patient stands.
     private var gestureReminder: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 14) {
             Label("Pause", systemImage: "hand.raised.fill")
-            Label("Série suivante", systemImage: "hand.thumbsup.fill")
+            Label("Suivant", systemImage: "hand.thumbsup.fill")
+            Label("V : exercice suivant", systemImage: "forward.end.fill")
         }
         .font(.footnote.weight(.semibold))
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
         .glassEffect(in: .capsule)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("Main ouverte levée : pause. Pouce levé : série suivante."))
+        .accessibilityLabel(Text("Main ouverte levée : pause. Pouce levé : série suivante. Deux doigts en V : exercice suivant. Bras croisés : terminer la séance."))
     }
 
     /// The model is large: the patient watches, the camera fades back.
@@ -490,14 +554,21 @@ struct SessionView: View {
         .glassEffect(in: .rect(cornerRadius: 24))
     }
 
-    /// Body lost during the set and end-of-set messages, in the middle of the screen.
+    /// What the set did, in a few words.
+    private var doneSummary: LocalizedStringKey {
+        if targetSeconds != nil { return "Série terminée · \(Int(motion.heldSeconds)) s tenues" }
+        return "Série terminée · \(motion.repCount) répétitions"
+    }
+
+    /// The end of the set: what was done in one line, then what comes next and when, and one way on.
+    /// Everything reads from 2–3 m, and everything can be done from there (thumbs up, open palm).
     @ViewBuilder
     private var statusCard: some View {
         if motion.phase == .finished, offersAnotherSet {
-            VStack(spacing: 16) {
-                card(systemImage: "checkmark.circle.fill", color: .green,
-                     title: "Série terminée !",
-                     detail: "\(motion.repCount) répétitions")
+            VStack(spacing: 18) {
+                Label(doneSummary, systemImage: "checkmark.circle.fill")
+                    .font(.title2.bold())
+                    .labelStyle(DoneLabelStyle())
                 HStack {
                     Button("Terminer", systemImage: "flag.checkered") {
                         onFinish(motion.result)
@@ -510,42 +581,94 @@ struct SessionView: View {
                 }
                 .controlSize(.extraLarge)
             }
+            .padding(24)
+            .glassEffect(in: .rect(cornerRadius: 32))
+            .transition(.scale(scale: 0.9).combined(with: .opacity))
         } else if motion.phase == .finished {
             VStack(spacing: 16) {
-                card(systemImage: "checkmark.circle.fill", color: .green,
-                     title: "Série terminée !",
-                     detail: "\(motion.repCount) répétitions")
-                VStack(spacing: 6) {
-                    if let nextTitle {
-                        Text("Ensuite : \(Text(nextTitle))")
-                            .font(.headline)
-                    }
-                    Text(nextTitle == nil ? "Fin dans \(restRemaining) s" : "Reprise dans \(restRemaining) s")
+                Label(doneSummary, systemImage: "checkmark.circle.fill")
+                    .font(.headline)
+                    .labelStyle(DoneLabelStyle())
+                VStack(spacing: 4) {
+                    Text(nextTitle == nil ? "Dernière série" : "Ensuite")
                         .font(.subheadline)
-                        .monospacedDigit()
-                        .contentTransition(.numericText(countsDown: true))
-                        .animation(.default, value: restRemaining)
-                    if exercise.allowsHandGestures {
-                        Label("Pouce levé pour continuer tout de suite", systemImage: "hand.thumbsup.fill")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
+                        .foregroundStyle(.secondary)
+                    if let nextTitle {
+                        Text(nextTitle)
+                            .font(.title2.bold())
                     }
                 }
-                .multilineTextAlignment(.center)
-                .padding()
-                .glassEffect(in: .rect(cornerRadius: 24))
-                HStack {
-                    Button("Recommencer", systemImage: "arrow.counterclockwise") {
-                        motion.restart()
-                    }
-                    .buttonStyle(.glass)
-                    Button("Continuer", systemImage: "arrow.right") {
-                        onFinish(motion.result)
-                    }
-                    .buttonStyle(.glassProminent)
+                restCountdown
+                Button {
+                    onFinish(motion.result)
+                } label: {
+                    Label(nextTitle == nil ? "Terminer" : "Continuer", systemImage: "arrow.right")
+                        .font(.headline)
+                        .frame(maxWidth: 260)
                 }
+                .buttonStyle(.glassProminent)
                 .controlSize(.extraLarge)
+                if exercise.allowsHandGestures {
+                    HStack(spacing: 14) {
+                        Label("Continuer", systemImage: "hand.thumbsup.fill")
+                        Label(restPaused ? "Reprendre" : "Pause", systemImage: "hand.raised.fill")
+                    }
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(Text("Pouce levé : continuer. Main ouverte : mettre le repos en pause."))
+                }
+                Button("Refaire cette série", systemImage: "arrow.counterclockwise") {
+                    motion.restart()
+                }
+                .font(.footnote)
+                .buttonStyle(.borderless)
             }
+            .multilineTextAlignment(.center)
+            .padding(24)
+            .glassEffect(in: .rect(cornerRadius: 32))
+            .transition(.scale(scale: 0.9).combined(with: .opacity))
+        }
+    }
+
+    /// The rest before the next set, counting down; paused, it waits for the patient.
+    private var restCountdown: some View {
+        HStack(spacing: 10) {
+            ZStack {
+                Circle().stroke(.white.opacity(0.25), lineWidth: 4)
+                Circle()
+                    .trim(from: 0, to: Double(restRemaining) / Double(Self.restDuration))
+                    .stroke(.tint, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                    .animation(.linear(duration: 1), value: restRemaining)
+            }
+            .frame(width: 28, height: 28)
+            Text(restPaused ? "Repos en pause" : (nextTitle == nil ? "Fin dans \(restRemaining) s" : "Reprise dans \(restRemaining) s"))
+                .font(.headline)
+                .monospacedDigit()
+                .contentTransition(.numericText(countsDown: true))
+                .animation(.default, value: restRemaining)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    /// Pause or resume the set; at the end of the set, the rest's countdown.
+    private func togglePause() {
+        if motion.phase == .finished {
+            restPaused.toggle()
+        } else if !motion.cameraUnavailable {
+            motion.togglePause()
+        }
+    }
+
+    /// The screen on display, for the commands from afar.
+    private var screen: SessionScreen {
+        if motion.phase == .finished { return restPaused ? .restPaused : .resting }
+        if motion.isPaused { return .paused }
+        switch motion.phase {
+        case .calibrating, .demonstrating: return .gettingReady
+        case .active: return targetSeconds == nil ? .exercising : .holding
+        case .finished: return .resting
         }
     }
 
@@ -606,5 +729,15 @@ struct SessionView: View {
         .glassEffect(.regular.tint((feedback.isPositive ? Color.green : Color.orange).opacity(0.6)), in: .capsule)
         .id(feedback.id)
         .transition(.move(edge: .bottom).combined(with: .opacity))
+    }
+}
+
+/// "Série terminée": the check mark in green, the text as it is.
+private struct DoneLabelStyle: LabelStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(spacing: 8) {
+            configuration.icon.foregroundStyle(.green)
+            configuration.title
+        }
     }
 }
