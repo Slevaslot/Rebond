@@ -61,7 +61,7 @@ struct TodayView: View {
         return ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 header
-                AlertsGroup(sessions: sessions, onReport: { showingReport = true }, onShowProgram: { router.tab = .program })
+                AlertsGroup(sessions: sessions, onReport: { showingReport = true })
 
                 if todays.isEmpty {
                     RestDayCard(programs: programs)

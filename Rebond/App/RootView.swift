@@ -226,14 +226,13 @@ struct RootView: View {
     }
 
     /// A new program joins the others. A physiotherapist's new prescription replaces their previous one
-    /// (same physiotherapist, same name), and the Accueil page says what changed.
+    /// (same physiotherapist, same name).
     private func save(_ program: EditableProgram) {
         if let prescriber {
             let name = prescriber.isEmpty ? nil : prescriber
             let previous = name.flatMap { name in
                 programs.first { $0.prescriber == name && $0.name == program.name.trimmingCharacters(in: .whitespaces) }
             }
-            ProgramChange.record(from: previous.map(EditableProgram.init), to: program, by: name)
             if let previous {
                 previous.update(with: program, in: context)
                 LibraryExercise.addMissing(previous.orderedExercises, in: context)

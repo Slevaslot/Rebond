@@ -1,17 +1,13 @@
 import SwiftData
 import SwiftUI
 
-/// The alerts of the Accueil page, grouped in one compact card: one row each, newest first.
+/// The alert of the Accueil page: the last session was painful (pain at or above the high-pain threshold).
 struct AlertsGroup: View {
     let sessions: [Session]
     let onReport: () -> Void
-    let onShowProgram: () -> Void
 
     static let dismissedKey = "dismissedPainAlert"
     @AppStorage(dismissedKey) private var painDismissed: Double = 0
-    @AppStorage(ProgramChange.dateKey) private var changeDate: Double = 0
-    @AppStorage(ProgramChange.byKey) private var changeBy = ""
-    @AppStorage(ProgramChange.summaryKey) private var changeSummary = ""
 
     /// The last session, when it was painful and its alert wasn't closed.
     private var painful: Session? {
@@ -24,39 +20,20 @@ struct AlertsGroup: View {
     }
 
     var body: some View {
-        let painful = painful
-        if changeDate > 0 || painful != nil {
-            VStack(spacing: 0) {
-                if changeDate > 0 {
-                    AlertRow(
-                        symbol: "list.bullet.clipboard.fill",
-                        color: .blue,
-                        title: Text("Nouvelle séance"),
-                        detail: changeBy.isEmpty ? Text(Date(timeIntervalSinceReferenceDate: changeDate), format: .dateTime.day().month()) : Text(changeBy),
-                        message: Text(changeSummary),
-                        action: onShowProgram,
-                        onDismiss: { withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) { changeDate = 0 } }
-                    )
+        if let painful {
+            AlertRow(
+                symbol: "bandage.fill",
+                color: .orange,
+                title: Text("Douleur de \(painful.pain) sur 10"),
+                detail: Text(painful.date, format: .dateTime.day().month()),
+                message: Text("Faites une pause et prévenez votre kiné."),
+                action: onReport,
+                onDismiss: {
+                    withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) {
+                        painDismissed = painful.date.timeIntervalSinceReferenceDate
+                    }
                 }
-                if changeDate > 0, painful != nil {
-                    Divider().padding(.leading, 62)
-                }
-                if let painful {
-                    AlertRow(
-                        symbol: "bandage.fill",
-                        color: .orange,
-                        title: Text("Douleur de \(painful.pain) sur 10"),
-                        detail: Text(painful.date, format: .dateTime.day().month()),
-                        message: Text("Faites une pause et prévenez votre kiné."),
-                        action: onReport,
-                        onDismiss: {
-                            withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) {
-                                painDismissed = painful.date.timeIntervalSinceReferenceDate
-                            }
-                        }
-                    )
-                }
-            }
+            )
             .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 24))
             .transition(.opacity.combined(with: .scale(scale: 0.97)))
         }
@@ -110,70 +87,5 @@ private struct AlertRow: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-    }
-}
-
-/// Remembers the last change made by the physiotherapist, to show it on the Accueil page.
-enum ProgramChange {
-    static let dateKey = "programChangeDate"
-    static let byKey = "programChangeBy"
-    static let summaryKey = "programChangeSummary"
-    /// Who prescribed the program and when, kept after the alert is closed, for the Programme page.
-    static let prescriberKey = "programPrescriber"
-    static let prescribedAtKey = "programPrescribedAt"
-
-    static func record(from old: EditableProgram?, to new: EditableProgram, by name: String?) {
-        let defaults = UserDefaults.standard
-        let now = Date.now.timeIntervalSinceReferenceDate
-        defaults.set(now, forKey: dateKey)
-        defaults.set(name ?? "", forKey: byKey)
-        defaults.set(describe(from: old, to: new), forKey: summaryKey)
-        defaults.set(name ?? "", forKey: prescriberKey)
-        defaults.set(now, forKey: prescribedAtKey)
-    }
-
-    /// The physiotherapist who prescribed this program, when it came from them (QR code or the demo):
-    /// an empty name when it is unknown, nil when the program was added by the patient.
-    static func prescriber(of program: Program, prescribedAt: Double, name: String) -> String? {
-        guard prescribedAt > 0,
-              abs(program.createdAt.timeIntervalSinceReferenceDate - prescribedAt) < 120
-        else { return nil }
-        return name
-    }
-
-    /// The change in plain words, short enough for one line: "Squat : plus de répétitions."
-    static func describe(from old: EditableProgram?, to new: EditableProgram) -> String {
-        guard let old else { return String(localized: "Une séance de \(new.exercises.count) exercices.") }
-        var changes: [String] = []
-        for exercise in new.exercises {
-            guard let before = old.exercises.first(where: { $0.name == exercise.name }) else {
-                changes.append(String(localized: "Nouvel exercice : \(exercise.name)."))
-                continue
-            }
-            if exercise.sets != before.sets {
-                changes.append(exercise.sets > before.sets
-                    ? String(localized: "\(exercise.name) : plus de séries.")
-                    : String(localized: "\(exercise.name) : moins de séries."))
-            } else if exercise.mode == .hold, exercise.holdSeconds != before.holdSeconds {
-                changes.append(exercise.holdSeconds > before.holdSeconds
-                    ? String(localized: "\(exercise.name) : maintien plus long.")
-                    : String(localized: "\(exercise.name) : maintien plus court."))
-            } else if exercise.mode != .hold, exercise.reps != before.reps {
-                changes.append(exercise.reps > before.reps
-                    ? String(localized: "\(exercise.name) : plus de répétitions.")
-                    : String(localized: "\(exercise.name) : moins de répétitions."))
-            }
-        }
-        for exercise in old.exercises where !new.exercises.contains(where: { $0.name == exercise.name }) {
-            changes.append(String(localized: "\(exercise.name) retiré."))
-        }
-        if old.sessionsPerWeek != new.sessionsPerWeek {
-            changes.append(String(localized: "\(new.sessionsPerWeek) séances par semaine."))
-        }
-        switch changes.count {
-        case 0: return String(localized: "Votre kiné a vérifié votre séance.")
-        case 1: return changes[0]
-        default: return String(localized: "\(changes.count) changements.")
-        }
     }
 }
