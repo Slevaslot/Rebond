@@ -10,9 +10,16 @@ struct ReadableWidth: ViewModifier {
     @State private var width: CGFloat = 0
 
     func body(content: Content) -> some View {
-        content
-            .contentMargins(.horizontal, Self.margin(for: width), for: .scrollContent)
-            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
+        Group {
+            // On a phone-sized screen, nothing set: a margin of 0 would replace the system's own margins and
+            // glue lists and forms (Espace kiné, Réglages) to the screen edges.
+            if Self.margin(for: width) > 0 {
+                content.contentMargins(.horizontal, Self.margin(for: width), for: .scrollContent)
+            } else {
+                content
+            }
+        }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
     }
 
     /// The extra margin on each side, nothing on a phone-sized screen.
