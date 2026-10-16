@@ -547,7 +547,7 @@ nonisolated final class FrameProcessor: NSObject, AVCaptureVideoDataOutputSample
             // While paused, the sign to resume is always looked for, whatever the exercise.
             let paused = isPaused.withLock { $0 }
             if exercise.allowsHandGestures || paused,
-               let gesture = gestures.process(pixelBuffer, body: frame.skeleton, isMoving: update.progress > 0.15,
+               let gesture = gestures.process(pixelBuffer, body: frame.skeleton, isMoving: update.progress > 0.35,
                                               isPaused: paused) {
                 onGesture?(gesture)
             }

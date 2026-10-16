@@ -23,7 +23,7 @@ nonisolated struct HandGestureDetector {
     var orientation = CGImagePropertyOrientation.up
 
     /// A wrist this far below the shoulders, in torso lengths, still counts as raised: the elbow can stay bent.
-    private let raisedMargin = 0.15
+    private let raisedMargin = 0.4
     private let minimumConfidence: Float = 0.3
 
     /// A hand shape held for a few frames in a row, then released before it can count again.
@@ -62,8 +62,8 @@ nonisolated struct HandGestureDetector {
         }
     }
 
-    /// About 1 s: a pause shouldn't come from a hand passing by.
-    private var palm = Hold(frames: 15)
+    /// About 0.65 s: a pause shouldn't come from a hand passing by, but must stay easy to make.
+    private var palm = Hold(frames: 10)
     /// About 0.4 s while paused: resuming is quicker than pausing.
     private var resume = Hold(frames: 6)
     private var wasPaused = false
@@ -71,11 +71,11 @@ nonisolated struct HandGestureDetector {
     private var thumb = Hold(frames: 9)
 
     /// Gap between the thumb and index tips, in palm sizes: below, they touch; above, they are apart.
-    private let closedGap = 0.35
-    private let openGap = 0.8
+    private let closedGap = 0.45
+    private let openGap = 0.65
     /// Recent gaps, about one second: a spread or pinch must happen within it.
     private var gaps: [Double] = []
-    private let gapWindow = 15
+    private let gapWindow = 22
 
     /// - Parameters:
     ///   - isMoving: The patient is in a repetition: an open hand is then part of the movement, not a pause.
@@ -97,8 +97,14 @@ nonisolated struct HandGestureDetector {
             palm.consume()
             thumb.consume()
         }
-        let (hands, raisedArms) = raisedHands(in: pixelBuffer, body: body)
-        let hand = raisedArms == 1 && hands.count == 1 && !isMoving ? hands[0] : nil
+        var (hands, raisedArms) = raisedHands(in: pixelBuffer, body: body)
+        // Not in place yet (too close, the hips out of the picture): any hand in view can still pause.
+        let bodyIsWhole = body?.points[.root] != nil && body?.points[.neck] != nil
+        if !bodyIsWhole {
+            hands = anyHands(in: pixelBuffer, body: body)
+            raisedArms = hands.isEmpty ? 0 : 1
+        }
+        let hand = raisedArms == 1 && !isMoving ? hands.first : nil
 
         if palm.update(hand.map(Self.isOpenPalm) ?? false) { return .openPalm }
         let isThumbUp = hand.map(Self.isThumbUp) ?? false
@@ -115,9 +121,9 @@ nonisolated struct HandGestureDetector {
             return nil
         }
         defer { gaps = Array(gaps.suffix(gapWindow - 1)) }
-        // Each position is held at least two frames, so a hand moving while talking doesn't count.
-        let wasClosed = gaps.filter { $0 < closedGap }.count >= 2
-        let wasOpen = gaps.filter { $0 > openGap }.count >= 2
+        // The starting position seen once, the end one held two frames: quick to make, still not a hand passing by.
+        let wasClosed = gaps.contains { $0 < closedGap }
+        let wasOpen = gaps.contains { $0 > openGap }
         gaps.append(gap)
         let lastTwo = gaps.suffix(2)
         guard lastTwo.count == 2 else { return nil }
