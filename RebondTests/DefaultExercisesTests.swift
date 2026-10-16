@@ -22,4 +22,27 @@ struct DefaultExercisesTests {
         LibraryExercise.addDefaults(in: context, defaults: defaults)
         #expect(try context.fetch(FetchDescriptor<LibraryExercise>()).count == CatalogExercise.all.count - 1)
     }
+
+    @Test func sameNameGetsANumber() {
+        #expect(LibraryExercise.uniqueName("Squat", taken: []) == "Squat")
+        #expect(LibraryExercise.uniqueName("Squat", taken: ["Squat"]) == "Squat 2")
+        #expect(LibraryExercise.uniqueName("Squat", taken: ["Squat", "Squat 2"]) == "Squat 3")
+    }
+
+    @MainActor
+    @Test func exerciseMatchesItsOwnCopyInAProgram() {
+        let filmed = LibraryExercise(catalogID: "reference-1", name: "Squat")
+        #expect(filmed.matches(PlannedExercise(catalogID: "reference-1", name: "Squat", sets: 3, reps: 10, order: 0)))
+        // Rebond's squat, same name: another exercise.
+        #expect(!filmed.matches(PlannedExercise(catalogID: "squat", name: "Squat", sets: 3, reps: 10, order: 0)))
+    }
+
+    @MainActor
+    @Test func groupsFollowTheMovement() {
+        let rebond = LibraryExercise(catalogID: "squat", name: "Squat")
+        let byHand = LibraryExercise(catalogID: nil, name: "Pont fessier")
+        let groups = LibraryExercise.grouped([byHand, rebond]).map(\.group)
+        #expect(groups == [.rebond, .withoutCamera])
+        #expect(LibraryExercise.grouped([rebond], keepingWithoutCamera: true).map(\.group) == [.rebond, .withoutCamera])
+    }
 }

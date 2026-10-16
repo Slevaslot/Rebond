@@ -43,15 +43,15 @@ final class AppRouter {
     /// A single exercise done outside any program.
     var freeExercise: WorkoutExercise?
 
-    /// "Créer un programme" in progress: the names of the exercises already ticked.
+    /// "Créer un programme" in progress: the exercises already ticked.
     struct ProgramCreation: Identifiable {
         let id = UUID()
-        let preselected: [String]
+        let preselected: [LibraryExercise]
     }
 
     var programCreation: ProgramCreation?
 
-    func newProgram(with exercises: [String] = []) {
+    func newProgram(with exercises: [LibraryExercise] = []) {
         programCreation = ProgramCreation(preselected: exercises)
     }
 

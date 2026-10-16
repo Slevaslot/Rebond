@@ -54,7 +54,7 @@ struct AddExerciseMenu<Label: View>: View {
             ForEach(programs) { program in
                 Button("Ajouter à « \(program.title) »") { exercise.append(to: program) }
             }
-            Button("Créer un programme avec cet exercice") { router.newProgram(with: [exercise.name]) }
+            Button("Créer un programme avec cet exercice") { router.newProgram(with: [exercise]) }
             Button("Non, juste l'exercice", role: .cancel) {}
         } message: { _ in
             Text("Vous pouvez déjà le faire seul (Accueil › Essayer un exercice). Ajoutez-le à un programme pour qu'il fasse partie de vos séances.")
@@ -62,8 +62,7 @@ struct AddExerciseMenu<Label: View>: View {
     }
 
     private func add(_ exercise: LibraryExercise) {
-        context.insert(exercise)
-        try? context.save()
+        LibraryExercise.insert(exercise, in: context)
         onAdded(exercise)
         if offersProgram { saved = exercise }
     }
@@ -175,15 +174,15 @@ struct LibraryExerciseRow: View {
 
 /// Ticking exercises of "Mes exercices", in the order they will be done. A new exercise can be added without leaving.
 struct LibraryPickerView: View {
-    var preselected: [String] = []
+    var preselected: [LibraryExercise] = []
     var nextTitle: LocalizedStringKey = "Suivant"
     let onNext: ([EditableProgram.Exercise]) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @Query(sort: \LibraryExercise.createdAt) private var library: [LibraryExercise]
-    /// Names of the ticked exercises, in order.
-    @State private var selection: [String] = []
+    /// The ticked exercises, in order. The exercises themselves, not their names: two can share a name.
+    @State private var selection: [LibraryExercise] = []
     @State private var addingWithoutCamera = false
 
     var body: some View {
@@ -192,33 +191,30 @@ struct LibraryPickerView: View {
                 AddExerciseMenu(label: {
                     Text("Ajouter un exercice")
                 }, onAdded: { exercise in
-                    withAnimation(.snappy) { selection.append(exercise.name) }
+                    withAnimation(.snappy) { selection.append(exercise) }
                 }, offersPhysiotherapist: false, offersProgram: false)
             }
-            // Three groups, as in "Choisir un exercice": filmed, Rebond's, then without the camera.
-            let filmed = library.filter(\.isFilmed)
-            if !filmed.isEmpty {
-                Section("Mes exercices filmés") { rows(filmed) }
-            }
-            let rebond = library.filter(\.isRebond)
-            if !rebond.isEmpty {
-                Section("Exercices Rebond") { rows(rebond) }
-            }
-            Section {
-                rows(library.filter { $0.catalogExercise == nil })
-                Button("Compté à la main ou minuteur", systemImage: "plus") { addingWithoutCamera = true }
-            } header: {
-                Text("Sans caméra")
-            } footer: {
-                Text("Pour un exercice que la caméra ne suit pas : vous comptez vous-même, ou un minuteur pour une position tenue.")
+            // The groups of "Mes exercices", as in the Exercices tab: filmed, Rebond's, then without the camera.
+            ForEach(LibraryExercise.grouped(library, keepingWithoutCamera: true), id: \.group) { group, exercises in
+                if group == .withoutCamera {
+                    Section {
+                        rows(exercises)
+                        Button("Compté à la main ou minuteur", systemImage: "plus") { addingWithoutCamera = true }
+                    } header: {
+                        Text(group.title)
+                    } footer: {
+                        Text("Pour un exercice que la caméra ne suit pas : vous comptez vous-même, ou un minuteur pour une position tenue.")
+                    }
+                } else {
+                    Section(String(localized: group.title)) { rows(exercises) }
+                }
             }
         }
         .sheet(isPresented: $addingWithoutCamera) {
             WithoutCameraExercisePicker { catalogID, name, holdSeconds in
                 let exercise = LibraryExercise(catalogID: catalogID, name: name, holdSeconds: holdSeconds)
-                context.insert(exercise)
-                try? context.save()
-                withAnimation(.snappy) { selection.append(exercise.name) }
+                LibraryExercise.insert(exercise, in: context)
+                withAnimation(.snappy) { selection.append(exercise) }
             }
         }
         .navigationTitle("Choisir les exercices")
@@ -241,27 +237,28 @@ struct LibraryPickerView: View {
         ForEach(exercises) { exercise in
             Button {
                 withAnimation(.snappy) {
-                    if let index = selection.firstIndex(of: exercise.name) {
+                    if let index = selection.firstIndex(where: { $0 === exercise }) {
                         selection.remove(at: index)
                     } else {
-                        selection.append(exercise.name)
+                        selection.append(exercise)
                     }
                 }
             } label: {
-                LibraryExerciseRow(exercise: exercise, isSelected: selection.contains(exercise.name))
+                LibraryExerciseRow(exercise: exercise, isSelected: selection.contains { $0 === exercise })
             }
             .buttonStyle(.plain)
         }
     }
 
     private var chosen: [EditableProgram.Exercise] {
-        selection.compactMap { name in library.first { $0.name == name }?.editable }
+        // A ticked exercise deleted meanwhile is left out.
+        selection.filter { exercise in library.contains { $0 === exercise } }.map(\.editable)
     }
 }
 
 /// "Créer un programme": tick its exercises, set how many of each, then its days.
 struct NewProgramFlow: View {
-    var preselected: [String] = []
+    var preselected: [LibraryExercise] = []
     let onSave: (EditableProgram) -> Void
 
     /// The program being set, once its exercises are ticked.
@@ -311,7 +308,7 @@ struct LibraryExerciseView: View {
     @State private var movementRevision = 0
 
     var body: some View {
-        let using = programs.filter { $0.exercises.contains { $0.name == exercise.name } }
+        let using = programs.filter { $0.exercises.contains(where: exercise.matches) }
         let others = programs.filter { program in !using.contains { $0.persistentModelID == program.persistentModelID } }
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
@@ -336,7 +333,7 @@ struct LibraryExerciseView: View {
                         ForEach(others) { program in
                             Button(program.title) { exercise.append(to: program) }
                         }
-                        Button("Nouveau programme") { router.newProgram(with: [exercise.name]) }
+                        Button("Nouveau programme") { router.newProgram(with: [exercise]) }
                     } label: {
                         Label("Ajouter à un programme", systemImage: "plus.circle")
                             .frame(maxWidth: .infinity, minHeight: 50, alignment: .leading)
@@ -463,11 +460,14 @@ struct LibraryExerciseView: View {
     }
 
     private func rename() {
-        let trimmed = newName.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty, trimmed != exercise.name else { return }
-        // The programs show it under the same name.
+        let typed = newName.trimmingCharacters(in: .whitespaces)
+        guard !typed.isEmpty, typed != exercise.name else { return }
+        // Another exercise's name gets a number: each one keeps its own name.
+        let others = ((try? context.fetch(FetchDescriptor<LibraryExercise>())) ?? []).filter { $0 !== exercise }
+        let trimmed = LibraryExercise.uniqueName(typed, taken: Set(others.map(\.name)))
+        // The programs show it under the same name; only this exercise, not another one sharing its old name.
         for program in programs {
-            for planned in program.exercises where planned.name == exercise.name { planned.name = trimmed }
+            for planned in program.exercises where exercise.matches(planned) { planned.name = trimmed }
         }
         if let id = exercise.catalogID.flatMap(ReferenceStore.id(fromCatalogID:)) { ReferenceStore.rename(id, to: trimmed) }
         exercise.name = trimmed

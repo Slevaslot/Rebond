@@ -102,19 +102,29 @@ struct ProgramTab: View {
                     .padding(.horizontal, 4)
                     .pageRow()
             } else {
-                VStack(spacing: 0) {
-                    ForEach(Array(library.enumerated()), id: \.element.id) { index, exercise in
-                        if index > 0 { Divider().padding(.leading, 74) }
-                        Button { path.append(exercise) } label: {
-                            LibraryExerciseRow(exercise: exercise)
-                                .padding(.horizontal)
-                                .padding(.vertical, 10)
+                // The same groups as when composing a program: filmed, Rebond's, then without the camera.
+                ForEach(LibraryExercise.grouped(library), id: \.group) { group, exercises in
+                    Text(group.title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 4)
+                        .padding(.top, 4)
+                        .accessibilityAddTraits(.isHeader)
+                        .pageRow()
+                    VStack(spacing: 0) {
+                        ForEach(Array(exercises.enumerated()), id: \.element.id) { index, exercise in
+                            if index > 0 { Divider().padding(.leading, 74) }
+                            Button { path.append(exercise) } label: {
+                                LibraryExerciseRow(exercise: exercise)
+                                    .padding(.horizontal)
+                                    .padding(.vertical, 10)
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
                     }
+                    .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 22))
+                    .pageRow()
                 }
-                .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 22))
-                .pageRow()
             }
         }
         .listStyle(.plain)

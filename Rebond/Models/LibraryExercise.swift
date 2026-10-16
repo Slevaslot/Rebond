@@ -66,6 +66,60 @@ final class LibraryExercise {
     /// One of Rebond's, followed by the camera.
     var isRebond: Bool { !isFilmed && catalogExercise != nil }
 
+    /// The groups of "Mes exercices", in the order they are shown everywhere: filmed, Rebond's, then without
+    /// the camera. Empty groups are left out, except "Sans caméra" when `keepingWithoutCamera`.
+    enum Group: CaseIterable {
+        case filmed, rebond, withoutCamera
+
+        var title: LocalizedStringResource {
+            switch self {
+            case .filmed: "Mes exercices filmés"
+            case .rebond: "Exercices Rebond"
+            case .withoutCamera: "Sans caméra"
+            }
+        }
+    }
+
+    var group: Group { isFilmed ? .filmed : isRebond ? .rebond : .withoutCamera }
+
+    static func grouped(_ exercises: [LibraryExercise], keepingWithoutCamera: Bool = false) -> [(group: Group, exercises: [LibraryExercise])] {
+        Group.allCases.compactMap { group in
+            let members = exercises.filter { $0.group == group }
+            return members.isEmpty && !(keepingWithoutCamera && group == .withoutCamera) ? nil : (group, members)
+        }
+    }
+
+    /// This exercise in a program: same name and same movement (two exercises can share a name, e.g. two filmed
+    /// squats; the program only keeps a copy of both).
+    func matches(_ planned: PlannedExercise) -> Bool {
+        planned.name == name && planned.catalogID == catalogID
+    }
+
+    /// `name`, or "name 2", "name 3"… when "Mes exercices" already has one by that name: each exercise is told
+    /// apart by its name in the lists and the programs.
+    static func uniqueName(_ name: String, in context: ModelContext) -> String {
+        let taken = Set(((try? context.fetch(FetchDescriptor<LibraryExercise>())) ?? []).map(\.name))
+        return uniqueName(name, taken: taken)
+    }
+
+    static func uniqueName(_ name: String, taken: Set<String>) -> String {
+        guard taken.contains(name) else { return name }
+        var number = 2
+        while taken.contains("\(name) \(number)") { number += 1 }
+        return "\(name) \(number)"
+    }
+
+    /// Adds a new exercise to "Mes exercices" under a name no other one has (a filmed movement is renamed with it).
+    static func insert(_ exercise: LibraryExercise, in context: ModelContext) {
+        let name = uniqueName(exercise.name, in: context)
+        if name != exercise.name {
+            exercise.name = name
+            if let id = exercise.catalogID.flatMap(ReferenceStore.id(fromCatalogID:)) { ReferenceStore.rename(id, to: name) }
+        }
+        context.insert(exercise)
+        try? context.save()
+    }
+
     /// Adds it at the end of a program, in 3 × 10 (or 3 × its hold).
     func append(to program: Program) {
         let next = (program.exercises.map(\.order).max() ?? -1) + 1
@@ -92,14 +146,13 @@ final class LibraryExercise {
         defaults.set(true, forKey: defaultsAddedKey)
     }
 
-    /// Adds the exercises of a program that aren't in "Mes exercices" yet (same name).
+    /// Adds the exercises of a program that aren't in "Mes exercices" yet (same name and movement).
     static func addMissing(_ exercises: [PlannedExercise], in context: ModelContext) {
-        let known = Set(((try? context.fetch(FetchDescriptor<LibraryExercise>())) ?? []).map(\.name))
-        var added = Set<String>()
-        for exercise in exercises where !known.contains(exercise.name) && !added.contains(exercise.name) {
-            added.insert(exercise.name)
-            context.insert(LibraryExercise(catalogID: exercise.catalogID, name: exercise.name,
-                                           holdSeconds: exercise.holdSeconds))
+        var known = (try? context.fetch(FetchDescriptor<LibraryExercise>())) ?? []
+        for exercise in exercises where !known.contains(where: { $0.matches(exercise) }) {
+            let new = LibraryExercise(catalogID: exercise.catalogID, name: exercise.name, holdSeconds: exercise.holdSeconds)
+            context.insert(new)
+            known.append(new)
         }
     }
 }
