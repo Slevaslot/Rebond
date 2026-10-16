@@ -9,6 +9,7 @@ struct ProgramTab: View {
     @Query(sort: \Program.createdAt) private var programs: [Program]
     @Query(sort: \LibraryExercise.createdAt) private var library: [LibraryExercise]
     @State private var showingSettings = false
+    @State private var addingWithoutCamera = false
     @State private var path = NavigationPath()
 
     var body: some View {
@@ -25,6 +26,11 @@ struct ProgramTab: View {
                 }
                 .sheet(isPresented: $showingSettings) {
                     SettingsView()
+                }
+                .sheet(isPresented: $addingWithoutCamera) {
+                    WithoutCameraExercisePicker { catalogID, name, holdSeconds in
+                        LibraryExercise.insert(LibraryExercise(catalogID: catalogID, name: name, holdSeconds: holdSeconds), in: context)
+                    }
                 }
                 // Back on this tab after visiting another one: the lists, not the page left open.
                 .onChange(of: router.tab) {
@@ -102,8 +108,9 @@ struct ProgramTab: View {
                     .padding(.horizontal, 4)
                     .pageRow()
             } else {
-                // The same groups as when composing a program: filmed, Rebond's, then without the camera.
-                ForEach(LibraryExercise.grouped(library), id: \.group) { group, exercises in
+                // The same groups as when composing a program: filmed, Rebond's, then without the camera, always
+                // there with its way to add one counted by hand or timed.
+                ForEach(LibraryExercise.grouped(library, keepingWithoutCamera: true), id: \.group) { group, exercises in
                     Text(group.title)
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.secondary)
@@ -121,9 +128,27 @@ struct ProgramTab: View {
                             }
                             .buttonStyle(.plain)
                         }
+                        if group == .withoutCamera {
+                            if !exercises.isEmpty { Divider().padding(.leading, 74) }
+                            Button { addingWithoutCamera = true } label: {
+                                Label("Compté à la main ou minuteur", systemImage: "plus")
+                                    .font(.headline)
+                                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                                    .padding(.horizontal)
+                                    .padding(.vertical, 10)
+                                    .contentShape(.rect)
+                            }
+                        }
                     }
                     .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 22))
                     .pageRow()
+                    if group == .withoutCamera {
+                        Text("Pour un exercice que la caméra ne suit pas : vous comptez vous-même, ou un minuteur pour une position tenue.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 4)
+                            .pageRow()
+                    }
                 }
             }
         }
