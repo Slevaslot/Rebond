@@ -87,6 +87,15 @@ enum SyntheticHand {
     static func pinched(at wrist: CGPoint) -> HandGestureDetector.Hand {
         make(at: wrist, index: .stretched, middle: .stretched, ring: .stretched, little: .stretched, thumb: .touchingIndex)
     }
+
+    /// Thumb and index, the other three fingers curled: how most people pinch or spread.
+    static func pinchedCurled(at wrist: CGPoint) -> HandGestureDetector.Hand {
+        make(at: wrist, index: .stretched, middle: .folded, ring: .folded, little: .folded, thumb: .touchingIndex)
+    }
+
+    static func spreadCurled(at wrist: CGPoint) -> HandGestureDetector.Hand {
+        make(at: wrist, index: .stretched, middle: .folded, ring: .folded, little: .folded, thumb: .out)
+    }
 }
 
 /// A body facing the camera, in pixels, origin top-left: torso 300 px (neck 400, hips 700).
@@ -422,6 +431,38 @@ struct HandGestureHoldTests {
             (time < 0.3 ? [SyntheticHand.openPalm(at: SyntheticBody.raisedRight)] : [SyntheticHand.pinched(at: SyntheticBody.raisedRight)], body)
         }
         #expect(seen.map(\.gesture) == [.pinch])
+    }
+
+    @Test func spreadAndPinchWithTheOtherFingersCurled() {
+        let body = SyntheticBody.make(rightWrist: SyntheticBody.raisedRight)
+        var detector = HandGestureDetector()
+        let spread = run(&detector, seconds: 0.6) { time in
+            ([time < 0.3 ? SyntheticHand.pinchedCurled(at: SyntheticBody.raisedRight) : SyntheticHand.spreadCurled(at: SyntheticBody.raisedRight)], body)
+        }
+        #expect(spread.map(\.gesture) == [.spread])
+        var other = HandGestureDetector()
+        let pinch = run(&other, seconds: 0.6) { time in
+            ([time < 0.3 ? SyntheticHand.spreadCurled(at: SyntheticBody.raisedRight) : SyntheticHand.pinchedCurled(at: SyntheticBody.raisedRight)], body)
+        }
+        #expect(pinch.map(\.gesture) == [.pinch])
+    }
+
+    @Test func openPalmPausesWithTheThumbSeenCloseToTheIndex() {
+        var palm = SyntheticHand.openPalm(at: SyntheticBody.raisedRight)
+        // Vision put the thumb's tip close to the index (0.45 palm from its tip), not touching it.
+        let indexTip = palm[.indexTip]!
+        palm[.thumbTip] = CGPoint(x: indexTip.x - 22, y: indexTip.y + 2)
+        #expect(HandGestureDetector.isOpenPalm(palm))
+    }
+
+    @Test func openPalmPausesDespiteASmallDrift() {
+        var detector = HandGestureDetector()
+        // The raised wrist drifts 60 px (0.2 torso) during the hold, as an arm held up does.
+        let seen = run(&detector, seconds: 1.5) { time in
+            let wrist = CGPoint(x: SyntheticBody.raisedRight.x + 60 * min(1, time), y: SyntheticBody.raisedRight.y)
+            return ([SyntheticHand.openPalm(at: wrist)], SyntheticBody.make(rightWrist: wrist))
+        }
+        #expect(seen.map(\.gesture) == [.openPalm])
     }
 
     @Test(arguments: [false, true])

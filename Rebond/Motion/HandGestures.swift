@@ -47,7 +47,8 @@ nonisolated struct HandGestureDetector {
     static let twoFingersHold = 0.8
     static let crossedArmsHold = 1.2
     /// A wrist moving more than this from where the sign started, in torso lengths, starts the hold again.
-    static let stillness = 0.15
+    /// Not less: from 2–3 m Vision's wrist jumps a little from frame to frame, and an arm held up drifts.
+    static let stillness = 0.25
     /// The same without the body (paused, close to the phone), in palm sizes.
     static let handStillness = 0.8
 
@@ -317,8 +318,9 @@ nonisolated extension HandGestureDetector {
               let thumb = hand[.thumbTip], let index = hand[.indexMCP], let palm = palmSize(hand),
               let gap = fingerGap(hand)
         else { return false }
-        // Thumb touching the index: the start of a spread, not a palm.
-        return hypot(thumb.x - index.x, thumb.y - index.y) > palm * 0.5 && gap > 0.6
+        // Thumb touching the index tip: the start of a spread, not a palm. Only touching: from afar Vision often
+        // puts the thumb's tip a bit close to the index, and the palm must still count.
+        return hypot(thumb.x - index.x, thumb.y - index.y) > palm * 0.5 && gap > closedGap
     }
 
     /// At least three fingers folded into the palm, the thumb pointing up, its tip the highest point of the hand.
@@ -342,9 +344,10 @@ nonisolated extension HandGestureDetector {
         return wrist.y - index.y > palm && wrist.y - middle.y > palm
     }
 
-    /// The four fingers folded: a fist, with or without the thumb up.
+    /// The four fingers folded, the index too: a fist, with or without the thumb up. A pinch made with the other
+    /// fingers curled (the usual way) keeps its index out, so it isn't a fist.
     static func isFist(_ hand: Hand) -> Bool {
-        [Finger.middle, .ring, .little].allSatisfy { isFolded($0, in: hand) }
+        [Finger.index, .middle, .ring, .little].allSatisfy { isFolded($0, in: hand) }
     }
 
     /// Both forearms crossed in front of the chest: each wrist on the other side of the body's midline, between
