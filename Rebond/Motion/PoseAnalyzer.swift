@@ -112,10 +112,16 @@ nonisolated struct PoseAnalyzer {
             imageSize: size
         )
 
-        // Vision's normalized x is relative to the width: rescale it to the height unit.
-        let aspect = size.width / size.height
+        return PoseFrame(skeleton: skeleton, measure: Self.measure(from: skeleton.points, imageSize: size))
+    }
+
+    /// The measure of a skeleton's points (normalized, origin top-left): also how recorded sequences are replayed
+    /// in the tests, through the same code as the camera.
+    static func measure(from points: [VNHumanBodyPoseObservation.JointName: CGPoint], imageSize size: CGSize) -> PoseMeasure? {
+        // Vision's normalized x is relative to the width: rescale it to the height unit, origin bottom-left.
+        let aspect = size.width / max(size.height, 1)
         func position(_ joint: VNHumanBodyPoseObservation.JointName) -> CGPoint? {
-            visible[joint].map { CGPoint(x: $0.location.x * aspect, y: $0.location.y) }
+            points[joint].map { CGPoint(x: $0.x * aspect, y: 1 - $0.y) }
         }
 
         /// Vision's root and neck are the middles of the hips and of the shoulders. Their confidence drops
@@ -126,27 +132,25 @@ nonisolated struct PoseAnalyzer {
             return CGPoint(x: (p.x + q.x) / 2, y: (p.y + q.y) / 2)
         }
 
-        var measure: PoseMeasure?
-        if let hips = position(.root) ?? middle(.leftHip, .rightHip),
-           let neck = position(.neck) ?? middle(.leftShoulder, .rightShoulder) {
-            measure = PoseMeasure(
-                hips: hips,
-                neck: neck,
-                leftHip: position(.leftHip),
-                rightHip: position(.rightHip),
-                leftKnee: position(.leftKnee),
-                rightKnee: position(.rightKnee),
-                leftAnkle: position(.leftAnkle),
-                rightAnkle: position(.rightAnkle),
-                leftShoulder: position(.leftShoulder),
-                rightShoulder: position(.rightShoulder),
-                leftElbow: position(.leftElbow),
-                rightElbow: position(.rightElbow),
-                leftWrist: position(.leftWrist),
-                rightWrist: position(.rightWrist)
-            )
-        }
-        return PoseFrame(skeleton: skeleton, measure: measure)
+        guard let hips = position(.root) ?? middle(.leftHip, .rightHip),
+              let neck = position(.neck) ?? middle(.leftShoulder, .rightShoulder)
+        else { return nil }
+        return PoseMeasure(
+            hips: hips,
+            neck: neck,
+            leftHip: position(.leftHip),
+            rightHip: position(.rightHip),
+            leftKnee: position(.leftKnee),
+            rightKnee: position(.rightKnee),
+            leftAnkle: position(.leftAnkle),
+            rightAnkle: position(.rightAnkle),
+            leftShoulder: position(.leftShoulder),
+            rightShoulder: position(.rightShoulder),
+            leftElbow: position(.leftElbow),
+            rightElbow: position(.rightElbow),
+            leftWrist: position(.leftWrist),
+            rightWrist: position(.rightWrist)
+        )
     }
 
     /// The reliable joints of each person seen. During a session, several people can be in view (family,
