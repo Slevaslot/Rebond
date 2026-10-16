@@ -31,7 +31,8 @@ nonisolated struct CatalogExercise: Identifiable, Sendable {
     enum ArmStyle: Sendable {
         /// Arms straight when standing, hands joined in front of the chest at the bottom (squat).
         case handsToChest
-        /// Straight arms following the wrists of the guide poses.
+        /// Arms following the guide poses: through the elbow when the poses give one (the "L" arm of the shoulder
+        /// rotation, a filmed body), straight from the shoulder to the wrist otherwise.
         case straight
     }
 
@@ -51,6 +52,17 @@ nonisolated struct CatalogExercise: Identifiable, Sendable {
     let guideRest: GuidePose
     let guideTarget: GuidePose
     let armStyle: ArmStyle
+    /// The demonstration seen from the side, facing right, for a movement done toward the camera that reads
+    /// badly from the front (a leg or a knee raised in front, a forward lunge). Same unit box as the guide poses.
+    /// The placement outline stays the front view: it is where the patient stands.
+    var guideProfile: GuideProfile? = nil
+
+    struct GuideProfile: Sendable {
+        let rest: GuidePose
+        let target: GuidePose
+        /// From the side, arms crossed on the chest are drawn through the elbows.
+        var armStyle: ArmStyle = .straight
+    }
 
     /// - Parameter side: For a filmed movement, the side of the body asked (as filmed, or the other one).
     func makeCounter(side: MovementSide = .asFilmed) -> any MovementCounter {
@@ -88,6 +100,20 @@ nonisolated extension CatalogExercise {
         .leftKnee: CGPoint(x: 0.41, y: 0.73), .rightKnee: CGPoint(x: 0.59, y: 0.73),
         .leftAnkle: CGPoint(x: 0.41, y: 0.95), .rightAnkle: CGPoint(x: 0.59, y: 0.95),
     ]
+
+    /// Standing seen from the side, facing right, the middle of the body at `x`: both sides on the same line,
+    /// the hands a little forward so the arm stands out from the torso.
+    private static func profileBody(x: Double) -> GuidePose {
+        func side(_ dx: Double, _ y: Double) -> CGPoint { CGPoint(x: x + dx / 0.65, y: y) }
+        return [
+            .nose: side(0.03, 0.08), .neck: side(0, 0.18),
+            .leftShoulder: side(0, 0.2), .rightShoulder: side(0, 0.2),
+            .leftWrist: side(0.08, 0.47), .rightWrist: side(0.08, 0.47),
+            .leftHip: side(0, 0.5), .rightHip: side(0, 0.5),
+            .leftKnee: side(0, 0.73), .rightKnee: side(0, 0.73),
+            .leftAnkle: side(0, 0.95), .rightAnkle: side(0, 0.95),
+        ]
+    }
 
     static let squat = CatalogExercise(
         id: "squat",
@@ -210,7 +236,25 @@ nonisolated extension CatalogExercise {
         guideTarget: standingBody.merging([
             .leftWrist: CGPoint(x: 0.33, y: 0.5), .rightWrist: CGPoint(x: 0.67, y: 0.5),
         ]) { $1 },
-        armStyle: .handsToChest
+        armStyle: .handsToChest,
+        // From the side, where sitting and standing read at a glance: thighs level on the chair, then standing
+        // over the feet, arms crossed on the chest.
+        guideProfile: GuideProfile(
+            rest: profileBody(x: 0.38).merging([
+                .leftShoulder: CGPoint(x: 0.38, y: 0.42), .rightShoulder: CGPoint(x: 0.38, y: 0.42),
+                .leftElbow: CGPoint(x: 0.38 + 0.05 / 0.65, y: 0.6), .rightElbow: CGPoint(x: 0.38 + 0.05 / 0.65, y: 0.6),
+                .leftWrist: CGPoint(x: 0.38 + 0.17 / 0.65, y: 0.68), .rightWrist: CGPoint(x: 0.38 + 0.17 / 0.65, y: 0.68),
+                .leftHip: CGPoint(x: 0.38, y: 0.72), .rightHip: CGPoint(x: 0.38, y: 0.72),
+                .leftKnee: CGPoint(x: 0.38 + 0.22 / 0.65, y: 0.72), .rightKnee: CGPoint(x: 0.38 + 0.22 / 0.65, y: 0.72),
+                .leftAnkle: CGPoint(x: 0.38 + 0.22 / 0.65, y: 0.95), .rightAnkle: CGPoint(x: 0.38 + 0.22 / 0.65, y: 0.95),
+                .guideChairSeat: CGPoint(x: 0.38 + 0.02 / 0.65, y: 0.76),
+            ]) { $1 },
+            target: profileBody(x: 0.38 + 0.2 / 0.65).merging([
+                .leftElbow: CGPoint(x: 0.38 + 0.29 / 0.65, y: 0.36), .rightElbow: CGPoint(x: 0.38 + 0.29 / 0.65, y: 0.36),
+                .leftWrist: CGPoint(x: 0.38 + 0.22 / 0.65, y: 0.27), .rightWrist: CGPoint(x: 0.38 + 0.22 / 0.65, y: 0.27),
+                .leftAnkle: CGPoint(x: 0.38 + 0.22 / 0.65, y: 0.95), .rightAnkle: CGPoint(x: 0.38 + 0.22 / 0.65, y: 0.95),
+            ]) { $1 }
+        )
     )
 
     /// Standing on one leg, the other raised in front with the knee straight, either side.
@@ -232,7 +276,14 @@ nonisolated extension CatalogExercise {
             .leftWrist: CGPoint(x: 0.24, y: 0.47), .rightWrist: CGPoint(x: 0.72, y: 0.5),
             .leftKnee: CGPoint(x: 0.39, y: 0.63), .leftAnkle: CGPoint(x: 0.35, y: 0.77),
         ]) { $1 },
-        armStyle: .straight
+        armStyle: .straight,
+        // From the side: the straight leg rises in front to about 55°, the body set back so the foot fits.
+        guideProfile: GuideProfile(
+            rest: profileBody(x: 0.36),
+            target: profileBody(x: 0.36).merging([
+                .leftKnee: CGPoint(x: 0.36 + 0.184 / 0.65, y: 0.629), .leftAnkle: CGPoint(x: 0.36 + 0.369 / 0.65, y: 0.758),
+            ]) { $1 }
+        )
     )
 
     /// Hurdle step: one knee raised, bent, as when stepping over an obstacle, then the foot set back down;
@@ -256,7 +307,14 @@ nonisolated extension CatalogExercise {
             .leftWrist: CGPoint(x: 0.24, y: 0.47), .rightWrist: CGPoint(x: 0.72, y: 0.5),
             .leftKnee: CGPoint(x: 0.38, y: 0.56), .leftAnkle: CGPoint(x: 0.4, y: 0.74),
         ]) { $1 },
-        armStyle: .straight
+        armStyle: .straight,
+        // From the side: the thigh rises in front nearly level, the shin hanging under the knee.
+        guideProfile: GuideProfile(
+            rest: profileBody(x: 0.4),
+            target: profileBody(x: 0.4).merging([
+                .leftKnee: CGPoint(x: 0.4 + 0.217 / 0.65, y: 0.558), .leftAnkle: CGPoint(x: 0.4 + 0.19 / 0.65, y: 0.778),
+            ]) { $1 }
+        )
     )
 
     /// Forward lunge, one foot in front of the other: the hips go straight down, the back knee toward the floor,
@@ -284,7 +342,25 @@ nonisolated extension CatalogExercise {
             .leftKnee: CGPoint(x: 0.4, y: 0.78), .rightKnee: CGPoint(x: 0.6, y: 0.86),
             .leftAnkle: CGPoint(x: 0.41, y: 0.95), .rightAnkle: CGPoint(x: 0.59, y: 0.95),
         ],
-        armStyle: .straight
+        armStyle: .straight,
+        // From the side, where the step reads: one foot in front of the other, the body goes straight down,
+        // the front knee over the foot, the back knee toward the floor, its heel raised.
+        guideProfile: GuideProfile(
+            rest: profileBody(x: 0.5).merging([
+                .leftShoulder: CGPoint(x: 0.5, y: 0.25), .rightShoulder: CGPoint(x: 0.5, y: 0.25),
+                .leftWrist: CGPoint(x: 0.5 + 0.08 / 0.65, y: 0.52), .rightWrist: CGPoint(x: 0.5 + 0.08 / 0.65, y: 0.52),
+                .leftHip: CGPoint(x: 0.5, y: 0.55), .rightHip: CGPoint(x: 0.5, y: 0.55),
+                .leftKnee: CGPoint(x: 0.5 + 0.1 / 0.65, y: 0.75), .leftAnkle: CGPoint(x: 0.5 + 0.2 / 0.65, y: 0.95),
+                .rightKnee: CGPoint(x: 0.5 - 0.12 / 0.65, y: 0.735), .rightAnkle: CGPoint(x: 0.5 - 0.24 / 0.65, y: 0.92),
+            ]) { $1 },
+            target: profileBody(x: 0.5).merging([
+                .leftShoulder: CGPoint(x: 0.5, y: 0.37), .rightShoulder: CGPoint(x: 0.5, y: 0.37),
+                .leftWrist: CGPoint(x: 0.5 + 0.08 / 0.65, y: 0.64), .rightWrist: CGPoint(x: 0.5 + 0.08 / 0.65, y: 0.64),
+                .leftHip: CGPoint(x: 0.5, y: 0.67), .rightHip: CGPoint(x: 0.5, y: 0.67),
+                .leftKnee: CGPoint(x: 0.5 + 0.215 / 0.65, y: 0.72), .leftAnkle: CGPoint(x: 0.5 + 0.2 / 0.65, y: 0.95),
+                .rightKnee: CGPoint(x: 0.5 - 0.04 / 0.65, y: 0.85), .rightAnkle: CGPoint(x: 0.5 - 0.21 / 0.65, y: 0.9),
+            ]) { $1 }
+        )
     )
 
     /// Side lunge, either side: one leg steps out and bends, the other stays straight; the hips go over the bent

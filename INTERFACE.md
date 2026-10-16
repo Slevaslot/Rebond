@@ -159,7 +159,7 @@ Règles :
 - **Typographie** : styles de texte système uniquement, Dynamic Type jusqu'aux tailles d'accessibilité. Seul le compteur de séance a une taille fixe (et reste lisible à 2 m).
 - **Couleurs** : couleurs sémantiques système ; **une seule couleur d'accent** (boutons, sélection). Vert, orange et rouge réservés aux états de la séance, toujours doublés d'un symbole. Mode sombre et Contraste augmenté vérifiés.
 - **Symboles** : SF Symbols partout (familles `figure.*` pour les exercices), symboles animés pour les confirmations. Pas d'icônes maison.
-- **Pictogramme du mouvement** : dessiné en `Canvas`, sans genre (HIG *Inclusion*), immobile si « Réduire les animations » est activé.
+- **Pictogramme du mouvement** : dessiné en `Canvas`, sans genre (HIG *Inclusion*), immobile si « Réduire les animations » est activé. Un mouvement fait vers la caméra (genou ou jambe levés devant, fente avant, assis-debout) est montré de profil ; la rotation de l'épaule plie le bras au coude (en L) ; un exercice d'un côté ne bouge que ce côté. Le contour de placement (`GuideFigure`) reste un corps quelle que soit la pose reçue : articulations manquantes reconstituées, buste de largeur normale, membres de longueur plausible ; il se pose sur les pieds du patient sans trembler (`GuideAnchor`). Les articulations suivies grossissent un instant à chaque palier d'amplitude atteint, pour voir l'objectif de loin.
 - **Icône de l'app** : réalisée avec Icon Composer (couches, rendu Liquid Glass, variantes sombre et teintée), à partir des gabarits Apple Design Resources.
 
 ## Accessibilité (HIG *Accessibility*)

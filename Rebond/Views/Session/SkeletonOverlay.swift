@@ -1,7 +1,10 @@
 import SwiftUI
 import Vision
 
-/// Draws the detected body over the camera preview.
+/// Draws the detected body over the camera preview. The joints the exercise follows are drawn thick, in the color
+/// of the amplitude reached (yellow on the way, then the "Bien", "Très bien", "Parfait" colors); each time the
+/// movement reaches a higher tier they swell for a moment, so reaching the target is seen from 2–3 m, not only
+/// by a change of color. A dark edge keeps every line readable over a bright room.
 struct SkeletonOverlay: View {
     typealias Joint = VNHumanBodyPoseObservation.JointName
 
@@ -10,6 +13,11 @@ struct SkeletonOverlay: View {
     let highlightColor: Color
     /// Body part at fault, drawn in red above everything else.
     var faultyJoints: Set<Joint> = []
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Counts the tiers reached, to make the followed joints swell each time.
+    @State private var tierReached = 0
+    @State private var tier = 0
 
     private static let bones: [(Joint, Joint)] = [
         (.leftShoulder, .rightShoulder),
@@ -21,37 +29,78 @@ struct SkeletonOverlay: View {
         (.rightHip, .rightKnee), (.rightKnee, .rightAnkle),
     ]
 
+    private enum Layer: Int, CaseIterable { case plain, highlighted, faulty }
+
     var body: some View {
-        Canvas { context, size in
-            func place(_ point: CGPoint) -> CGPoint {
-                skeleton.place(point, in: size)
+        KeyframeAnimator(initialValue: 1.0, trigger: tierReached) { swell in
+            Canvas { context, size in
+                draw(in: &context, size: size, swell: swell)
             }
-
-            for (a, b) in Self.bones {
-                guard let pointA = skeleton.points[a], let pointB = skeleton.points[b] else { continue }
-                var path = Path()
-                path.move(to: place(pointA))
-                path.addLine(to: place(pointB))
-                let isFaulty = faultyJoints.contains(a) && faultyJoints.contains(b)
-                let isHighlighted = highlightedJoints.contains(a) && highlightedJoints.contains(b)
-                context.stroke(
-                    path,
-                    with: .color(isFaulty ? .red : isHighlighted ? highlightColor : .white.opacity(0.6)),
-                    style: StrokeStyle(lineWidth: isFaulty || isHighlighted ? 7 : 3, lineCap: .round)
-                )
-            }
-
-            for (joint, point) in skeleton.points where Self.bones.contains(where: { $0.0 == joint || $0.1 == joint }) {
-                let isFaulty = faultyJoints.contains(joint)
-                let isHighlighted = highlightedJoints.contains(joint)
-                let radius: CGFloat = isFaulty || isHighlighted ? 8 : 5
-                let center = place(point)
-                let dot = Path(ellipseIn: CGRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2))
-                context.fill(dot, with: .color(isFaulty ? .red : isHighlighted ? highlightColor : .white))
-            }
+        } keyframes: { _ in
+            SpringKeyframe(reduceMotion ? 1 : 1.7, duration: 0.18)
+            SpringKeyframe(1, duration: 0.45)
+        }
+        .onChange(of: highlightColor, initial: true) {
+            let reached = Self.tier(of: highlightColor)
+            if reached > tier { tierReached += 1 }
+            tier = reached
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+    }
+
+    /// 0 on the way, then 1 "Bien", 2 "Très bien", 3 "Parfait".
+    private static func tier(of color: Color) -> Int {
+        let tiers: [AmplitudeTier] = [.good, .veryGood, .perfect]
+        return (tiers.firstIndex { $0.color == color } ?? -1) + 1
+    }
+
+    private func layer(_ joints: Joint...) -> Layer {
+        if joints.allSatisfy(faultyJoints.contains) { return .faulty }
+        if joints.allSatisfy(highlightedJoints.contains) { return .highlighted }
+        return .plain
+    }
+
+    private func draw(in context: inout GraphicsContext, size: CGSize, swell: Double) {
+        func place(_ point: CGPoint) -> CGPoint {
+            skeleton.place(point, in: size)
+        }
+        func color(_ layer: Layer) -> Color {
+            switch layer {
+            case .plain: .white.opacity(0.6)
+            case .highlighted: highlightColor
+            case .faulty: .red
+            }
+        }
+        func width(_ layer: Layer) -> CGFloat {
+            switch layer {
+            case .plain: 3
+            case .highlighted: 8 * swell
+            case .faulty: 8
+            }
+        }
+        let joints = skeleton.points.filter { joint, _ in Self.bones.contains { $0.0 == joint || $0.1 == joint } }
+
+        // Plain first, then the followed joints, then the fault on top, each over its dark edge.
+        for drawn in Layer.allCases {
+            var lines = Path()
+            for (a, b) in Self.bones where layer(a, b) == drawn {
+                guard let pointA = skeleton.points[a], let pointB = skeleton.points[b] else { continue }
+                lines.move(to: place(pointA))
+                lines.addLine(to: place(pointB))
+            }
+            var dots = Path()
+            let radius = drawn == .plain ? 5 : width(drawn)
+            for (joint, point) in joints where layer(joint) == drawn {
+                let center = place(point)
+                dots.addEllipse(in: CGRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2))
+            }
+            let edge = Color.black.opacity(0.35)
+            context.stroke(lines, with: .color(edge), style: StrokeStyle(lineWidth: width(drawn) + 4, lineCap: .round))
+            context.stroke(dots, with: .color(edge), lineWidth: 4)
+            context.stroke(lines, with: .color(color(drawn)), style: StrokeStyle(lineWidth: width(drawn), lineCap: .round))
+            context.fill(dots, with: .color(drawn == .plain ? .white : color(drawn)))
+        }
     }
 }
 

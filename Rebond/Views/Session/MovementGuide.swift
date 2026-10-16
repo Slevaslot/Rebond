@@ -30,6 +30,8 @@ struct MovementGuide: View, Animatable {
     }
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Where the patient's feet are on screen, steadied: the outline stands on them without shaking.
+    @State private var feet = GuideAnchor()
 
     /// Seconds for one full movement, down and back up.
     private static let cycle = MotionSession.demonstrationDuration
@@ -37,13 +39,23 @@ struct MovementGuide: View, Animatable {
     var body: some View {
         GeometryReader { geometry in
             let size = geometry.size
-            let box = figureBox(in: size)
+            let box = figureBox(in: size, feetY: feet.value)
             let placement = placement(in: size, box: box)
 
             TimelineView(.animation(paused: reduceMotion || !isDemonstrating)) { timeline in
                 Canvas { context, _ in
-                    let progress = isDemonstrating && !reduceMotion ? Self.progress(since: demonstrationStart, at: timeline.date) : 0
-                    let figure = Self.outline(exercise.guideRest, exercise.guideTarget, armStyle: exercise.armStyle, progress: progress, in: box)
+                    let figure: Path
+                    if isDemonstrating {
+                        // With "Réduire les animations", the figure stays still in the movement's key position.
+                        let progress = reduceMotion ? 1 : Self.progress(since: demonstrationStart, at: timeline.date)
+                        figure = Self.outline(exercise.demonstrationRest, exercise.demonstrationTarget,
+                                              armStyle: exercise.demonstrationArmStyle, progress: progress, in: box,
+                                              view: exercise.demonstrationView)
+                    } else {
+                        // Where to stand: the resting pose, from the front, as the camera sees the patient.
+                        figure = Self.outline(exercise.guideRest, exercise.guideRest, armStyle: exercise.armStyle,
+                                              progress: 0, in: box)
+                    }
                     let color: Color = if isDemonstrating { tint } else {
                         switch placement {
                         case .aligned: .green
@@ -60,6 +72,9 @@ struct MovementGuide: View, Animatable {
                 }
             }
             .onChange(of: placement, initial: true) { onPlacement(placement) }
+            .onChange(of: bodyPoint(.leftAnkle, .rightAnkle, in: size).map { Double($0.y) }, initial: true) { _, y in
+                feet.update(y, tolerance: size.height * 0.03)
+            }
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
@@ -69,6 +84,11 @@ struct MovementGuide: View, Animatable {
     /// ankles fill about 56% of the screen height on real videos). Once the feet are seen, the figure stands
     /// on them: their height on screen depends on how the phone is set, not on where the patient stands.
     func figureBox(in size: CGSize) -> CGRect {
+        figureBox(in: size, feetY: bodyPoint(.leftAnkle, .rightAnkle, in: size).map { Double($0.y) })
+    }
+
+    /// The same, standing on feet seen at `feetY` points from the top (nil: not seen yet).
+    func figureBox(in size: CGSize, feetY: Double?) -> CGRect {
         if isCompact {
             let height = size.height * 0.9
             let width = height * 0.65
@@ -77,9 +97,8 @@ struct MovementGuide: View, Animatable {
         let height = size.height * 0.6
         let width = height * 0.65
         var top = size.height * 0.28
-        if let feet = bodyPoint(.leftAnkle, .rightAnkle, in: size),
-           let guideFeet = exercise.guideRest[.leftAnkle]?.y {
-            top = min(max(feet.y - guideFeet * height, size.height * 0.05), size.height * 0.3)
+        if let feetY, feetY.isFinite, let guideFeet = exercise.guideRest[.leftAnkle]?.y {
+            top = min(max(feetY - guideFeet * height, size.height * 0.05), size.height * 0.3)
         }
         return CGRect(x: (size.width - width) / 2, y: top, width: width, height: height)
     }
@@ -102,122 +121,59 @@ struct MovementGuide: View, Animatable {
     }
 
     /// A signage-style pictogram drawn as one single contour: round head, torso with rounded corners,
-    /// arms and legs of even thickness.
-    /// Going down, the hands come together in front of the body, as in a real squat.
-    static func outline(_ rest: GuidePose, _ target: GuidePose, armStyle: CatalogExercise.ArmStyle, progress: Double, in box: CGRect) -> Path {
-        func point(_ joint: Joint, at progress: Double) -> CGPoint? {
-            guard let a = rest[joint], let b = target[joint] else { return nil }
-            return CGPoint(
-                x: box.minX + (a.x + (b.x - a.x) * progress) * box.width,
-                y: box.minY + (a.y + (b.y - a.y) * progress) * box.height
-            )
-        }
-        let limb = box.height * 0.075
-        let arm = limb * 0.8
+    /// arms and legs of even thickness. Any pair of poses gives a sane figure (see `GuideFigure`).
+    static func outline(_ rest: GuidePose, _ target: GuidePose, armStyle: CatalogExercise.ArmStyle, progress: Double,
+                        in box: CGRect, view: GuideFigure.View = .front) -> Path {
+        path(of: GuideFigure(rest: rest, target: target, armStyle: armStyle, progress: progress, in: box, view: view))
+    }
 
-        func torso(at progress: Double) -> CGRect? {
-            guard let leftShoulder = point(.leftShoulder, at: progress), let rightShoulder = point(.rightShoulder, at: progress),
-                  let leftHip = point(.leftHip, at: progress), let rightHip = point(.rightHip, at: progress)
-            else { return nil }
-            let top = (leftShoulder.y + rightShoulder.y) / 2
-            return CGRect(
-                x: leftHip.x - limb / 2,
-                y: top,
-                width: rightHip.x - leftHip.x + limb,
-                height: (leftHip.y + rightHip.y) / 2 - top + limb / 2
-            )
+    /// The figure's contour: every part joined in one shape.
+    static func path(of figure: GuideFigure) -> Path {
+        let size = figure.torsoSize
+        let torso = Path(roundedRect: CGRect(x: -size.width / 2, y: -size.height / 2, width: size.width, height: size.height),
+                         cornerRadius: figure.torsoCornerRadius)
+            .applying(CGAffineTransform(rotationAngle: figure.torsoAngle)
+                .concatenating(CGAffineTransform(translationX: figure.torsoCenter.x, y: figure.torsoCenter.y)))
+        let radius = figure.headRadius
+        var outline = torso
+            .union(Path(ellipseIn: CGRect(x: figure.head.x - radius, y: figure.head.y - radius, width: radius * 2, height: radius * 2)))
+            .union(segment(figure.neck, cap: .butt))
+        for limb in figure.limbs {
+            outline = outline.union(segment(limb, cap: .round))
         }
-        guard let body = torso(at: progress), let standing = torso(at: 0) else { return Path() }
-
-        // Top corners rounded like the end of the arms, so each arm covers its corner exactly.
-        var outline = Path(roundedRect: body, cornerRadius: arm / 2)
-
-        // Arms from the top corners of the torso: straight when standing, then the elbows bend and the
-        // hands come together in front of the chest. Upper arm and forearm keep their length.
-        var armShape = Path()
-        func addSegment(_ a: CGPoint, _ b: CGPoint) {
-            var segment = Path()
-            segment.move(to: a)
-            segment.addLine(to: b)
-            armShape = armShape.union(segment.strokedPath(StrokeStyle(lineWidth: arm, lineCap: .round)))
-        }
-        let sides: [(x: (CGRect) -> CGFloat, wrist: Joint, outward: CGFloat)] = [
-            ({ $0.minX + arm / 2 }, .leftWrist, -1), ({ $0.maxX - arm / 2 }, .rightWrist, 1),
-        ]
-        func unit(_ v: CGVector) -> CGVector {
-            let length = max(hypot(v.dx, v.dy), 0.0001)
-            return CGVector(dx: v.dx / length, dy: v.dy / length)
-        }
-        func mix(_ a: CGVector, _ b: CGVector) -> CGVector {
-            unit(CGVector(dx: a.dx + (b.dx - a.dx) * progress, dy: a.dy + (b.dy - a.dy) * progress))
-        }
-        for side in sides where armStyle == .straight {
-            // Straight arm from the top corner of the torso to the guide's wrist.
-            guard let hand = point(side.wrist, at: progress) else { continue }
-            addSegment(CGPoint(x: side.x(body), y: body.minY + arm / 2), hand)
-        }
-        for side in sides where armStyle == .handsToChest {
-            guard let standingHand = point(side.wrist, at: 0) else { continue }
-            let standingStart = CGPoint(x: side.x(standing), y: standing.minY + arm / 2)
-            let straight = CGVector(dx: standingHand.x - standingStart.x, dy: standingHand.y - standingStart.y)
-            let segment = hypot(straight.dx, straight.dy) / 2
-            let start = CGPoint(x: side.x(body), y: body.minY + arm / 2)
-
-            // At the bottom: hands joined in front of the chest, elbows out and down.
-            let chest = CGPoint(x: body.midX, y: body.minY + body.height * 0.3)
-            let reach = min(hypot(chest.x - start.x, chest.y - start.y), segment * 2 * 0.999)
-            let toChest = unit(CGVector(dx: chest.x - start.x, dy: chest.y - start.y))
-            let bend = sqrt(max(0, segment * segment - reach * reach / 4))
-            var normal = CGVector(dx: -toChest.dy, dy: toChest.dx)
-            if normal.dx * side.outward < 0 { normal = CGVector(dx: -normal.dx, dy: -normal.dy) }
-            let bottomElbow = CGPoint(
-                x: start.x + toChest.dx * reach / 2 + normal.dx * bend,
-                y: start.y + toChest.dy * reach / 2 + normal.dy * bend
-            )
-            let bottomUpper = unit(CGVector(dx: bottomElbow.x - start.x, dy: bottomElbow.y - start.y))
-            let bottomFore = unit(CGVector(dx: chest.x - bottomElbow.x, dy: chest.y - bottomElbow.y))
-
-            // In between, each segment turns smoothly from straight to bent, keeping its length.
-            let upper = mix(unit(straight), bottomUpper)
-            let fore = mix(unit(straight), bottomFore)
-            let elbow = CGPoint(x: start.x + upper.dx * segment, y: start.y + upper.dy * segment)
-            let hand = CGPoint(x: elbow.x + fore.dx * segment, y: elbow.y + fore.dy * segment)
-            addSegment(start, elbow)
-            addSegment(elbow, hand)
-        }
-
-        var legs = Path()
-        for (hip, knee, ankle) in [(Joint.leftHip, Joint.leftKnee, Joint.leftAnkle), (.rightHip, .rightKnee, .rightAnkle)] {
-            guard let hip = point(hip, at: progress), let knee = point(knee, at: progress), let ankle = point(ankle, at: progress) else { continue }
-            legs.move(to: CGPoint(x: hip.x, y: body.maxY - limb))
-            legs.addLine(to: knee)
-            legs.addLine(to: ankle)
-        }
-        outline = outline.union(legs.strokedPath(StrokeStyle(lineWidth: limb, lineCap: .round, lineJoin: .round)))
-
-        // Exercises done from a chair: a seat seen from the front, wider than the figure, with its two legs.
-        // It stays where the resting pose puts it: the figure sits on it, then stands in front of it.
-        if let seat = rest[.guideChairSeat] {
-            let seatY = box.minY + seat.y * box.height
-            let floorY = box.minY + (rest[.leftAnkle]?.y ?? 0.95) * box.height
-            let half = box.width * 0.36
-            let left = box.minX + seat.x * box.width - half, right = box.minX + seat.x * box.width + half
+        if !figure.chair.isEmpty {
             var chair = Path()
-            chair.move(to: CGPoint(x: left, y: floorY))
-            chair.addLine(to: CGPoint(x: left, y: seatY))
-            chair.addLine(to: CGPoint(x: right, y: seatY))
-            chair.addLine(to: CGPoint(x: right, y: floorY))
-            outline = outline.union(chair.strokedPath(StrokeStyle(lineWidth: arm * 0.8, lineCap: .round, lineJoin: .round)))
+            for line in figure.chair { chair.addLines(line) }
+            outline = outline.union(chair.strokedPath(StrokeStyle(lineWidth: figure.chairWidth, lineCap: .round, lineJoin: .round)))
         }
-
-        // Head joined to the torso by a short neck: the whole figure is a single contour.
-        let radius = box.height * 0.065
-        let head = CGRect(x: body.midX - radius, y: body.minY - box.height * 0.02 - radius * 2, width: radius * 2, height: radius * 2)
-        let neck = CGRect(x: body.midX - radius * 0.45, y: head.midY, width: radius * 0.9, height: body.minY - head.midY + arm)
         return outline
-            .union(Path(ellipseIn: head))
-            .union(Path(roundedRect: neck, cornerRadius: radius * 0.3))
-            .union(armShape)
+    }
+
+    /// One piece of limb with round ends, wider at its end when it comes toward the camera.
+    private static func segment(_ segment: GuideFigure.Segment, cap: CGLineCap) -> Path {
+        let dx = segment.end.x - segment.start.x, dy = segment.end.y - segment.start.y
+        let length = hypot(dx, dy)
+        func disc(_ center: CGPoint, _ width: CGFloat) -> Path {
+            Path(ellipseIn: CGRect(x: center.x - width / 2, y: center.y - width / 2, width: width, height: width))
+        }
+        guard length > 0.01 else { return disc(segment.end, max(segment.width, segment.endWidth)) }
+        guard abs(segment.endWidth - segment.width) > 0.01 else {
+            var line = Path()
+            line.move(to: segment.start)
+            line.addLine(to: segment.end)
+            return line.strokedPath(StrokeStyle(lineWidth: segment.width, lineCap: cap))
+        }
+        let normal = CGVector(dx: -dy / length, dy: dx / length)
+        let start = segment.width / 2, end = segment.endWidth / 2
+        var tapered = Path()
+        tapered.addLines([
+            CGPoint(x: segment.start.x + normal.dx * start, y: segment.start.y + normal.dy * start),
+            CGPoint(x: segment.end.x + normal.dx * end, y: segment.end.y + normal.dy * end),
+            CGPoint(x: segment.end.x - normal.dx * end, y: segment.end.y - normal.dy * end),
+            CGPoint(x: segment.start.x - normal.dx * start, y: segment.start.y - normal.dy * start),
+        ])
+        tapered.closeSubpath()
+        return tapered.union(disc(segment.start, segment.width)).union(disc(segment.end, segment.endWidth))
     }
 
     private func placement(in size: CGSize, box: CGRect) -> GuidePlacement {
@@ -243,4 +199,12 @@ struct MovementGuide: View, Animatable {
         }
         return GuidePlacement.evaluate(body, guide: guide)
     }
+}
+
+nonisolated extension CatalogExercise {
+    /// The poses the demonstration plays: from the side when the movement reads better that way.
+    var demonstrationRest: GuidePose { guideProfile?.rest ?? guideRest }
+    var demonstrationTarget: GuidePose { guideProfile?.target ?? guideTarget }
+    var demonstrationView: GuideFigure.View { guideProfile == nil ? .front : .profile }
+    var demonstrationArmStyle: ArmStyle { guideProfile?.armStyle ?? armStyle }
 }
