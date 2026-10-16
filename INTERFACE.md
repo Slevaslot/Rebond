@@ -42,6 +42,7 @@ Deux onglets, plus Kiné si l'espace kiné est activé (HIG *Tab bars* : les ong
 - **Vérifier le mouvement** (page d'un exercice filmé, dans « Mes exercices » comme dans un programme) : le même écran, dans une feuille, avec « Terminé ». L'inversion y est enregistrée tout de suite, et l'écran le dit ; la refaire revient au départ d'origine.
 - On crée d'abord un exercice. Une fois enregistré, l'app propose la suite : « Ajouter à « … » » pour chaque programme, « Créer un programme avec cet exercice », ou « Non, juste l'exercice ». Un exercice seul n'est dans aucune séance, mais se fait déjà avec « Essayer un exercice ».
 - « Créer un exercice » ne crée jamais de programme ; « Créer un programme » crée directement un programme entier, sur l'Accueil vide comme dans l'onglet Exercices.
+- **Un seul côté, en miroir** : pour un exercice filmé d'un seul côté, « Faire maintenant » propose les deux côtés, le côté filmé, ou l'autre côté en miroir (vidéo retournée, côté nommé, la caméra suit ce côté-là).
 - **Des deux côtés** (réglage de chaque exercice d'un programme) : chaque série se fait d'un côté puis de l'autre, avec un seul film ou modèle, montré en miroir pour le second côté. Activé par défaut pour un exercice filmé d'un seul côté (une jambe, un bras). La séance affiche « Série 1 sur 3 · côté gauche », la fin de série annonce « Côté droit ». La caméra compte les deux côtés avec le même film.
 - **Essayer un exercice** (hors programme) n'est pas une séance : il est enregistré pour l'historique de l'exercice, mais ne compte ni dans la régularité, ni dans le suivi, ni dans le bilan envoyé au kiné (`Session.isTrial`).
 
@@ -95,7 +96,7 @@ Le téléphone est posé à 2–3 m. **Tout doit se lire de loin et s'entendre s
    - jauge de profondeur ;
    - correction en cours : texte court + symbole + voix ;
    - **Pause** et **Terminer** toujours visibles, en bas, ≥ 60 pt de haut (atteignables à la main en revenant au téléphone).
-5. **Fin de série.** Résumé (répétitions complètes, incomplètes, meilleure amplitude), puis « Série suivante » ou « Terminer la séance ».
+5. **Fin de série.** Allégée : ce qui a été fait en une ligne (répétitions complètes, incomplètes, amplitude habituelle), puis « Ensuite » en grand (série, côté ou exercice suivant ; « Dernière série » à la fin), le compte à rebours du repos (la paume le met en pause), « Continuer » et un petit « Refaire cette série ». Tout se gère aussi à distance (signes, Siri, montre).
 6. **Fin de séance.** Douleur 0–10, puis résumé. Une séance terminée en quelques secondes sans aucune répétition est proposée à l'abandon plutôt qu'enregistrée d'office.
 
 Règles pendant la série :
