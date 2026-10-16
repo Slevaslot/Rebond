@@ -52,7 +52,8 @@ nonisolated struct CatalogExercise: Identifiable, Sendable {
     let guideTarget: GuidePose
     let armStyle: ArmStyle
 
-    func makeCounter() -> any MovementCounter {
+    /// - Parameter side: For a filmed movement, the side of the body asked (as filmed, or the other one).
+    func makeCounter(side: MovementSide = .asFilmed) -> any MovementCounter {
         switch analysis {
         case .squat(let targetDepth): RepCounter(targetDepth: targetDepth)
         case .armRaise(let targetAngle): ArmRaiseCounter(targetAngle: targetAngle)
@@ -63,7 +64,8 @@ nonisolated struct CatalogExercise: Identifiable, Sendable {
         case .forwardLunge(let targetDrop): LungeCounter(direction: .forward, target: targetDrop)
         case .sideLunge(let targetShift): LungeCounter(direction: .side, target: targetShift)
         case .shoulderRotation(let targetTurn): ShoulderRotationCounter(targetTurn: targetTurn)
-        case .recorded(let movement): ReferenceCounter(movement: movement)
+        case .recorded(let movement) where movement.isHold: HoldCounter(movement: movement, side: side)
+        case .recorded(let movement): ReferenceCounter(movement: movement, side: side)
         }
     }
 }
@@ -382,9 +384,17 @@ nonisolated extension CatalogExercise {
     func canFollow(_ measure: PoseMeasure?) -> Bool {
         guard let measure else { return false }
         switch analysis {
-        case .squat, .sitToStand, .forwardLunge, .sideLunge, .recorded:
+        case .squat, .sitToStand, .forwardLunge, .sideLunge:
             // The hips and the neck give the movement.
             return true
+        case .recorded(let movement):
+            // The measures that carry the filmed movement, on either side, enough to estimate it.
+            let features = MovementFeatures.vector(measure, torso: measure.torsoLength)
+            let key = movement.keyFeatures
+            let total = key.reduce(0) { $0 + movement.axis[$1] * movement.axis[$1] }
+            guard total > 0 else { return true }
+            func visible(_ v: [Double?]) -> Double { key.filter { v[$0] != nil }.reduce(0) { $0 + movement.axis[$1] * movement.axis[$1] } }
+            return max(visible(features), visible(MovementFeatures.swapped(features))) / total >= ReferenceCounter.minimumVisibleWeight
         case .armRaise, .oneArmRaise:
             return ArmRaiseCounter.arms(in: measure) != nil
         case .legRaise, .kneeRaise:

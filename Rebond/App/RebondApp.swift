@@ -29,6 +29,8 @@ import TipKit
                 .environment(router)
                 .environment(store)
                 .task { await store.refresh() }
+                // Filmed movements learned by an older analysis: learned again once, in the background.
+                .task(priority: .background) { await ReferenceStore.upgradeOlderMovements() }
                 // Widgets: the snapshot they read, and the link that opens today's session.
                 .modifier(WidgetSync())
                 .onOpenURL { url in

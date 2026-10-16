@@ -39,6 +39,10 @@ nonisolated enum Correction: Sendable {
     case matchLeftLeg
     case matchRightLeg
     case matchTrunk
+    /// A filmed movement done with one side: the other side does it.
+    case useOtherSide
+    /// A filmed held position: the patient left it, the timer stopped.
+    case holdPosition
 
     var message: LocalizedStringResource {
         switch self {
@@ -67,6 +71,8 @@ nonisolated enum Correction: Sendable {
         case .matchLeftLeg, .matchRightLeg: "Placez cette jambe comme sur la vidéo"
         case .matchTrunk: "Gardez le buste comme sur la vidéo"
         case .keepStandingLegStraight: "Gardez la jambe d'appui tendue"
+        case .useOtherSide: "Faites-le de l'autre côté"
+        case .holdPosition: "Reprenez la position"
         }
     }
 }
@@ -109,6 +115,11 @@ nonisolated struct CounterUpdate: Sendable {
     let event: RepEvent?
     /// Posture problem visible right now, to highlight on the body.
     var posture: Correction? = nil
+    /// False when the joints the movement needs aren't seen on this frame: `progress` is the last one measured,
+    /// nothing is counted nor advised, and the screen doesn't pretend to follow.
+    var isMeasured = true
+    /// A held position: whether the patient is in it (the timer runs). Nil for repetitions.
+    var isHolding: Bool? = nil
 }
 
 /// Counts the repetitions of one exercise from a stream of 2D measures.

@@ -51,8 +51,27 @@ nonisolated struct SetResult: Sendable {
     var completedReps = 0
     var incompleteReps = 0
     var heldSeconds = 0
-    /// Best repetition, in percent of the exercise's target. Nil when nothing was measured.
-    var amplitude: Double?
+    /// Each counted repetition measured by the camera, in percent of the exercise's target. Empty when nothing
+    /// was measured (counted by hand, timer): the amplitude is then unavailable, never zero.
+    var amplitudes: [Double] = []
+
+    init(completedReps: Int = 0, incompleteReps: Int = 0, heldSeconds: Int = 0, amplitudes: [Double] = []) {
+        self.completedReps = completedReps
+        self.incompleteReps = incompleteReps
+        self.heldSeconds = heldSeconds
+        self.amplitudes = amplitudes
+    }
+
+    /// The set's usual repetition (median of those measured), in percent of the target: a single great one
+    /// doesn't hide the others. Nil when nothing was measured.
+    var amplitude: Double? { SetResult.median(amplitudes) }
+
+    static func median(_ values: [Double]) -> Double? {
+        guard !values.isEmpty else { return nil }
+        let sorted = values.sorted()
+        let middle = sorted.count / 2
+        return sorted.count.isMultiple(of: 2) ? (sorted[middle - 1] + sorted[middle]) / 2 : sorted[middle]
+    }
 }
 
 /// Totals of one exercise over the session.
@@ -60,8 +79,12 @@ nonisolated struct ExerciseTally: Sendable, Equatable {
     var completedReps = 0
     var incompleteReps = 0
     var heldSeconds = 0
-    var amplitude: Double?
+    /// Every measured repetition of the session, in percent of the target.
+    var amplitudes: [Double] = []
     var setsDone = 0
+
+    /// The session's usual repetition (median of every measured one). Nil when nothing was measured.
+    var amplitude: Double? { SetResult.median(amplitudes) }
 }
 
 /// The steps of a session and what was done so far. Pure logic, tested without a screen.
@@ -110,9 +133,7 @@ nonisolated struct WorkoutPlan: Sendable {
         tally.incompleteReps += result.incompleteReps
         tally.heldSeconds += result.heldSeconds
         tally.setsDone += 1
-        if let amplitude = result.amplitude {
-            tally.amplitude = max(tally.amplitude ?? 0, amplitude)
-        }
+        tally.amplitudes += result.amplitudes
         tallies[step.exerciseIndex] = tally
         currentIndex += 1
     }

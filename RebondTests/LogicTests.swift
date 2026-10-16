@@ -16,13 +16,17 @@ struct WorkoutPlanTests {
         #expect(plan.currentStep?.set == 1)
     }
 
-    @Test func addsUpSetsAndKeepsBestAmplitude() {
+    @Test func addsUpSetsAndKeepsTheUsualAmplitude() {
         var plan = WorkoutPlan(exercises: exercises)
-        plan.record(SetResult(completedReps: 8, incompleteReps: 2, amplitude: 90))
-        plan.record(SetResult(completedReps: 10, amplitude: 104))
+        plan.record(SetResult(completedReps: 3, incompleteReps: 2, amplitudes: [80, 90, 92]))
+        plan.record(SetResult(completedReps: 2, amplitudes: [95, 140]))
         plan.record(SetResult(heldSeconds: 30))
         #expect(plan.isFinished)
-        #expect(plan.tallies[0] == ExerciseTally(completedReps: 18, incompleteReps: 2, amplitude: 104, setsDone: 2))
+        // The median of every measured repetition, not the single best one (140).
+        #expect(plan.tallies[0].amplitude == 92)
+        #expect(plan.tallies[0].completedReps == 5 && plan.tallies[0].incompleteReps == 2 && plan.tallies[0].setsDone == 2)
+        // Nothing measured: unavailable, not zero.
+        #expect(plan.tallies[1].amplitude == nil)
         #expect(plan.tallies[1].heldSeconds == 30)
         #expect(!plan.nothingDone)
     }

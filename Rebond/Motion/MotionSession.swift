@@ -59,8 +59,8 @@ final class MotionSession {
     private(set) var depthProgress = 0.0
     private(set) var repCount = 0
     private(set) var incompleteCount = 0
-    /// Best completed repetition, as a fraction of the exercise's target.
-    private(set) var bestAmplitude = 0.0
+    /// Each counted repetition's amplitude, as a fraction of the exercise's target.
+    private(set) var amplitudes: [Double] = []
     private(set) var feedback: Feedback?
     private(set) var guideDisplay = GuideDisplay.large
     /// Paused from the screen or by a hand gesture: nothing is counted until the patient resumes.
@@ -250,7 +250,7 @@ final class MotionSession {
         SetResult(
             completedReps: repCount,
             incompleteReps: incompleteCount,
-            amplitude: repCount > 0 ? bestAmplitude * 100 : nil
+            amplitudes: amplitudes.map { $0 * 100 }
         )
     }
 
@@ -361,7 +361,7 @@ final class MotionSession {
         depthProgress = 0
         repCount = 0
         incompleteCount = 0
-        bestAmplitude = 0
+        amplitudes = []
         feedbackDismissal?.cancel()
         feedback = nil
         heldFault = nil
@@ -422,7 +422,7 @@ final class MotionSession {
             break
         case .repCompleted(let result):
             repCount += 1
-            bestAmplitude = max(bestAmplitude, result.amplitude)
+            amplitudes.append(result.amplitude)
             if repCount >= targetReps {
                 phase = .finished
                 depthProgress = 0

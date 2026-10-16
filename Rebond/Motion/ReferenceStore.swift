@@ -60,51 +60,20 @@ nonisolated enum ReferenceStore {
 
     // MARK: Learning from a video
 
-    /// Analyzes a filmed movement and keeps it, with its video.
+    static func posesURL(_ id: UUID) -> URL { folder(id).appending(path: "poses.json") }
+
+    /// Analyzes a filmed movement and keeps it, with its video and the body seen on each frame (`poses.json`,
+    /// so it can be learned again without the video's analysis: start and end swapped, a newer analysis).
     /// - Parameter mirrored: The video wasn't filmed like a mirror (imported from Photos): it is turned over,
     ///   to look like the camera of the session.
     static func learn(from video: URL, name: String, mirrored: Bool) async throws -> ReferenceMovement {
         let id = UUID()
-        let asset = AVURLAsset(url: video)
-        let duration = min(try await asset.load(.duration).seconds, 90)
-
-        // 15 images per second, as during the session. Everyone seen is followed from one image to the next:
-        // the physiotherapist is often in the picture with the patient.
-        let analyzer = PoseAnalyzer(orientation: mirrored ? .upMirrored : .up)
-        var people: [PersonTrack] = []
-        let generator = imageGenerator(for: asset, maximumSide: 1280)
-        let times = stride(from: 0.0, to: duration, by: 1.0 / 15).map { CMTime(seconds: $0, preferredTimescale: 600) }
-        var frames: [(time: Double, people: [PoseFrame], size: CGSize)] = []
-        for await result in generator.images(for: times) {
-            guard let image = try? result.image else { continue }
-            frames.append((result.requestedTime.seconds, analyzer.analyzeEveryone(image),
-                           CGSize(width: image.width, height: image.height)))
-        }
-        frames.sort { $0.time < $1.time }
-        for frame in frames {
-            PersonTrack.follow(frame.people, at: frame.time, imageSize: frame.size, in: &people)
-        }
-        // The patient is the one doing the movement.
-        guard let patient = people.max(by: { ReferenceAnalyzer.motion(of: $0.samples) < ReferenceAnalyzer.motion(of: $1.samples) })
-        else { throw ReferenceError.noBody }
-        // Pass 1: is the capture good enough to measure?
-        if let problem = CaptureQuality.problem(patient.samples, frameCount: frames.count) {
-            throw ReferenceError.poorCapture(problem)
-        }
-        let analysis = try ReferenceAnalyzer.analyze(patient.samples)
+        let samples = try await patientSamples(in: video, mirrored: mirrored)
+        let analysis = try ReferenceAnalyzer.analyze(samples)
 
         try FileManager.default.createDirectory(at: folder(id), withIntermediateDirectories: true)
-        // The images of the clearest repetition, shown during the session as the patient moves.
-        let frameTimes = stride(from: analysis.bestStart, through: analysis.bestEnd, by: 1.0 / 15).map { $0 }
-        let small = imageGenerator(for: asset, maximumSide: 640)
-        var index = 0
-        for await result in small.images(for: frameTimes.map { CMTime(seconds: $0, preferredTimescale: 600) }) {
-            guard let image = try? result.image else { continue }
-            writeJPEG(mirrored ? flipped(image) : image, to: frameURL(id, index))
-            index += 1
-        }
-        let peakFrame = frameTimes.firstIndex { $0 >= analysis.bestPeak } ?? frameTimes.count / 2
-        let peakIndex = min(peakFrame, max(index - 1, 0))
+        try? JSONEncoder().encode(PoseRecording(samples: samples)).write(to: posesURL(id))
+        let (index, peakIndex) = await saveFrames(id, of: video, analysis: analysis, mirrored: mirrored)
         // Pass 2 and 3: which exercise of the catalog, checked against its signature; otherwise a custom one.
         var recognition: RecognitionResult?
         if let measurement = analysis.measurement, let catalog = ExerciseCatalogFile.bundled {
@@ -126,24 +95,101 @@ nonisolated enum ReferenceStore {
         try? FileManager.default.removeItem(at: videoURL(id))
         try FileManager.default.copyItem(at: video, to: videoURL(id))
 
-        let movement = ReferenceMovement(
-            id: id, name: movementName,
-            createdAt: .now,
-            axis: analysis.axis, target: analysis.target, template: analysis.template,
-            minDuration: analysis.minDuration, repCount: analysis.repCount,
-            highlightedJoints: analysis.highlightedJoints,
-            recognizedID: recognition?.catalogID,
-            symbol: symbol.systemName,
-            recognitionNote: recognition.map(Self.note),
-            plan: plan,
-            instructions: instructions,
-            rest: analysis.rest,
-            restPose: analysis.restPose,
-            targetPose: analysis.targetPose,
-            frameCount: index, peakFrame: peakIndex
-        )
+        var movement = ReferenceMovement(id: id, name: movementName, analysis: analysis, frameCount: index, peakFrame: peakIndex)
+        movement.recognizedID = recognition?.catalogID
+        movement.symbol = symbol.systemName
+        movement.recognitionNote = recognition.map(Self.note)
+        movement.plan = plan
+        movement.instructions = instructions
+        movement.videoMirrored = mirrored
         try save(movement)
         return movement
+    }
+
+    /// Learns a kept movement again, from the body saved with it (or its video for a movement learned before):
+    /// with this version's analysis, or with its start and end swapped (the patient said it was upside down).
+    /// Its name, symbol, recognition and plan stay.
+    static func relearn(_ movement: ReferenceMovement, swapped: Bool) async throws -> ReferenceMovement {
+        let id = movement.id
+        let mirrored = movement.videoMirrored ?? false
+        let samples: [ReferenceSample]
+        if let data = try? Data(contentsOf: posesURL(id)), let recording = try? JSONDecoder().decode(PoseRecording.self, from: data) {
+            samples = recording.samples
+        } else {
+            samples = try await patientSamples(in: videoURL(id), mirrored: mirrored)
+            try? JSONEncoder().encode(PoseRecording(samples: samples)).write(to: posesURL(id))
+        }
+        let analysis = try ReferenceAnalyzer.analyze(samples, restChoice: swapped ? .swapped : .automatic)
+        let (index, peakIndex) = await saveFrames(id, of: videoURL(id), analysis: analysis, mirrored: mirrored)
+        var learned = ReferenceMovement(id: id, name: movement.name, createdAt: movement.createdAt, analysis: analysis,
+                                        frameCount: index, peakFrame: peakIndex)
+        learned.recognizedID = movement.recognizedID
+        learned.symbol = movement.symbol
+        learned.recognitionNote = movement.recognitionNote
+        learned.plan = movement.plan
+        learned.instructions = movement.instructions
+        learned.restSwapped = swapped
+        learned.videoMirrored = movement.videoMirrored
+        learned.revision = (movement.revision ?? 0) + 1
+        try save(learned)
+        return learned
+    }
+
+    /// Movements learned by an older analysis (which could take the end of the movement for its start) are
+    /// learned again from their video, once. One that can't be learned again stays as it was.
+    static func upgradeOlderMovements() async {
+        for movement in all() where (movement.version ?? 1) < ReferenceAnalyzer.version {
+            guard FileManager.default.fileExists(atPath: videoURL(movement.id).path(percentEncoded: false)) else { continue }
+            _ = try? await relearn(movement, swapped: movement.restSwapped ?? false)
+        }
+    }
+
+    /// The patient in a video: 15 images per second, as during the session. Everyone seen is followed from one
+    /// image to the next (the physiotherapist is often in the picture); the patient is the one doing the movement.
+    private static func patientSamples(in video: URL, mirrored: Bool) async throws -> [ReferenceSample] {
+        let asset = AVURLAsset(url: video)
+        let duration = min(try await asset.load(.duration).seconds, 90)
+        let analyzer = PoseAnalyzer(orientation: mirrored ? .upMirrored : .up)
+        var people: [PersonTrack] = []
+        let generator = imageGenerator(for: asset, maximumSide: 1280)
+        let times = stride(from: 0.0, to: duration, by: 1.0 / 15).map { CMTime(seconds: $0, preferredTimescale: 600) }
+        var frames: [(time: Double, people: [PoseFrame], size: CGSize)] = []
+        for await result in generator.images(for: times) {
+            guard let image = try? result.image else { continue }
+            frames.append((result.requestedTime.seconds, analyzer.analyzeEveryone(image),
+                           CGSize(width: image.width, height: image.height)))
+        }
+        frames.sort { $0.time < $1.time }
+        for frame in frames {
+            PersonTrack.follow(frame.people, at: frame.time, imageSize: frame.size, in: &people)
+        }
+        guard let patient = people.max(by: { ReferenceAnalyzer.motion(of: $0.samples) < ReferenceAnalyzer.motion(of: $1.samples) })
+        else { throw ReferenceError.noBody }
+        // Pass 1: is the capture good enough to measure?
+        if let problem = CaptureQuality.problem(patient.samples, frameCount: frames.count) {
+            throw ReferenceError.poorCapture(problem)
+        }
+        return patient.samples
+    }
+
+    /// The images of the clearest repetition, shown during the session as the patient moves.
+    /// Returns how many were saved and which one is the end of the movement.
+    private static func saveFrames(_ id: UUID, of video: URL, analysis: ReferenceAnalysis, mirrored: Bool) async -> (count: Int, peak: Int) {
+        for index in 0..<200 {
+            let url = frameURL(id, index)
+            guard FileManager.default.fileExists(atPath: url.path(percentEncoded: false)) else { break }
+            try? FileManager.default.removeItem(at: url)
+        }
+        let frameTimes = stride(from: analysis.bestStart, through: analysis.bestEnd, by: 1.0 / 15).map { $0 }
+        let small = imageGenerator(for: AVURLAsset(url: video), maximumSide: 640)
+        var index = 0
+        for await result in small.images(for: frameTimes.map { CMTime(seconds: $0, preferredTimescale: 600) }) {
+            guard let image = try? result.image else { continue }
+            writeJPEG(mirrored ? flipped(image) : image, to: frameURL(id, index))
+            index += 1
+        }
+        let peakFrame = frameTimes.firstIndex { $0 >= analysis.bestPeak } ?? frameTimes.count / 2
+        return (index, min(peakFrame, max(index - 1, 0)))
     }
 
     /// What the recognition decided, in a few words.

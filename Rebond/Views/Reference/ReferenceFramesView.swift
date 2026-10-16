@@ -25,7 +25,7 @@ struct ReferenceFramesView: View {
                 }
             }
         }
-        .task(id: movement.id) {
+        .task(id: "\(movement.id)-\(movement.revision ?? 0)") {
             let id = movement.id, count = movement.frameCount
             frames = await Task.detached(priority: .userInitiated) {
                 (0..<count).compactMap { UIImage(contentsOfFile: ReferenceStore.frameURL(id, $0).path(percentEncoded: false)) }

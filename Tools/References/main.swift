@@ -75,6 +75,9 @@ func learn(_ recording: PoseRecording) -> ReferenceAnalysis {
                      "buste", "poignetG", "poignetD", "couY", "chevilleG", "chevilleD"]
         let axis = analysis.axis.enumerated().filter { abs($0.element) > 0.1 }.map { "\(names[$0.offset]) \(f($0.element))" }
         print("Axe : \(axis.joined(separator: ", "))")
+        print("Départ : \(analysis.restReason) (confiance \(f(analysis.restConfidence))), alterné : \(analysis.alternatesSides), \(analysis.kind)\(analysis.holdSeconds.map { " \($0) s" } ?? "")")
+        print("Répétitions (s) : \(analysis.repetitions.map { "\(f($0.lowerBound, 1))–\(f($0.upperBound, 1))" }.joined(separator: ", "))")
+        print("Non suivies : \(analysis.featureMask.enumerated().filter { !$0.element }.map { names[$0.offset] }.joined(separator: ", "))")
         print("Repos : \(analysis.rest.enumerated().map { "\(names[$0.offset]) \(f($0.element))" }.joined(separator: ", "))")
         return analysis
     } catch {
@@ -104,10 +107,7 @@ func count(_ recording: PoseRecording, with movement: ReferenceMovement) {
 }
 
 func makeMovement(from analysis: ReferenceAnalysis) -> ReferenceMovement {
-    ReferenceMovement(id: UUID(), name: "Film", createdAt: .now, axis: analysis.axis, target: analysis.target,
-                      template: analysis.template, minDuration: analysis.minDuration, repCount: analysis.repCount,
-                      highlightedJoints: analysis.highlightedJoints, rest: analysis.rest,
-                      restPose: analysis.restPose, targetPose: analysis.targetPose, frameCount: 0, peakFrame: 0)
+    ReferenceMovement(id: UUID(), name: "Film", analysis: analysis, frameCount: 0, peakFrame: 0)
 }
 
 switch command {
