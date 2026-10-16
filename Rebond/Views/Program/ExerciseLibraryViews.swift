@@ -146,6 +146,8 @@ struct WithoutCameraExercisePicker: View {
 struct LibraryExerciseRow: View {
     let exercise: LibraryExercise
     var isSelected: Bool?
+    /// Off in a list that draws its own disclosure indicator.
+    var showsChevron = true
 
     var body: some View {
         HStack(spacing: 14) {
@@ -160,7 +162,7 @@ struct LibraryExerciseRow: View {
                     .font(.title2)
                     .foregroundStyle(isSelected ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.tertiary))
                     .contentTransition(.symbolEffect(.replace))
-            } else {
+            } else if showsChevron {
                 Image(systemName: "chevron.right")
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(.tertiary)
