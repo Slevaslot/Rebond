@@ -26,13 +26,46 @@ nonisolated struct WidgetSnapshot: Codable, Equatable, Sendable {
     var sessionDates: [Date]
     /// The day of `exercises`: today, or the next day with a session on a rest day. Nil in older files.
     var sessionDay: Date? = nil
+    /// The days with a session, from the day the file was written and for `upcomingDays` days: the widgets
+    /// stay right on the following days, even if the app is not opened. Nil in older files.
+    var upcoming: [PlannedDay]? = nil
+
+    /// A day with a session, and its exercises.
+    struct PlannedDay: Codable, Equatable, Sendable {
+        /// Start of the day.
+        let day: Date
+        let exercises: [Exercise]
+        let estimatedMinutes: Int
+    }
 
     static let empty = WidgetSnapshot(hasProgram: false, sessionsPerWeek: 0, exercises: [], estimatedMinutes: 0, sessionDates: [])
 
     /// Sessions kept in the file: enough for the current week, whatever the first weekday.
     static let keptDays = 14
+    /// Days of `upcoming`: a week of timeline entries, each one finding its next session within a week.
+    static let upcomingDays = 14
 
     // MARK: Derived values
+
+    /// The snapshot as it reads on `date`: the session of that day, or the next one, taken from `upcoming`.
+    /// Unchanged for older files, or past the days known.
+    func resolved(on date: Date, calendar: Calendar = .current) -> WidgetSnapshot {
+        let start = calendar.startOfDay(for: date)
+        guard hasProgram, let next = upcoming?.first(where: { calendar.startOfDay(for: $0.day) >= start }) else { return self }
+        var snapshot = self
+        snapshot.exercises = next.exercises
+        snapshot.estimatedMinutes = next.estimatedMinutes
+        snapshot.sessionDay = next.day
+        return snapshot
+    }
+
+    /// Where a tap leads on `date`, matching what the widget shows: creating a program while there is none,
+    /// the session while today's is to do, otherwise the Accueil page (rest day, session done).
+    /// To call on the snapshot resolved for that date.
+    func destination(on date: Date, calendar: Calendar = .current) -> DeepLink.Destination {
+        guard hasProgram else { return .newProgram }
+        return hasSession(on: date, calendar: calendar) && !isDone(on: date, calendar: calendar) ? .session : .home
+    }
 
     /// The exercises are the ones of `date` (always true for older files, without `sessionDay`).
     func hasSession(on date: Date, calendar: Calendar = .current) -> Bool {
@@ -87,6 +120,15 @@ nonisolated struct WidgetSnapshot: Codable, Equatable, Sendable {
     static func nextRefresh(after date: Date, calendar: Calendar = .current) -> Date {
         calendar.nextDate(after: date, matching: DateComponents(hour: 0, minute: 0), matchingPolicy: .nextTime)
             ?? date.addingTimeInterval(24 * 3600)
+    }
+
+    /// `date`, then the next `days` midnights: the entries of a widget timeline.
+    static func timelineDates(from date: Date, days: Int, calendar: Calendar = .current) -> [Date] {
+        var dates = [date]
+        for _ in 0..<days {
+            dates.append(nextRefresh(after: dates[dates.count - 1], calendar: calendar))
+        }
+        return dates
     }
 
     // MARK: File in the App Group

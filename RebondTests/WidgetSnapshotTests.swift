@@ -120,4 +120,112 @@ struct WidgetSnapshotTests {
         #expect(snapshot.sessionTitle(on: date(14), calendar: calendar) == "Prochaine séance demain")
         #expect(snapshot.sessionTitle(on: date(13), calendar: calendar).hasPrefix("Prochaine séance "))
     }
+
+    // MARK: Where a tap leads
+
+    @Test func tapLeadsWhereTheWidgetSays() {
+        // No program: "Créer un programme".
+        #expect(WidgetSnapshot.empty.destination(on: date(15), calendar: calendar) == .newProgram)
+
+        // Today's session to do: the session.
+        var today = snapshot(sessions: [date(14)])
+        today.sessionDay = date(15, 8)
+        #expect(today.destination(on: date(15), calendar: calendar) == .session)
+
+        // Already done today: Accueil.
+        today.sessionDates.insert(date(15, 9), at: 0)
+        #expect(today.destination(on: date(15), calendar: calendar) == .home)
+
+        // Rest day, next session tomorrow: Accueil.
+        var rest = snapshot(sessions: [])
+        rest.sessionDay = date(16)
+        #expect(rest.destination(on: date(15), calendar: calendar) == .home)
+    }
+
+    @Test func widgetLinksAreDistinctAndRoundTrip() {
+        let urls = DeepLink.Destination.allCases.map(\.url)
+        #expect(Set(urls).count == DeepLink.Destination.allCases.count)
+        for destination in DeepLink.Destination.allCases {
+            #expect(DeepLink.destination(of: destination.url) == destination)
+        }
+        // The link the Live Activity and older widgets already use.
+        #expect(DeepLink.session.absoluteString == "rebond://seance")
+        #expect(DeepLink.destination(of: URL(string: "rebond://seance")!) == .session)
+    }
+
+    @Test func otherLinksAreNotWidgetLinks() {
+        // The physiotherapist's QR code, a report file, another app: left to their own handlers.
+        #expect(DeepLink.destination(of: URL(string: "rebond://programme?d=eyJ2IjoxfQ")!) == nil)
+        #expect(DeepLink.destination(of: URL(filePath: "/tmp/Bilan.rebond")) == nil)
+        #expect(DeepLink.destination(of: URL(string: "https://rebond.app/seance")!) == nil)
+        #expect(DeepLink.destination(of: URL(string: "rebond://inconnu")!) == nil)
+    }
+
+    // MARK: Following days, without the app
+
+    private func exercise(_ name: String) -> WidgetSnapshot.Exercise {
+        WidgetSnapshot.Exercise(name: name, symbol: "figure.cooldown", sets: 3, reps: 10, holdSeconds: nil)
+    }
+
+    @Test func laterEntriesFindTheirDaysSession() {
+        // Written on Thursday 15 (session A); next session Saturday 17 (session B).
+        var snapshot = snapshot(sessions: [])
+        snapshot.sessionDay = date(15, 9)
+        snapshot.exercises = [exercise("A")]
+        snapshot.upcoming = [
+            .init(day: calendar.startOfDay(for: date(15)), exercises: [exercise("A")], estimatedMinutes: 5),
+            .init(day: calendar.startOfDay(for: date(17)), exercises: [exercise("B"), exercise("C")], estimatedMinutes: 9),
+        ]
+
+        let thursday = snapshot.resolved(on: date(15), calendar: calendar)
+        #expect(thursday.exercises.map(\.name) == ["A"])
+        #expect(thursday.destination(on: date(15), calendar: calendar) == .session)
+
+        // Friday, rest day: Saturday's session, announced for tomorrow; a tap opens Accueil.
+        let friday = snapshot.resolved(on: date(16, 0), calendar: calendar)
+        #expect(friday.exercises.map(\.name) == ["B", "C"])
+        #expect(friday.estimatedMinutes == 9)
+        #expect(!friday.hasSession(on: date(16), calendar: calendar))
+        #expect(friday.sessionTitle(on: date(16), calendar: calendar) == "Prochaine séance demain")
+        #expect(friday.destination(on: date(16), calendar: calendar) == .home)
+
+        let saturday = snapshot.resolved(on: date(17, 0), calendar: calendar)
+        #expect(saturday.destination(on: date(17), calendar: calendar) == .session)
+
+        // Past the days known, or an older file: unchanged.
+        #expect(snapshot.resolved(on: date(20), calendar: calendar) == snapshot)
+        snapshot.upcoming = nil
+        #expect(snapshot.resolved(on: date(16), calendar: calendar) == snapshot)
+        #expect(WidgetSnapshot.empty.resolved(on: date(16), calendar: calendar) == .empty)
+    }
+
+    @Test func timelineCoversAWeekOfMidnights() {
+        let dates = WidgetSnapshot.timelineDates(from: date(15, 22), days: 7, calendar: calendar)
+        #expect(dates.count == 8)
+        #expect(dates[0] == date(15, 22))
+        #expect(dates[1] == date(16, 0))
+        #expect(dates[7] == date(22, 0))
+    }
+
+    @MainActor
+    @Test func upcomingDaysComeFromTheProgramsDays() throws {
+        let container = try ModelContainer(for: Program.self, Session.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+        let context = container.mainContext
+        let now = Date.now
+        let weekday = Calendar.current.component(.weekday, from: now)
+        let program = Program(sessionsPerWeek: 1, exercises: [
+            PlannedExercise(catalogID: "squat", name: "Squat", sets: 3, reps: 10, order: 0),
+        ], weekdays: [weekday])
+        context.insert(program)
+
+        let snapshot = WidgetSnapshot(programs: [program], sessions: [], now: now)
+        let upcoming = try #require(snapshot.upcoming)
+        // Today and the same day next week, within the two weeks kept.
+        #expect(upcoming.map(\.day) == [0, 7].map { Calendar.current.date(byAdding: .day, value: $0, to: Calendar.current.startOfDay(for: now))! })
+        #expect(upcoming.allSatisfy { $0.exercises.map(\.name) == ["Squat"] })
+        // Tomorrow is a rest day: Accueil, with next week's session.
+        let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: now)!
+        #expect(snapshot.resolved(on: tomorrow).destination(on: tomorrow) == .home)
+        #expect(snapshot.resolved(on: tomorrow).sessionDay == upcoming[1].day)
+    }
 }

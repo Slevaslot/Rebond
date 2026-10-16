@@ -1,13 +1,14 @@
 import SwiftUI
 import WidgetKit
 
-/// Lock Screen ring: sessions done this week out of those planned by the physiotherapist.
+/// Lock Screen ring: sessions done this week out of those planned by the physiotherapist. A tap goes to
+/// today's session, "Créer un programme" while there is none, otherwise the Accueil page.
 struct RegularityWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: "WeekRegularity", provider: RebondProvider()) { entry in
             RegularityView(entry: entry)
                 .containerBackground(.clear, for: .widget)
-                .widgetURL(DeepLink.session)
+                .widgetURL(entry.url)
         }
         .configurationDisplayName("Régularité")
         .description("Vos séances de la semaine sur celles prévues par votre kiné.")
@@ -23,7 +24,11 @@ struct RegularityView: View {
         Gauge(value: week.fraction) {
             Image(systemName: "figure.cooldown")
         } currentValueLabel: {
-            if week.isComplete {
+            if !entry.snapshot.hasProgram {
+                // No "0/0": nothing planned yet, a tap creates the program.
+                Image(systemName: "plus")
+                    .font(.title3.bold())
+            } else if week.isComplete {
                 Image(systemName: "checkmark")
                     .font(.title3.bold())
             } else {
@@ -35,7 +40,9 @@ struct RegularityView: View {
         .gaugeStyle(.accessoryCircularCapacity)
         .widgetAccentable()
         .accessibilityLabel(Text("Régularité"))
-        .accessibilityValue(Text("\(week.done) séances sur \(week.planned) cette semaine"))
+        .accessibilityValue(entry.snapshot.hasProgram
+            ? Text("\(week.done) séances sur \(week.planned) cette semaine")
+            : Text("Aucun programme. Touchez pour créer le vôtre."))
     }
 }
 
@@ -44,4 +51,5 @@ struct RegularityView: View {
 } timeline: {
     RebondEntry(date: .now, snapshot: .sample)
     RebondEntry(date: .now, snapshot: .sampleDoneToday)
+    RebondEntry(date: .now, snapshot: .empty)
 }

@@ -1,14 +1,36 @@
 import AppIntents
+import SwiftData
 
 extension AppRouter {
-    /// Starts the session from outside the app (widget, Shortcuts, Spotlight). Without a program yet,
-    /// shows the Accueil page, which explains how to add one, rather than an empty session.
+    /// Starts the session from outside the app (widget, Shortcuts, Spotlight). Without a session to do,
+    /// shows the Accueil page, which explains how to add a program, rather than an empty session.
+    /// Decided from the programs themselves: the widgets' snapshot may be missing (App Group unavailable).
     func startWorkoutIfProgram() {
-        if WidgetSnapshot.load()?.hasProgram == false {
+        if storedPrograms.sessionExercises().isEmpty {
             tab = .today
         } else {
             startWorkout()
         }
+    }
+
+    /// A link of a widget. What it shows may be behind the programs (written before a change, or never with
+    /// the App Group unavailable): the programs decide, so a tap never opens an empty session or a second
+    /// "Créer un programme" over an existing one.
+    func open(_ destination: DeepLink.Destination) {
+        switch destination {
+        case .session:
+            startWorkoutIfProgram()
+        case .newProgram:
+            // Over the Accueil page, which explains the other ways to start.
+            tab = .today
+            if storedPrograms.isEmpty, programCreation == nil { newProgram() }
+        case .home:
+            tab = .today
+        }
+    }
+
+    private var storedPrograms: [Program] {
+        (try? AppData.container.mainContext.fetch(FetchDescriptor<Program>())) ?? []
     }
 }
 

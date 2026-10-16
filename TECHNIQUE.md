@@ -196,6 +196,8 @@ WidgetSync ── applicationContext(WidgetSnapshot) ▶ App Group de la montre 
 
 1. **Rappels** : notifications locales les jours de séance et rappel hebdomadaire du rapport.
 2. **App Intents + widgets** : « Démarrer ma séance » (Raccourcis, Spotlight, centre de contrôle), « Séances de la semaine » (iPhone et montre), « Pause » et « Série suivante » (iPhone et montre), widgets « Séance du jour » et « Régularité ».
+   - **Données** : `WidgetSync` (racine de l'app) écrit `WidgetSnapshot` dans l'App Group à chaque changement des programmes ou des séances, au retour au premier plan et à minuit (`significantTimeChange`), puis recharge les widgets. L'instantané contient aussi les jours de séance des 14 jours à venir (`upcoming`) : la timeline (maintenant + 7 minuits) donne à chaque jour sa séance sans rouvrir l'app (`resolved(on:)`).
+   - **Liens** (`DeepLink.Destination`, choisi par `WidgetSnapshot.destination(on:)`, testé) : `rebond://seance` (séance du jour à faire), `rebond://nouveau-programme` (aucun programme), `rebond://accueil` (repos, séance faite). L'app (`AppRouter.open`) décide avec les programmes eux-mêmes : un instantané en retard (ou absent sans App Group, compte gratuit) n'ouvre jamais une séance vide ni un second « Créer un programme ». `rebond://programme?d=…` reste le lien de prescription (`ProgramTransfer`).
 3. **Live Activity interactive** : boutons Pause et Série suivante.
 4. **HealthKit** : chaque séance comme entraînement « renforcement fonctionnel », voir « Apple Watch ».
 
