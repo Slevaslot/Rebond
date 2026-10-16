@@ -3,7 +3,7 @@ import AppIntents
 /// Pause from the wrist with Siri ("Pause dans Rebond"), during a session the iPhone follows.
 struct WatchPauseIntent: AppIntent {
     static let title: LocalizedStringResource = "Mettre en pause ou reprendre la série"
-    static let description = IntentDescription("Met en pause la série en cours sur l'iPhone, ou la reprend.")
+    static let description = IntentDescription("Met en pause la série en cours dans Rebond, ou la reprend.")
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
@@ -18,7 +18,7 @@ struct WatchPauseIntent: AppIntent {
 /// Next set from the wrist with Siri.
 struct WatchNextSetIntent: AppIntent {
     static let title: LocalizedStringResource = "Passer à la série suivante"
-    static let description = IntentDescription("Termine la série en cours sur l'iPhone et passe à la suivante.")
+    static let description = IntentDescription("Termine la série en cours dans Rebond et passe à la suivante.")
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
