@@ -341,14 +341,17 @@ nonisolated struct HoldCounter: MovementCounter {
         let raw = MovementFeatures.vector(measure, torso: measure.torsoLength)
         let current = side == .mirrored ? MovementFeatures.swapped(raw) : raw
         let followed = movement.followedFeatures
-        let key = MovementFeatures.posture.filter { followed[$0] && abs(movement.axis[$0]) > 0.05 }
+        // The measures that make the position (angles, heights from the hips), not where the body stands.
+        let key = MovementFeatures.bodyRelative.filter { followed[$0] && abs(movement.axis[$0]) > 0.05 }
         let measures = key.isEmpty ? MovementFeatures.posture.filter { followed[$0] } : key
         let seen = measures.filter { current[$0] != nil }
         guard !measures.isEmpty, Double(seen.count) / Double(measures.count) >= 0.75 else { return unmeasured(at: time) }
         unmeasuredSince = nil
 
+        // How far along the way from the start to the position, from the measures seen (least squares).
         let start = movement.rest ?? MovementFeatures.standing
-        let way = seen.reduce(0) { $0 + (current[$1]! - start[$1]) * movement.axis[$1] }
+        let weight = seen.reduce(0) { $0 + movement.axis[$1] * movement.axis[$1] }
+        let way = seen.reduce(0) { $0 + (current[$1]! - start[$1]) * movement.axis[$1] } / max(weight, 1e-6)
         lastValues.append(way / max(movement.target, 0.01))
         if lastValues.count > 3 { lastValues.removeFirst() }
         let progress = min(1, max(0, ReferenceAnalyzer.median(lastValues)))

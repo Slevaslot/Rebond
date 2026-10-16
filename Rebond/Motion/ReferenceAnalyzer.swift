@@ -295,8 +295,8 @@ nonisolated enum ReferenceAnalyzer {
         let tolerance = range * 0.12
 
         // Still at the start, as the filming screen asks: the strongest sign. Only at the very start (within
-        // 1.5 s): a video that starts moving has no such sign, and a pause later isn't the start.
-        let startWindow = stillWindow(along, fromStart: true, tolerance: tolerance).flatMap { $0.lowerBound <= 22 ? $0 : nil }
+        // half a second): a video that starts moving has no such sign, and a pause later isn't the start.
+        let startWindow = stillWindow(along, fromStart: true, tolerance: tolerance).flatMap { $0.lowerBound <= 8 ? $0 : nil }
         var middleStart = false
         if let window = startWindow {
             let p = position(median(Array(window.map { along[$0] })))

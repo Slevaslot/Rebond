@@ -94,8 +94,8 @@ nonisolated struct ReferenceMovement: Codable, Sendable, Identifiable {
         guard alternatesSides != true else { return nil }
         let weight = { (indices: [Int]) in indices.reduce(0) { $0 + abs(axis.indices.contains($1) ? axis[$1] : 0) } }
         let left = weight(MovementFeatures.sidePairs.map(\.0)), right = weight(MovementFeatures.sidePairs.map(\.1))
-        if left > right * 1.5 { return .left }
-        if right > left * 1.5 { return .right }
+        if left > right * 1.5 { return BodySide(visionSide: .left) }
+        if right > left * 1.5 { return BodySide(visionSide: .right) }
         return nil
     }
 

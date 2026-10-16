@@ -15,6 +15,13 @@ nonisolated enum BodySide: Hashable, Sendable {
     case right, left
 
     var other: BodySide { self == .right ? .left : .right }
+
+    /// The patient's side from the side Vision names in the session's picture. The front camera's picture is
+    /// mirrored (the patient sees themselves as in a mirror), and Vision names the sides of the body it sees as
+    /// if it faced the camera: what it calls the left arm is the patient's right arm (checked on the team's films).
+    init(visionSide: BodySide) {
+        self = visionSide.other
+    }
 }
 
 /// One exercise of the program, copied from SwiftData so the session logic stays pure.

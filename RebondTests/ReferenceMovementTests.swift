@@ -292,7 +292,8 @@ struct ReferenceMovementTests {
 
     @Test func theFilmedSideIsTheOneCounted() throws {
         let movement = try leftArmMovement()
-        #expect(movement.filmedSide == .left)
+        // The left arm as Vision names it in the mirrored picture: the patient's right arm.
+        #expect(movement.filmedSide == .right)
         #expect(raises(ReferenceCounter(movement: movement), left: true).completed.count == 3)
         // The other arm isn't counted as filmed, and the patient is told.
         let wrong = raises(ReferenceCounter(movement: movement), left: false)
