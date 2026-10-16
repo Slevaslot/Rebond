@@ -208,6 +208,10 @@ nonisolated struct ReferenceAnalysis: Sendable {
     let bestStart: Double
     let bestPeak: Double
     let bestEnd: Double
+    /// From the first repetition's start to the last one's end: the exercise, without getting in place before
+    /// or walking to the phone after.
+    var activeStart: Double = 0
+    var activeEnd: Double = .infinity
     /// The catalog exercise it was recognized as, for its name and symbol.
     var recognizedID: String? = nil
     var rest: [Double] = []
@@ -239,7 +243,11 @@ nonisolated enum ReferenceAnalyzer {
         // Facing the camera first, then the most repetitions.
         guard var best = results.max(by: { ($0.facing ? 1 : 0, $0.analysis.repCount) < ($1.facing ? 1 : 0, $1.analysis.repCount) })
         else { throw lastError }
-        best.analysis.measurement = MovementMeasurement.measure(best.samples.map(\.measure))
+        // Measured over the repetitions only, with half a second around them.
+        let active = best.samples.filter {
+            $0.time >= best.analysis.activeStart - 0.5 && $0.time <= best.analysis.activeEnd + 0.5
+        }
+        best.analysis.measurement = MovementMeasurement.measure((active.count >= 20 ? active : best.samples).map(\.measure))
         return best.analysis
     }
 
@@ -358,6 +366,8 @@ nonisolated enum ReferenceAnalyzer {
             bestStart: valid[reps[best].start].time,
             bestPeak: peakFrame.time,
             bestEnd: valid[reps[best].end].time,
+            activeStart: valid[reps.first!.start].time,
+            activeEnd: valid[reps.last!.end].time,
             rest: rest
         )
     }

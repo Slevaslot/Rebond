@@ -7,12 +7,14 @@ import FoundationModels
 /// Returns nil when Apple Intelligence isn't available: the nearest candidate is then chosen by distance.
 nonisolated struct FoundationModelsChooser: RecognitionChooser {
     static let notRecognized = "nonReconnu"
+    /// The answer may be "nonReconnu"; off (demo), it must be one of the candidates, which all fit the measures.
+    var allowsNotRecognized = false
 
     func choose(summary: String, candidates: [ExerciseSignature], images: [CGImage]) async -> RecognitionChoice? {
         let model = SystemLanguageModel.default
         guard case .available = model.availability, !candidates.isEmpty else { return nil }
 
-        let ids = candidates.map(\.id) + [Self.notRecognized]
+        let ids = candidates.map(\.id).sorted() + (allowsNotRecognized ? [Self.notRecognized] : [])
         let root = DynamicGenerationSchema(name: "Identification", properties: [
             .init(name: "exercice", description: "L'id d'un candidat, ou nonReconnu si aucun ne correspond.",
                   schema: DynamicGenerationSchema(name: "Exercice", anyOf: ids)),
@@ -25,16 +27,23 @@ nonisolated struct FoundationModelsChooser: RecognitionChooser {
 
         let session = LanguageModelSession(instructions: """
             Tu identifies un exercice de rééducation filmé chez le kinésithérapeute, de face. \
-            Tu choisis uniquement parmi les candidats donnés, d'après les mesures et les images. \
+            Tu choisis uniquement parmi les candidats donnés. Regarde d'abord les images (position du corps, \
+            jambe ou bras qui bouge, chaise), puis les mesures pour confirmer ; les bras peuvent bouger pendant \
+            un exercice de jambes. \
             Si aucun ne correspond vraiment, réponds nonReconnu. Ne devine pas.
             Exemples :
             - « hauteur des hanches 0,5→1,0, genoux, plan sagittal, debout avec descente, les deux côtés » sans chaise \
-            → squat ; avec une chaise derrière le patient → sit-to-stand.
+            → squat ; avec une chaise derrière le patient → sit-to-stand ; un pied devant l'autre → forward-lunge ; \
+            un pas sur le côté → side-lunge.
             - « hauteur du poignet, épaule, plan frontal, un côté » bras écarté sur le côté → shoulder-abduction ; \
-            bras levé en diagonale, vers l'avant → scaption.
-            - « hauteur du genou, genou plié, un côté » → hurdle-step ; jambe tendue → leg-raise.
+            bras levé en diagonale, vers l'avant → scaption. En cas de doute entre les deux, choisis \
+            shoulder-abduction.
+            - Jambe levée devant, un côté : « genou le plus plié » sous 120° (genou plié) → hurdle-step ; \
+            au-dessus de 120° (jambe tendue) → leg-raise.
             """)
-        let list = candidates.map { "- \($0.id) (\($0.name)) : \($0.summary)" }.joined(separator: "\n")
+        // Always in the same order (by id), not nearest first: the model tends to favor the first choice it reads.
+        let listed = candidates.sorted { $0.id < $1.id }
+        let list = listed.map { "- \($0.id) (\($0.name)) : \($0.summary)" }.joined(separator: "\n")
         let text = """
             Mesures du mouvement filmé : \(summary).
             Candidats :
