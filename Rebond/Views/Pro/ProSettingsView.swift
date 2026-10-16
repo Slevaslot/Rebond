@@ -41,19 +41,10 @@ struct ProSettingsView: View {
                     if store.isSubscribed {
                         Button("Gérer l'abonnement") { managingSubscription = true }
                     }
-                    #if DEBUG
-                    Toggle("Débloquer Pro (démo)", isOn: $store.demoUnlocked)
-                    #endif
                 } header: {
                     Text("Abonnement")
                 } footer: {
                     Text("Rebond reste toujours gratuit pour vos patients.")
-                }
-
-                Section {
-                    Button("Charger des patients de démo") { DemoData.loadPatients(into: context) }
-                } footer: {
-                    Text("Trois patients fictifs, pour découvrir l'espace kiné.")
                 }
 
                 Section {

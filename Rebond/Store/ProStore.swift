@@ -12,20 +12,17 @@ final class ProStore {
 
     var isSubscribed: Bool { plan != nil }
 
-    #if DEBUG
-    /// Development builds only: unlocks Pro without a purchase, to show the physiotherapist space during the demo.
+    /// Test builds only (`BuildChannel.showsDemoTools`): unlocks Pro without a purchase, to show the physiotherapist
+    /// space during the demo and to the jury.
     var demoUnlocked = UserDefaults.standard.bool(forKey: "demoProUnlocked") {
         didSet {
             UserDefaults.standard.set(demoUnlocked, forKey: "demoProUnlocked")
         }
     }
-    #endif
 
     /// Patients that can be followed now; nil for unlimited. The demo switch unlocks everything.
     var patientLimit: Int? {
-        #if DEBUG
-        if demoUnlocked { return nil }
-        #endif
+        if BuildChannel.showsDemoTools, demoUnlocked { return nil }
         return ProPlan.patientLimit(for: plan)
     }
 

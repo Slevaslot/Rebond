@@ -66,11 +66,11 @@ struct MessageReadingView: View {
                     message = strings.joined(separator: "\n")
                 }
                 .buttonBorderShape(.capsule)
-                #if DEBUG
+                if BuildChannel.showsDemoTools {
                 Button("Exemple de message", systemImage: "text.bubble") {
                     message = "Bonjour, comme vu ensemble : squats 3x10, élévations latérales des bras 3x12, gainage 3 fois 30 secondes. À faire 3 fois par semaine. Bon courage !"
                 }
-                #endif
+                }
             }
             .listRowBackground(Color.clear)
             .listRowInsets(EdgeInsets())

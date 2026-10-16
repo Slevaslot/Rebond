@@ -456,9 +456,7 @@ struct NoProgramView<Header: View>: View {
     @ViewBuilder let header: Header
     @Environment(AppRouter.self) private var router
     @Query(sort: \LibraryExercise.createdAt) private var library: [LibraryExercise]
-    #if DEBUG
     @Environment(\.modelContext) private var context
-    #endif
 
     var body: some View {
         ScrollView {
@@ -496,10 +494,10 @@ struct NoProgramView<Header: View>: View {
                         .buttonStyle(.glass)
                         .buttonBorderShape(.capsule)
                         .controlSize(.large)
-                        #if DEBUG
+                        if BuildChannel.showsDemoTools {
                         Button("Charger le programme de démo", systemImage: "sparkles") { DemoData.load(into: context) }
                             .font(.footnote)
-                        #endif
+                        }
                     }
                 }
 

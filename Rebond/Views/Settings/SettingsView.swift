@@ -6,6 +6,9 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(AppRouter.self) private var router
+    @Environment(ProStore.self) private var store
+    @Environment(\.modelContext) private var context
+    @State private var confirmingDemo = false
     @AppStorage(PatientIdentity.nameKey) private var patientName = ""
     @AppStorage(AppRole.key) private var role = AppRole.patient.rawValue
     @Query(sort: \Program.createdAt, order: .reverse) private var programs: [Program]
@@ -100,6 +103,26 @@ struct SettingsView: View {
                 } footer: {
                     Text("Ajoute un onglet Kiné pour prescrire des programmes par QR code et suivre vos patients à partir de leurs bilans. Rebond reste gratuit pour vos patients.")
                 }
+
+                // Every demo tool in one place, in test builds only (development and TestFlight).
+                if BuildChannel.showsDemoTools {
+                    @Bindable var store = store
+                    Section {
+                        Button("Remplir avec des données de démo", systemImage: "sparkles") { confirmingDemo = true }
+                            .confirmationDialog("Remplacer le programme et l'historique par les données de démo ?",
+                                                isPresented: $confirmingDemo, titleVisibility: .visible) {
+                                Button("Remplacer", role: .destructive) { DemoData.load(into: context) }
+                            }
+                        Button("Ajouter les patients de démo (kiné)", systemImage: "person.3") { DemoData.loadPatients(into: context) }
+                        Toggle(isOn: $store.demoUnlocked) {
+                            Label("Débloquer Rebond Pro", systemImage: "lock.open")
+                        }
+                    } header: {
+                        Text("Démo")
+                    } footer: {
+                        Text("Un programme avec trois semaines de séances, trois patients fictifs côté kiné, et l'espace kiné sans limite de patients. Ces outils n'existent que dans la version de test.")
+                    }
+                }
             }
             // A single screen when it fits; it scrolls with large text sizes.
             .scrollBounceBehavior(.basedOnSize)
@@ -112,11 +135,8 @@ struct SettingsView: View {
     }
 }
 
-/// The medical notice, privacy, and the demo data (development builds only).
+/// The medical notice and privacy.
 private struct AboutView: View {
-    @Environment(\.modelContext) private var context
-    @State private var confirmingDemo = false
-
     var body: some View {
         Form {
             Section {
@@ -124,14 +144,6 @@ private struct AboutView: View {
                 Label("Tout reste sur votre iPhone. Seul le bilan que vous choisissez d'envoyer quitte l'appareil.", systemImage: "lock.shield")
                 Link("Politique de confidentialité", destination: AppLinks.privacyPolicy)
             }
-            #if DEBUG
-            Section("Démo") {
-                Button("Charger les données de démo") { confirmingDemo = true }
-                    .confirmationDialog("Remplacer le programme et l'historique par les données de démo ?", isPresented: $confirmingDemo, titleVisibility: .visible) {
-                        Button("Remplacer", role: .destructive) { DemoData.load(into: context) }
-                    }
-            }
-            #endif
         }
         .navigationTitle("À propos")
         .navigationBarTitleDisplayMode(.inline)

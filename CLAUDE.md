@@ -120,7 +120,7 @@ Tout ce qui concerne l'interface (structure, séance, scan, autorisations, Liqui
 
 ## Modèle économique
 
-B2B, détaillé dans `BUSINESS.md` : l'app patient est entièrement gratuite, sans aucun écran payant ; l'espace kiné demande l'abonnement Rebond Pro. Les builds de développement ont un interrupteur « Débloquer Pro (démo) ».
+B2B, détaillé dans `BUSINESS.md` : l'app patient est entièrement gratuite, sans aucun écran payant ; l'espace kiné demande l'abonnement Rebond Pro. Les builds de test (développement et TestFlight, `BuildChannel.showsDemoTools`) ont une section « Démo » dans Réglages : données de démo, patients de démo, « Débloquer Rebond Pro ». Rien de tout cela dans la version App Store.
 
 ## Conventions de code
 
