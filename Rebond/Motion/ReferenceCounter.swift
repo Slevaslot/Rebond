@@ -38,6 +38,8 @@ nonisolated struct ReferenceCounter: MovementCounter {
     private var finished: (points: [[Double]], time: Double)?
     /// The side of the repetition going on: read as in a mirror or not.
     private var repetitionMirrored: Bool?
+    /// The side being done, kept from the last clear movement (at rest, both sides look alike).
+    private var sidesSwapped = false
     private var unmeasuredSince: Double?
     private var lastProgress = 0.0
     private let stillFrames = 10
@@ -114,6 +116,7 @@ nonisolated struct ReferenceCounter: MovementCounter {
         lastValues.append(chosen.value)
         if lastValues.count > 3 { lastValues.removeFirst() }
         let value = ReferenceAnalyzer.median(lastValues)
+        if value >= movement.target * ReferenceAnalyzer.startFraction { sidesSwapped = chosen.mirrored }
         let wasInRepetition = cycle.isInRepetition
         var (event, posture) = cycle.advance(value, fault: nil, at: time)
         if !wasInRepetition, cycle.isInRepetition { repetitionMirrored = chosen.mirrored }
@@ -185,7 +188,7 @@ nonisolated struct ReferenceCounter: MovementCounter {
             repetitionMirrored = nil
         }
         if calibratedNow, case .none = result { result = .calibrated }
-        return CounterUpdate(progress: progress, event: result, posture: posture)
+        return CounterUpdate(progress: progress, event: result, posture: posture, sidesSwapped: sidesSwapped)
     }
 
     /// The movement read on one side: its value along the film's axis, and the deviation it was read from.

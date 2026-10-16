@@ -120,6 +120,8 @@ nonisolated struct CounterUpdate: Sendable {
     var isMeasured = true
     /// A held position: whether the patient is in it (the timer runs). Nil for repetitions.
     var isHolding: Bool? = nil
+    /// A filmed movement done on the other side than in the video: the highlighted joints switch sides.
+    var sidesSwapped = false
 }
 
 /// Counts the repetitions of one exercise from a stream of 2D measures.

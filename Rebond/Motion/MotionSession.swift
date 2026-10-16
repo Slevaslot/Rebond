@@ -57,6 +57,8 @@ final class MotionSession {
     private(set) var skeleton: PoseSkeleton?
     /// 0 at rest, 1 when the target depth is reached.
     private(set) var depthProgress = 0.0
+    /// A filmed movement done on the other side than in the video: its joints are highlighted on that side.
+    private(set) var sidesSwapped = false
     /// The joints the movement needs are seen on the last frames: otherwise the gauge doesn't pretend to follow.
     private(set) var isMeasuring = true
     /// A held position: seconds held so far, and whether the patient is in the position right now.
@@ -425,6 +427,7 @@ final class MotionSession {
         isMeasuring = update.isMeasured
         // Joints not seen: the gauge stays where it was measured last, nothing is advised on a guess.
         if update.isMeasured { depthProgress = update.progress }
+        if update.isMeasured, sidesSwapped != update.sidesSwapped { sidesSwapped = update.sidesSwapped }
         faultToHighlight = update.isMeasured ? (update.posture ?? heldFault) : nil
         if let targetSeconds {
             applyHold(update, target: targetSeconds)

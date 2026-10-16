@@ -1,6 +1,7 @@
 import AVFoundation
 import SwiftUI
 import TipKit
+import Vision
 
 /// Guided session: camera feed with the skeleton, repetition counter, depth gauge and corrections on top.
 struct SessionView: View {
@@ -82,7 +83,7 @@ struct SessionView: View {
                 if let skeleton = motion.skeleton, !isWatching, !motion.isPaused {
                     SkeletonOverlay(
                         skeleton: skeleton,
-                        highlightedJoints: exercise.highlightedJoints,
+                        highlightedJoints: motion.sidesSwapped ? exercise.highlightedJoints.otherSide : exercise.highlightedJoints,
                         highlightColor: AmplitudeTier(progress: motion.depthProgress)?.color ?? .yellow,
                         faultyJoints: motion.faultToHighlight?.bodyJoints ?? []
                     )
@@ -741,5 +742,19 @@ private struct DoneLabelStyle: LabelStyle {
             configuration.icon.foregroundStyle(.green)
             configuration.title
         }
+    }
+}
+
+private extension Set where Element == VNHumanBodyPoseObservation.JointName {
+    /// The same joints on the other side of the body: left ↔ right.
+    var otherSide: Self {
+        let pairs: [(VNHumanBodyPoseObservation.JointName, VNHumanBodyPoseObservation.JointName)] = [
+            (.leftShoulder, .rightShoulder), (.leftElbow, .rightElbow), (.leftWrist, .rightWrist),
+            (.leftHip, .rightHip), (.leftKnee, .rightKnee), (.leftAnkle, .rightAnkle),
+            (.leftEye, .rightEye), (.leftEar, .rightEar),
+        ]
+        var other: [VNHumanBodyPoseObservation.JointName: VNHumanBodyPoseObservation.JointName] = [:]
+        for (a, b) in pairs { other[a] = b; other[b] = a }
+        return Set(map { other[$0] ?? $0 })
     }
 }
