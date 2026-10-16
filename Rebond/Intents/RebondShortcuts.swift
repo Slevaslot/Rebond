@@ -82,7 +82,29 @@ struct RebondShortcuts: AppShortcutsProvider {
                 "Next set in \(.applicationName)",
             ],
             shortTitle: "Série suivante",
+            systemImageName: "forward.frame.fill"
+        )
+        AppShortcut(
+            intent: NextExerciseIntent(),
+            phrases: [
+                "Passer à l'exercice suivant dans \(.applicationName)",
+                "Exercice suivant dans \(.applicationName)",
+                "Exercice suivant \(.applicationName)",
+                "Next exercise in \(.applicationName)",
+            ],
+            shortTitle: "Exercice suivant",
             systemImageName: "forward.end.fill"
+        )
+        AppShortcut(
+            intent: EndSessionIntent(),
+            phrases: [
+                "Terminer la séance dans \(.applicationName)",
+                "Terminer ma séance \(.applicationName)",
+                "Fin de la séance \(.applicationName)",
+                "End my \(.applicationName) session",
+            ],
+            shortTitle: "Terminer la séance",
+            systemImageName: "flag.checkered"
         )
         AppShortcut(
             intent: StartSeanceIntent(),

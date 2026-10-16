@@ -4,8 +4,8 @@ import TipKit
 import WatchConnectivity
 
 /// The iPhone's side of the Apple Watch link (WatchConnectivity): sends the set in progress to the watch, and
-/// receives the patient's taps on the watch (pause, next set). Also sends today's session to the watch for its
-/// app and complications. Does nothing when no watch is paired.
+/// receives the patient's taps on the watch (pause, next set), which go to the session through `SessionRemote`.
+/// Also sends today's session to the watch for its app and complications. Does nothing when no watch is paired.
 ///
 /// The set state is forwarded by `WorkoutLiveActivity`, so every set screen that updates the Lock Screen also
 /// updates the watch. The session's start and end are sent by `WorkoutView`.
@@ -13,13 +13,6 @@ import WatchConnectivity
 final class PhoneWatchLink: NSObject {
     static let shared = PhoneWatchLink()
 
-    /// A tap on the watch, for the session on screen. A new value at each tap, even the same command twice.
-    struct Command: Equatable {
-        let message: WatchMessage
-        let id = UUID()
-    }
-
-    private(set) var command: Command?
     /// The watch records the current session's workout in Health.
     private(set) var watchRecordsWorkout = false
     private(set) var isWatchAppInstalled = false
@@ -98,7 +91,8 @@ final class PhoneWatchLink: NSObject {
         }
     }
 
-    /// The same commands from the Live Activity buttons and Siri (`ToggleSessionPauseIntent`, `NextSetIntent`).
+    /// A command as if it came from the watch. The watch's taps, Double Tap and Siri on the watch arrive here; they
+    /// go to the session the same way as every other command (`SessionRemote`), resolved for the screen on display.
     func perform(_ message: WatchMessage) {
         receive(message)
     }
@@ -107,8 +101,10 @@ final class PhoneWatchLink: NSObject {
         switch message {
         case .recordingWorkout:
             watchRecordsWorkout = true
-        case .togglePause, .nextSet:
-            command = Command(message: message)
+        case .togglePause:
+            SessionRemote.shared.send(.togglePause, from: .watch)
+        case .nextSet:
+            SessionRemote.shared.send(.nextSet, from: .watch)
         }
     }
 

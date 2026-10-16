@@ -173,7 +173,7 @@ ExerciseResult                     copie autonome, pas de lien vers PlannedExerc
 iPhone (caméra, comptage)                         Apple Watch
 WorkoutView ── sessionStarted ──────────────────▶ startWatchApp → HKWorkoutSession (cœur, calories)
 WorkoutLiveActivity ── set(WatchSetState) ──────▶ SetView + WatchHaptic → WKInterfaceDevice.play
-PhoneWatchLink.command ◀── togglePause/nextSet ── boutons, Double Tap, Siri
+SessionRemote.send ◀───── togglePause/nextSet ── boutons, Double Tap, Siri
                        ◀── recordingWorkout ───── la montre enregistrera l'entraînement
 WorkoutView ── setsFinished, sessionEnded(saved) ▶ finishWorkout (Santé) ou discardWorkout
 WidgetSync ── applicationContext(WidgetSnapshot) ▶ App Group de la montre → complications
@@ -181,8 +181,8 @@ WidgetSync ── applicationContext(WidgetSnapshot) ▶ App Group de la montre 
 
 - **Protocole** (`Shared/WatchLink.swift`, logique pure testée) : `PhoneMessage`, `WatchMessage`, `WatchSetState`, encodés en JSON sous une clé unique (`WatchCoding`). `WatchHaptic.feedback(from:to:)` choisit le seul retour à jouer.
 - **Transport** : `sendMessage` pour le direct (seulement si la montre est joignable : une répétition en retard ne sert à rien) ; `transferUserInfo` pour le début, la fin et `recordingWorkout`, qui doivent arriver ; `updateApplicationContext` pour la séance du jour (seule la dernière compte).
-- **Branchement** : `WorkoutLiveActivity` transmet chaque état à `PhoneWatchLink` : tout écran de série qui met à jour la Live Activity met aussi à jour la montre. Les commandes de la montre arrivent dans `WorkoutView` comme le menu Passer (`SkipRequest`) et un `pauseRequest` (environnement) lu par `SessionView` et `HoldSetView`.
-- **Live Activity et Siri** : `ToggleSessionPauseIntent` et `NextSetIntent` (`LiveActivityIntent`, `Shared/SessionControlIntents.swift`) passent par le même chemin (`PhoneWatchLink.perform`).
+- **Branchement** : `WorkoutLiveActivity` transmet chaque état à `PhoneWatchLink` : tout écran de série qui met à jour la Live Activity met aussi à jour la montre. Les commandes de la montre (`WatchMessage.togglePause`, `.nextSet`) sont envoyées par `PhoneWatchLink.receive` à `SessionRemote.shared.send(_:from: .watch)`, comme les boutons, les signes de la main, Siri et la Live Activity : la commande est résolue pour l'écran affiché (`SessionCommand.resolve`) et exécutée par `WorkoutView`.
+- **Live Activity et Siri** : `ToggleSessionPauseIntent`, `NextSetIntent`, `NextExerciseIntent` et `EndSessionIntent` (`LiveActivityIntent`, `Shared/SessionControlIntents.swift`, compilé aussi dans l'extension des widgets, qui n'a pas `SessionRemote`) gardent un `handler` statique, réglé dans `RebondApp.init` : il appelle `SessionRemote.shared.send(_:from: .siri)` et renvoie la phrase que Siri dit (`SessionAction.confirmation`, ou la raison de `.ignored`). `EndSessionIntent` demande d'abord la confirmation de Siri (`requestConfirmation`) quand une séance peut être terminée (`canEnd`). Un bouton de la Live Activity passe par le même intent, donc avec la source `.siri` : sans effet sur le résultat, seul le geste demande une confirmation.
 - **Santé** : `HealthRecording.decide` (testé). La montre enregistre si elle a démarré son entraînement (`recordingWorkout`) ; sinon l'iPhone (`PhoneHealth`, `HKWorkoutBuilder`) si le patient l'a activé et que la séance dure au moins 20 s. Jamais de doublon.
 - **Simulateur** : jumeler un iPhone et une montre (`xcrun simctl list pairs`), installer l'app iPhone, puis l'app de la montre (`Rebond.app/Watch/RebondWatch.app`). WatchConnectivity peut mettre une vingtaine de secondes à voir l'app de la montre installée (`isWatchAppInstalled`). La caméra n'existant pas en simulateur, tester avec un maintien chronométré ou un exercice en comptage manuel ; la montre simulée fournit une fréquence cardiaque factice.
 
