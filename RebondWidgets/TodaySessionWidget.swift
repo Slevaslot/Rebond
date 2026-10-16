@@ -1,12 +1,13 @@
 import SwiftUI
 import WidgetKit
 
-/// "Séance du jour": what is left to do today and the week's regularity. Opens the app on the session.
+/// "Séance du jour": what is left to do today and the week's regularity. A tap goes where it says: today's
+/// session, "Créer un programme" while there is none, otherwise the Accueil page.
 struct TodaySessionWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: "TodaySession", provider: RebondProvider()) { entry in
             TodaySessionView(entry: entry)
-                .widgetURL(DeepLink.session)
+                .widgetURL(entry.url)
         }
         .configurationDisplayName("Séance du jour")
         .description("Votre séance du jour et vos séances de la semaine. Touchez pour commencer.")
@@ -37,7 +38,7 @@ struct TodaySessionView: View {
 
     @ViewBuilder private var inline: some View {
         if !entry.snapshot.hasProgram {
-            Label("Ajoutez votre programme", systemImage: "figure.cooldown")
+            Label("Créez votre programme", systemImage: "plus.circle")
         } else if entry.doneToday {
             Label("Séance faite · \(entry.week.done)/\(entry.week.planned)", systemImage: "checkmark.circle")
         } else {
@@ -61,7 +62,7 @@ private struct SmallView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Image(systemName: entry.doneToday ? "checkmark.circle.fill" : "figure.cooldown")
+            Image(systemName: symbol)
                 .font(.title2)
                 .foregroundStyle(Color.accentColor)
                 .widgetAccentable()
@@ -74,6 +75,11 @@ private struct SmallView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var symbol: String {
+        if !entry.snapshot.hasProgram { return "plus.circle.fill" }
+        return entry.doneToday ? "checkmark.circle.fill" : "figure.cooldown"
     }
 }
 
@@ -94,21 +100,45 @@ private struct MediumView: View {
                             .foregroundStyle(.secondary)
                     }
                     Spacer(minLength: 0)
-                    if !entry.doneToday {
-                        Link(destination: DeepLink.session) {
-                            Label("Commencer", systemImage: "play.fill")
-                                .font(.subheadline.bold())
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 6)
-                                .foregroundStyle(.white)
-                                .background(Color.accentColor, in: .capsule)
-                        }
-                        .widgetAccentable()
+                    // Only while today's session is to do: on a rest day or once done, the widget opens Accueil.
+                    if entry.destination == .session {
+                        ActionCapsule(title: "Commencer", systemImage: "play.fill", destination: .session)
                     }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Ajoutez les exercices de votre kiné, puis vos jours de séance.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 0)
+                    ActionCapsule(title: "Créer un programme", systemImage: "plus", destination: .newProgram)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
+    }
+}
+
+/// The main action of the medium widget, as a filled capsule.
+private struct ActionCapsule: View {
+    let title: LocalizedStringKey
+    let systemImage: String
+    let destination: DeepLink.Destination
+
+    var body: some View {
+        Link(destination: destination.url) {
+            Label(title, systemImage: systemImage)
+                .font(.subheadline.bold())
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 6)
+                .foregroundStyle(.white)
+                .background(Color.accentColor, in: .capsule)
+        }
+        .widgetAccentable()
     }
 }
 
@@ -119,9 +149,10 @@ private struct TodayStatus: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             if !entry.snapshot.hasProgram {
-                Text("Votre programme")
+                // What is missing, then what a tap does: the widget opens "Créer un programme".
+                Text("Aucun programme")
                     .font(.headline)
-                Text("Ajoutez celui de votre kiné dans Rebond.")
+                Text("Touchez pour créer le vôtre.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else if entry.doneToday {
@@ -228,8 +259,10 @@ private struct RectangularView: View {
                 .font(.caption.weight(.semibold))
                 .widgetAccentable()
             if !entry.snapshot.hasProgram {
-                Text("Ajoutez votre programme")
+                Text("Aucun programme")
                     .font(.headline)
+                Text("Touchez pour créer le vôtre.")
+                    .font(.caption)
             } else if entry.doneToday {
                 Text("Séance faite")
                     .font(.headline)
@@ -262,6 +295,7 @@ private struct RectangularView: View {
 } timeline: {
     RebondEntry(date: .now, snapshot: .sample)
     RebondEntry(date: .now, snapshot: .sampleDoneToday)
+    RebondEntry(date: .now, snapshot: .empty)
 }
 
 #Preview("Écran verrouillé", as: .accessoryRectangular) {
@@ -269,6 +303,7 @@ private struct RectangularView: View {
 } timeline: {
     RebondEntry(date: .now, snapshot: .sample)
     RebondEntry(date: .now, snapshot: .sampleDoneToday)
+    RebondEntry(date: .now, snapshot: .empty)
 }
 
 extension WidgetSnapshot {
