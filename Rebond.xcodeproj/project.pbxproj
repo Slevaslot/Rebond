@@ -593,6 +593,7 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Rebond-Info.plist";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Rebond lit votre fréquence cardiaque et vos calories pour les afficher sur votre Apple Watch pendant la séance. Ces données restent sur vos appareils.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Rebond enregistre chaque séance comme un entraînement dans l'app Santé. Ces données restent sur vos appareils.";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Rebond utilise la caméra pour photographier votre feuille d'exercices et suivre vos mouvements pendant les séances. Les images ne quittent jamais votre iPhone.";
@@ -637,6 +638,7 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Rebond-Info.plist";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Rebond lit votre fréquence cardiaque et vos calories pour les afficher sur votre Apple Watch pendant la séance. Ces données restent sur vos appareils.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Rebond enregistre chaque séance comme un entraînement dans l'app Santé. Ces données restent sur vos appareils.";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Rebond utilise la caméra pour photographier votre feuille d'exercices et suivre vos mouvements pendant les séances. Les images ne quittent jamais votre iPhone.";
@@ -781,6 +783,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "RebondWatch-Info.plist";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_CFBundleDisplayName = Rebond;
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Rebond lit votre fréquence cardiaque et vos calories pour les afficher sur votre Apple Watch pendant la séance. Ces données restent sur vos appareils.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Rebond enregistre chaque séance comme un entraînement dans l'app Santé. Ces données restent sur vos appareils.";
@@ -819,6 +822,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "RebondWatch-Info.plist";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_CFBundleDisplayName = Rebond;
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Rebond lit votre fréquence cardiaque et vos calories pour les afficher sur votre Apple Watch pendant la séance. Ces données restent sur vos appareils.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Rebond enregistre chaque séance comme un entraînement dans l'app Santé. Ces données restent sur vos appareils.";
