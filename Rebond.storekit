@@ -1,100 +1,221 @@
 {
-  "identifier" : "6A1C2B3D",
-  "nonRenewingSubscriptions" : [
-
-  ],
-  "products" : [
-
-  ],
-  "settings" : {
-    "_failTransactionsEnabled" : false,
-    "_locale" : "fr_FR",
-    "_storefront" : "FRA",
-    "_storeKitErrors" : [
-
-    ]
+  "identifier": "6A1C2B3D",
+  "nonRenewingSubscriptions": [],
+  "products": [],
+  "settings": {
+    "_failTransactionsEnabled": false,
+    "_locale": "fr_FR",
+    "_storefront": "FRA",
+    "_storeKitErrors": []
   },
-  "subscriptionGroups" : [
+  "subscriptionGroups": [
     {
-      "id" : "21500001",
-      "localizations" : [
+      "id": "21500001",
+      "localizations": [
         {
-          "description" : "Bilan pour votre kiné et progrès détaillés",
-          "displayName" : "Rebond Plus",
-          "locale" : "fr_FR"
-        }
-      ],
-      "name" : "Rebond Plus",
-      "subscriptions" : [
-        {
-          "adHocOffers" : [
-
-          ],
-          "codeOffers" : [
-
-          ],
-          "displayPrice" : "4.99",
-          "familyShareable" : false,
-          "groupNumber" : 1,
-          "internalID" : "6739000001",
-          "introductoryOffer" : {
-            "internalID" : "6739000011",
-            "paymentMode" : "free",
-            "subscriptionPeriod" : "P2W"
-          },
-          "localizations" : [
-            {
-              "description" : "Bilan hebdomadaire pour votre kiné et suivi détaillé de vos progrès.",
-              "displayName" : "Rebond Plus mensuel",
-              "locale" : "fr_FR"
-            }
-          ],
-          "productID" : "rebond.plus.monthly",
-          "recurringSubscriptionPeriod" : "P1M",
-          "referenceName" : "Rebond Plus mensuel",
-          "subscriptionGroupID" : "21500001",
-          "type" : "RecurringSubscription",
-          "winbackOffers" : [
-
-          ]
+          "description": "Suivi des patients pour les kinés, selon leur nombre",
+          "displayName": "Rebond Pro",
+          "locale": "fr_FR"
         },
         {
-          "adHocOffers" : [
-
-          ],
-          "codeOffers" : [
-
-          ],
-          "displayPrice" : "11.99",
-          "familyShareable" : false,
-          "groupNumber" : 1,
-          "internalID" : "6739000002",
-          "introductoryOffer" : {
-            "internalID" : "6739000012",
-            "paymentMode" : "free",
-            "subscriptionPeriod" : "P2W"
+          "description": "Patient follow-up for physiotherapists, by number of patients",
+          "displayName": "Rebond Pro",
+          "locale": "en_US"
+        }
+      ],
+      "name": "Rebond Pro",
+      "subscriptions": [
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "9.99",
+          "familyShareable": false,
+          "groupNumber": 3,
+          "internalID": "6739000101",
+          "introductoryOffer": {
+            "internalID": "6739000201",
+            "paymentMode": "free",
+            "subscriptionPeriod": "P1M"
           },
-          "localizations" : [
+          "localizations": [
             {
-              "description" : "Trois mois de suivi, la durée d'une rééducation type.",
-              "displayName" : "Rebond Plus 3 mois",
-              "locale" : "fr_FR"
+              "description": "Jusqu'à 10 patients suivis",
+              "displayName": "Rebond Pro 10 mensuel",
+              "locale": "fr_FR"
+            },
+            {
+              "description": "Up to 10 patients",
+              "displayName": "Rebond Pro 10 monthly",
+              "locale": "en_US"
             }
           ],
-          "productID" : "rebond.plus.quarterly",
-          "recurringSubscriptionPeriod" : "P3M",
-          "referenceName" : "Rebond Plus trimestriel",
-          "subscriptionGroupID" : "21500001",
-          "type" : "RecurringSubscription",
-          "winbackOffers" : [
-
-          ]
+          "productID": "rebond.pro10.monthly",
+          "recurringSubscriptionPeriod": "P1M",
+          "referenceName": "Rebond Pro 10 mensuel",
+          "subscriptionGroupID": "21500001",
+          "type": "RecurringSubscription",
+          "winbackOffers": []
+        },
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "99.99",
+          "familyShareable": false,
+          "groupNumber": 3,
+          "internalID": "6739000102",
+          "introductoryOffer": {
+            "internalID": "6739000202",
+            "paymentMode": "free",
+            "subscriptionPeriod": "P1M"
+          },
+          "localizations": [
+            {
+              "description": "Jusqu'à 10 patients suivis",
+              "displayName": "Rebond Pro 10 annuel",
+              "locale": "fr_FR"
+            },
+            {
+              "description": "Up to 10 patients",
+              "displayName": "Rebond Pro 10 yearly",
+              "locale": "en_US"
+            }
+          ],
+          "productID": "rebond.pro10.yearly",
+          "recurringSubscriptionPeriod": "P1Y",
+          "referenceName": "Rebond Pro 10 annuel",
+          "subscriptionGroupID": "21500001",
+          "type": "RecurringSubscription",
+          "winbackOffers": []
+        },
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "19.99",
+          "familyShareable": false,
+          "groupNumber": 2,
+          "internalID": "6739000103",
+          "introductoryOffer": {
+            "internalID": "6739000203",
+            "paymentMode": "free",
+            "subscriptionPeriod": "P1M"
+          },
+          "localizations": [
+            {
+              "description": "Jusqu'à 30 patients suivis",
+              "displayName": "Rebond Pro 30 mensuel",
+              "locale": "fr_FR"
+            },
+            {
+              "description": "Up to 30 patients",
+              "displayName": "Rebond Pro 30 monthly",
+              "locale": "en_US"
+            }
+          ],
+          "productID": "rebond.pro30.monthly",
+          "recurringSubscriptionPeriod": "P1M",
+          "referenceName": "Rebond Pro 30 mensuel",
+          "subscriptionGroupID": "21500001",
+          "type": "RecurringSubscription",
+          "winbackOffers": []
+        },
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "199.99",
+          "familyShareable": false,
+          "groupNumber": 2,
+          "internalID": "6739000104",
+          "introductoryOffer": {
+            "internalID": "6739000204",
+            "paymentMode": "free",
+            "subscriptionPeriod": "P1M"
+          },
+          "localizations": [
+            {
+              "description": "Jusqu'à 30 patients suivis",
+              "displayName": "Rebond Pro 30 annuel",
+              "locale": "fr_FR"
+            },
+            {
+              "description": "Up to 30 patients",
+              "displayName": "Rebond Pro 30 yearly",
+              "locale": "en_US"
+            }
+          ],
+          "productID": "rebond.pro30.yearly",
+          "recurringSubscriptionPeriod": "P1Y",
+          "referenceName": "Rebond Pro 30 annuel",
+          "subscriptionGroupID": "21500001",
+          "type": "RecurringSubscription",
+          "winbackOffers": []
+        },
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "39.99",
+          "familyShareable": false,
+          "groupNumber": 1,
+          "internalID": "6739000105",
+          "introductoryOffer": {
+            "internalID": "6739000205",
+            "paymentMode": "free",
+            "subscriptionPeriod": "P1M"
+          },
+          "localizations": [
+            {
+              "description": "Patients illimités, pour un cabinet",
+              "displayName": "Rebond Cabinet mensuel",
+              "locale": "fr_FR"
+            },
+            {
+              "description": "Unlimited patients, for a practice",
+              "displayName": "Rebond Practice monthly",
+              "locale": "en_US"
+            }
+          ],
+          "productID": "rebond.cabinet.monthly",
+          "recurringSubscriptionPeriod": "P1M",
+          "referenceName": "Rebond Cabinet mensuel",
+          "subscriptionGroupID": "21500001",
+          "type": "RecurringSubscription",
+          "winbackOffers": []
+        },
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "399.99",
+          "familyShareable": false,
+          "groupNumber": 1,
+          "internalID": "6739000106",
+          "introductoryOffer": {
+            "internalID": "6739000206",
+            "paymentMode": "free",
+            "subscriptionPeriod": "P1M"
+          },
+          "localizations": [
+            {
+              "description": "Patients illimités, pour un cabinet",
+              "displayName": "Rebond Cabinet annuel",
+              "locale": "fr_FR"
+            },
+            {
+              "description": "Unlimited patients, for a practice",
+              "displayName": "Rebond Practice yearly",
+              "locale": "en_US"
+            }
+          ],
+          "productID": "rebond.cabinet.yearly",
+          "recurringSubscriptionPeriod": "P1Y",
+          "referenceName": "Rebond Cabinet annuel",
+          "subscriptionGroupID": "21500001",
+          "type": "RecurringSubscription",
+          "winbackOffers": []
         }
       ]
     }
   ],
-  "version" : {
-    "major" : 4,
-    "minor" : 0
+  "version": {
+    "major": 4,
+    "minor": 0
   }
 }

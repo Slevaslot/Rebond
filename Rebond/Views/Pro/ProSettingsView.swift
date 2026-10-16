@@ -30,15 +30,16 @@ struct ProSettingsView: View {
                 }
 
                 Section {
-                    if store.hasPro {
-                        Label("Rebond Pro : patients illimités", systemImage: "checkmark.seal.fill")
-                        if store.isSubscribed {
-                            Button("Gérer l'abonnement") { managingSubscription = true }
-                        }
-                    } else {
-                        Label("Offre gratuite : \(min(patients.count { !$0.isDemo }, ProStore.freePatientLimit)) patients suivis sur \(ProStore.freePatientLimit)",
-                              systemImage: "person.2")
-                        Button("Découvrir Rebond Pro") { showingPaywall = true }
+                    Label {
+                        PlanUsage(followed: patients.count { !$0.isDemo })
+                    } icon: {
+                        Image(systemName: store.isSubscribed ? "checkmark.seal.fill" : "person.2")
+                    }
+                    if !store.isUnlimited {
+                        Button(store.isSubscribed ? "Passer à l'offre supérieure" : "Voir les offres Rebond Pro") { showingPaywall = true }
+                    }
+                    if store.isSubscribed {
+                        Button("Gérer l'abonnement") { managingSubscription = true }
                     }
                     #if DEBUG
                     Toggle("Débloquer Pro (démo)", isOn: $store.demoUnlocked)
@@ -65,7 +66,7 @@ struct ProSettingsView: View {
             .navigationTitle("Espace kiné")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { Button("Fermer", systemImage: "xmark", role: .close) { dismiss() } }
-            .sheet(isPresented: $showingPaywall) { ProPaywall() }
+            .sheet(isPresented: $showingPaywall) { ProPaywall(followed: patients.count { !$0.isDemo }) }
             .manageSubscriptionsSheet(isPresented: $managingSubscription)
             .confirmationDialog("Désactiver l'espace kiné ?", isPresented: $confirmingTurnOff, titleVisibility: .visible) {
                 Button("Désactiver", role: .destructive) {

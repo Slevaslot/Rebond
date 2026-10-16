@@ -23,25 +23,28 @@ Livrable demandé par le Build Challenge (« a go-to-market plan, including mone
 | Être alerté des séances douloureuses | Ses progrès visibles, semaine après semaine |
 | Aucun serveur, aucune donnée hébergée : simple à adopter | Tout reste sur son iPhone ; il choisit quand envoyer son bilan |
 
-## Deux offres pour le kiné
+## Des offres selon le volume de patients
 
-| | Gratuite | Rebond Pro |
-|---|---|---|
-| Prescrire un programme en QR code | ✓ | ✓ |
-| Suivre ses patients (régularité, répétitions, amplitude, douleur, alertes) | **3 patients** | **Illimité** |
-| Modifier un programme et le renvoyer (nouveau QR code) | ✓ | ✓ |
-| Données | Sur l'iPhone, aucun serveur | Sur l'iPhone, aucun serveur |
-| Prix | 0 € | 19,99 € HT / mois ou 199 € HT / an, 1 mois offert |
+| | Gratuite | Rebond Pro 10 | Rebond Pro 30 | Rebond Cabinet |
+|---|---|---|---|---|
+| Patients suivis | **3** | **10** | **30** | **Illimité** |
+| Mensuel (TTC) | 0 € | 9,99 € | 19,99 € | 39,99 € |
+| Annuel (TTC, 2 mois offerts) | 0 € | 99,99 € | 199,99 € | 399,99 € |
+| Essai | – | 1 mois offert | 1 mois offert | 1 mois offert |
+
+Toutes les fonctions sont dans toutes les offres (prescription par QR code, suivi, alertes, programme renvoyé) ; seul le nombre de patients suivis change. Données sur l'iPhone, aucun serveur.
+
+Les trois offres sont des niveaux d'un même groupe d'abonnements App Store : le kiné passe à l'offre supérieure en un geste, au prorata, et l'écran d'abonnement lui conseille l'offre qui correspond à son nombre de patients.
 
 Le patient ne paie jamais.
 
 **Pourquoi ce découpage :**
 - L'offre gratuite fait adopter l'outil : le kiné l'essaie sur 3 patients, avec toutes les fonctions locales.
-- Le moment de payer est naturel : au 4ᵉ patient, il a déjà vu la valeur.
+- Le moment de payer est naturel : au 4ᵉ patient, il a déjà vu la valeur ; puis le prix suit son activité (10, 30, illimité).
 - Pas de serveur : rien à héberger, aucune donnée de santé confiée à un tiers, adoption simple pour le cabinet.
 
 **État pour le hackathon :**
-- Le build App Store contient l'offre gratuite et Rebond Pro en patients illimités (StoreKit 2). L'écran d'achat ne promet que ce qui existe déjà.
+- Le build App Store contient l'offre gratuite et les trois offres Rebond Pro (StoreKit 2). L'écran d'achat ne promet que ce qui existe déjà.
 - L'espace kiné est un onglet de la même app, activé dans Réglages (« Je suis kiné ») ou en ouvrant un bilan. Des patients de démo permettent de le montrer sans attendre de vrais bilans.
 - La version connectée de démo (serveur) a été abandonnée : tout reste local. Une version hébergée (HDS, consentement du patient, vérification RPPS) reste une piste après le hackathon, pas une promesse de l'offre.
 
@@ -79,5 +82,5 @@ Le patient ne paie jamais.
 1. Le problème, raconté du côté du kiné (30 s).
 2. Démo (deux iPhone) : le kiné prescrit le programme par QR code → le patient le scanne et fait sa séance guidée par la caméra → il envoie son bilan → le kiné l'ouvre, voit la douleur et la régularité, ajuste le programme et montre le nouveau QR code (90 s).
 3. 100 % Apple, 100 % sur l'appareil : Foundation Models, Vision, VisionKit, Swift Charts, StoreKit, App Intents (20 s).
-4. Le modèle : gratuit pour le patient ; pour le kiné, gratuit jusqu'à 3 patients, puis Rebond Pro en patients illimités (30 s).
+4. Le modèle : gratuit pour le patient ; pour le kiné, gratuit jusqu'à 3 patients, puis un prix selon le volume : 10, 30 ou illimité (30 s).
 5. La suite : pilote avec 5 cabinets (10 s).

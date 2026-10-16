@@ -2,17 +2,15 @@ import Foundation
 import Observation
 import StoreKit
 
-/// Rebond Pro: the physiotherapist's subscription. The free offer has everything that works on the iPhone,
-/// for up to `freePatientLimit` patients; Pro follows as many patients as needed. No server either way.
-/// Patients never pay: their app is entirely free.
+/// Rebond Pro: the physiotherapist's subscription, priced by the number of patients followed (`ProPlan`).
+/// The free offer has everything that works on the iPhone, for up to `ProPlan.freePatientLimit` patients.
+/// No server either way. Patients never pay: their app is entirely free.
 @Observable
 final class ProStore {
-    /// Products created in App Store Connect, in the "Rebond Pro" subscription group.
-    static let productIDs = ["rebond.pro.monthly", "rebond.pro.yearly"]
-    /// Patients followed with the free offer.
-    nonisolated static let freePatientLimit = 3
+    /// The active plan, the highest if several; nil with the free offer.
+    private(set) var plan: ProPlan?
 
-    private(set) var isSubscribed = false
+    var isSubscribed: Bool { plan != nil }
 
     #if DEBUG
     /// Development builds only: unlocks Pro without a purchase, to show the physiotherapist space during the demo.
@@ -23,13 +21,16 @@ final class ProStore {
     }
     #endif
 
-    var hasPro: Bool {
+    /// Patients that can be followed now; nil for unlimited. The demo switch unlocks everything.
+    var patientLimit: Int? {
         #if DEBUG
-        isSubscribed || demoUnlocked
-        #else
-        isSubscribed
+        if demoUnlocked { return nil }
         #endif
+        return ProPlan.patientLimit(for: plan)
     }
+
+    /// Unlimited patients: nothing more to buy.
+    var isUnlimited: Bool { patientLimit == nil }
 
     @ObservationIgnored private var updates: Task<Void, Never>?
 
@@ -41,17 +42,17 @@ final class ProStore {
         }
     }
 
-    /// Reads the current entitlements: a purchase, a renewal, or an offer code.
+    /// Reads the current entitlements: a purchase, a renewal, an upgrade, or an offer code.
     func refresh() async {
-        var active = false
+        var active: [String] = []
         for await result in Transaction.currentEntitlements {
             if case .verified(let transaction) = result,
-               Self.productIDs.contains(transaction.productID),
+               ProPlan(productID: transaction.productID) != nil,
                transaction.revocationDate == nil {
-                active = true
+                active.append(transaction.productID)
                 await transaction.finish()
             }
         }
-        isSubscribed = active
+        plan = ProPlan.best(of: active)
     }
 }

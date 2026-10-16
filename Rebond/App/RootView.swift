@@ -180,7 +180,7 @@ struct RootView: View {
             .interactiveDismissDisabled()
         }
         .onOpenURL(perform: open)
-        .sheet(isPresented: $showingPaywall) { ProPaywall() }
+        .sheet(isPresented: $showingPaywall) { ProPaywall(followed: TrackedPatient.countedPatients(in: context)) }
         .alert("Ce fichier n'est pas un bilan Rebond.", isPresented: $invalidReport) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -208,7 +208,7 @@ struct RootView: View {
 
     /// A patient's report only makes sense in the physiotherapist space: opening one turns it on and shows the patient.
     private func openReport(_ url: URL) {
-        let result = TrackedPatient.importReport(at: url, into: context, hasPro: store.hasPro)
+        let result = TrackedPatient.importReport(at: url, into: context, patientLimit: store.patientLimit)
         if result == .invalid {
             invalidReport = true
             return

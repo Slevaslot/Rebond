@@ -35,7 +35,7 @@ final class TrackedPatient {
     enum Reception {
         case added(TrackedPatient)
         case updated(TrackedPatient)
-        /// A new patient beyond the free offer's limit: nothing was saved.
+        /// A new patient beyond the plan's limit: nothing was saved.
         case limitReached
     }
 
@@ -68,15 +68,16 @@ final class TrackedPatient {
 
     /// Reads a `.rebond` report shared by a patient (Files, Mail, Messages…). A new patient beyond the free limit isn't added.
     @discardableResult
-    static func importReport(at url: URL, into context: ModelContext, hasPro: Bool) -> ImportResult {
+    /// - Parameter patientLimit: patients the physiotherapist's plan follows; nil for unlimited.
+    static func importReport(at url: URL, into context: ModelContext, patientLimit: Int?) -> ImportResult {
         let scoped = url.startAccessingSecurityScopedResource()
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
         guard let data = try? Data(contentsOf: url) else { return .invalid }
-        return importReport(data, into: context, hasPro: hasPro)
+        return importReport(data, into: context, patientLimit: patientLimit)
     }
 
-    static func importReport(_ data: Data, into context: ModelContext, hasPro: Bool) -> ImportResult {
-        guard let reception = try? receive(data, in: context, canAddNew: canAddNew(in: context, hasPro: hasPro)) else { return .invalid }
+    static func importReport(_ data: Data, into context: ModelContext, patientLimit: Int?) -> ImportResult {
+        guard let reception = try? receive(data, in: context, canAddNew: canAddNew(in: context, patientLimit: patientLimit)) else { return .invalid }
         switch reception {
         case .added(let patient), .updated(let patient):
             // Saved right away: the report may have opened the app, which can be closed just after.
@@ -86,8 +87,8 @@ final class TrackedPatient {
         }
     }
 
-    /// Whether one more patient can be followed: always with Rebond Pro, up to the limit without.
-    static func canAddNew(in context: ModelContext, hasPro: Bool) -> Bool {
-        hasPro || countedPatients(in: context) < ProStore.freePatientLimit
+    /// Whether one more patient can be followed within the plan's limit (nil: unlimited).
+    static func canAddNew(in context: ModelContext, patientLimit: Int?) -> Bool {
+        patientLimit.map { countedPatients(in: context) < $0 } ?? true
     }
 }

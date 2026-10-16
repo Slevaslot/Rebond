@@ -4,7 +4,7 @@ import UniformTypeIdentifiers
 
 /// The Kiné tab: the physiotherapist's workspace, laid out like the Accueil page (Health-style cards).
 /// The week at a glance, prescribing a program by QR code, and the patients followed from the reports they send.
-/// Free for up to `ProStore.freePatientLimit` patients; Rebond Pro follows as many as needed. Everything stays on this iPhone.
+/// Free for up to `ProPlan.freePatientLimit` patients; the Rebond Pro plans follow more, priced by volume. Everything stays on this iPhone.
 struct ProHomeView: View {
     @Environment(AppRouter.self) private var router
     @Environment(ProStore.self) private var store
@@ -128,15 +128,14 @@ struct ProHomeView: View {
                     Button {
                         showingPaywall = true
                     } label: {
-                        Text(store.hasPro ? "Rebond Pro · patients illimités"
-                                          : "\(min(patients.count { !$0.isDemo }, ProStore.freePatientLimit)) / \(ProStore.freePatientLimit) patients gratuits")
+                        PlanUsage(followed: patients.count { !$0.isDemo })
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity)
                             .padding(.top, 8)
                     }
                     .buttonStyle(.plain)
-                    .disabled(store.hasPro)
+                    .disabled(store.isUnlimited)
                 }
             }
             .listStyle(.insetGrouped)
@@ -158,11 +157,11 @@ struct ProHomeView: View {
             .sheet(item: $prescribing) { item in
                 PrescribeFlow(program: item.program, startsWithTemplates: true)
             }
-            .sheet(isPresented: $showingPaywall) { ProPaywall() }
+            .sheet(isPresented: $showingPaywall) { ProPaywall(followed: patients.count { !$0.isDemo }) }
             .sheet(isPresented: $showingSettings) { ProSettingsView() }
             .fileImporter(isPresented: $importing, allowedContentTypes: [.rebondReport, .json]) { result in
                 guard case .success(let url) = result else { return }
-                switch TrackedPatient.importReport(at: url, into: context, hasPro: store.hasPro) {
+                switch TrackedPatient.importReport(at: url, into: context, patientLimit: store.patientLimit) {
                 case .imported(let id): path = [id]
                 case .limitReached: showingPaywall = true
                 case .invalid: importError = true

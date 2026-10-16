@@ -57,20 +57,20 @@ struct PhysioSpaceTests {
     @Test @MainActor func freeOfferStopsAtTheLimit() throws {
         let container = try ModelContainer(for: TrackedPatient.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
         let context = container.mainContext
-        for _ in 0..<ProStore.freePatientLimit {
+        for _ in 0..<ProPlan.freePatientLimit {
             let data = try transfer([session(daysAgo: 1, pain: 2)]).encoded()
-            guard case .imported = TrackedPatient.importReport(data, into: context, hasPro: false) else {
+            guard case .imported = TrackedPatient.importReport(data, into: context, patientLimit: ProPlan.freePatientLimit) else {
                 Issue.record("A patient within the free offer should be imported")
                 return
             }
         }
         let extra = try transfer([session(daysAgo: 1, pain: 2)]).encoded()
-        #expect(TrackedPatient.importReport(extra, into: context, hasPro: false) == .limitReached)
-        #expect(TrackedPatient.importReport(Data("{}".utf8), into: context, hasPro: true) == .invalid)
-        if case .imported = TrackedPatient.importReport(extra, into: context, hasPro: true) {} else {
-            Issue.record("Rebond Pro follows unlimited patients")
+        #expect(TrackedPatient.importReport(extra, into: context, patientLimit: ProPlan.freePatientLimit) == .limitReached)
+        #expect(TrackedPatient.importReport(Data("{}".utf8), into: context, patientLimit: nil) == .invalid)
+        if case .imported = TrackedPatient.importReport(extra, into: context, patientLimit: nil) {} else {
+            Issue.record("Rebond Cabinet follows unlimited patients")
         }
-        #expect(try context.fetchCount(FetchDescriptor<TrackedPatient>()) == ProStore.freePatientLimit + 1)
+        #expect(try context.fetchCount(FetchDescriptor<TrackedPatient>()) == ProPlan.freePatientLimit + 1)
     }
 
     @Test @MainActor func demoPatientsAreLoadedOnce() throws {

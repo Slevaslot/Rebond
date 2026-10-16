@@ -47,7 +47,7 @@ Prévoir des données de démo (un programme et quelques séances pré-remplies)
 | Semaine du rapport | Les 7 derniers jours, dates exactes affichées. |
 | Seuil de douleur élevée | 7, paramétrable, à valider avec un kiné. |
 | Langues | Français (source) et anglais. |
-| Modèle économique | Le patient ne paie jamais. Kiné : offre gratuite (tout en local, 3 patients suivis) et Rebond Pro (patients illimités, tout en local). Voir `BUSINESS.md`. |
+| Modèle économique | Le patient ne paie jamais. Kiné : offre gratuite (3 patients) puis prix selon le volume : Rebond Pro 10, Rebond Pro 30, Rebond Cabinet (illimité), mensuel ou annuel, 1 mois offert. Tout en local. Voir `BUSINESS.md` et `ProPlan`. |
 | Serveur | Aucun. La version connectée de démo (`Server/`, `DemoServer`) a été supprimée : les bilans et les programmes passent seulement par le fichier `.rebond` et le QR code. |
 | Espace kiné | Un onglet « Kiné » de plus (pas une app à part) : le kiné garde l'accès à l'app patient. Activé dans Réglages ou en ouvrant un bilan, il reste activé d'un lancement à l'autre et l'app s'ouvre dessus. Patients de démo pour la présentation. |
 | Premier lancement | Un seul écran : une phrase, l'avertissement médical, « Je suis patient » / « Je suis kiné » (le kiné arrive sur son espace). Pas de tutoriel : la séance guide le patient à la voix. |
@@ -113,7 +113,7 @@ Tout ce qui concerne l'interface (structure, séance, scan, autorisations, Liqui
 - Privacy manifest (`PrivacyInfo.xcprivacy`) à jour, y compris les API à justification (`UserDefaults`, dates de fichiers…) si elles sont utilisées.
 - Étiquettes de confidentialité App Store Connect : « Aucune donnée collectée ».
 - URL de politique de confidentialité (obligatoire), même courte : à publier, puis mettre à jour `AppLinks.privacyPolicy`.
-- Produits `rebond.pro.monthly` et `rebond.pro.yearly` à créer dans App Store Connect (groupe « Rebond Pro »). Le fichier `Rebond.storekit` permet de tester l'achat depuis Xcode.
+- Groupe d'abonnements « Rebond Pro » à créer dans App Store Connect avec 6 produits (`ProPlan.allProductIDs`) : `rebond.pro10.monthly` / `.yearly` (niveau 3), `rebond.pro30.monthly` / `.yearly` (niveau 2), `rebond.cabinet.monthly` / `.yearly` (niveau 1), prix de `BUSINESS.md`, offre d'introduction 1 mois gratuit. Accord « Apps payantes » signé pour l'équipe MWM. Le fichier `Rebond.storekit` reprend tout cela pour tester l'achat depuis Xcode.
 - Avertissement dans l'app : Rebond ne remplace pas l'avis d'un professionnel de santé.
 - Icône réalisée avec Icon Composer.
 - Une seule équipe de signature propriétaire de l'identifiant d'app.
