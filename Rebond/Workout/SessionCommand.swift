@@ -144,3 +144,17 @@ nonisolated extension SessionCommand {
         }
     }
 }
+
+nonisolated extension SessionCommand {
+    /// The command of each hand sign.
+    init(_ gesture: HandGesture) {
+        switch gesture {
+        case .openPalm: self = .togglePause
+        case .thumbsUp: self = .nextSet
+        case .twoFingers: self = .nextExercise
+        case .crossedArms: self = .endSession
+        case .spread: self = .expandModel
+        case .pinch: self = .shrinkModel
+        }
+    }
+}

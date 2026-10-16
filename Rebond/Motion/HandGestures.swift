@@ -11,8 +11,12 @@ nonisolated enum HandGesture: Sendable {
     case spread
     /// Thumb and index apart, then coming together: put the model back in its card.
     case pinch
-    /// Fist with the thumb up, held a moment: next set.
+    /// Fist with the thumb up, held a moment: next set (or go on, or confirm).
     case thumbsUp
+    /// Index and middle finger up in a "V", held a moment: next exercise.
+    case twoFingers
+    /// Both forearms crossed in front of the chest, held a moment: end the session (asked again first).
+    case crossedArms
 }
 
 /// Recognizes `HandGesture`s with Vision's hand pose.

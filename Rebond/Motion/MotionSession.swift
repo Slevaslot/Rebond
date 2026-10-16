@@ -234,6 +234,8 @@ final class MotionSession {
             // While paused, the detector reports any sign as the resume: a thumbs up never skips the set then.
             guard !isPaused else { return }
             onNext?()
+        case .twoFingers, .crossedArms:
+            SessionRemote.shared.send(SessionCommand(gesture), from: .gesture)
         }
     }
 
